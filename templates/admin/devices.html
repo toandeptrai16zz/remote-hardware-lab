@@ -1,0 +1,1483 @@
+{% extends "layout.html" %}
+{% block title %}Quản lý Thiết bị{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+<style>
+  :root {
+    /* Color palette */
+    --primary-gradient: linear-gradient(135deg, #667eea, #764ba2);
+    --danger-gradient: linear-gradient(135deg, #ff6b6b, #ee5a52);
+    --success-gradient: linear-gradient(135deg, #28a745, #20c997);
+    --warning-gradient: linear-gradient(135deg, #ffc107, #fd7e14);
+    --surface-dark: #2a2a2e;
+    --surface-darker: #1e1e22;
+    --surface-overlay: rgba(255, 255, 255, 0.05);
+    --surface-overlay-hover: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(255, 255, 255, 0.1);
+    --border-accent: rgba(255, 255, 255, 0.2);
+    --border-strong: rgba(255, 255, 255, 0.3);
+    --text-primary: #fff;
+    --text-secondary: rgba(255, 255, 255, 0.8);
+    --text-muted: rgba(255, 255, 255, 0.7);
+    --text-subtle: rgba(255, 255, 255, 0.6);
+    
+    /* Design tokens */
+    --border-radius-xl: 20px;
+    --border-radius-lg: 16px;
+    --border-radius-md: 12px;
+    --border-radius-sm: 10px;
+    --border-radius-xs: 6px;
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 0.75rem;
+    --spacing-lg: 1rem;
+    --spacing-xl: 1.5rem;
+    --spacing-2xl: 2rem;
+    --spacing-3xl: 3rem;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --transition-base: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-base: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 8px 15px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 20px 25px rgba(0, 0, 0, 0.2);
+    --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.5);
+    --blur-sm: blur(5px);
+    --blur-md: blur(10px);
+    --backdrop-dark: rgba(0, 0, 0, 0.7);
+  }
+
+  /* Layout components */
+  .device-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: var(--spacing-2xl) var(--spacing-lg);
+  }
+
+  .device-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-2xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .device-header h2 {
+    margin: 0;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+
+  .device-header .header-icon {
+    color: #667eea;
+    font-size: 1.5rem;
+  }
+
+  /* Card styling */
+  .card-soft {
+    background: var(--surface-dark);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-base);
+    transition: var(--transition-base);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-soft::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--primary-gradient);
+  }
+
+  .card-soft:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--border-accent);
+  }
+
+  .card-content {
+    padding: var(--spacing-2xl);
+  }
+
+  .card-title {
+    margin-bottom: var(--spacing-xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  /* Form styling */
+  .form-label {
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+  }
+
+  .form-label .required-indicator {
+    color: #ff6b6b;
+    font-size: 0.875rem;
+  }
+
+  .form-control-dark,
+  .form-select {
+    background-color: var(--surface-overlay);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    min-height: 48px;
+    font-size: 0.9375rem;
+    transition: var(--transition-fast);
+    position: relative;
+  }
+
+  .form-control-dark:focus,
+  .form-select:focus {
+    background-color: var(--surface-overlay-hover);
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    color: var(--text-primary);
+    outline: none;
+  }
+
+  .form-control-dark::placeholder {
+    color: var(--text-muted);
+    opacity: 0.8;
+  }
+
+  .form-group {
+    margin-bottom: var(--spacing-xl);
+    position: relative;
+  }
+
+  .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Button styling */
+  .btn-primary-custom {
+    background: var(--primary-gradient);
+    border: none;
+    padding: var(--spacing-md) var(--spacing-2xl);
+    border-radius: var(--border-radius-sm);
+    font-weight: var(--font-weight-semibold);
+    color: white;
+    font-size: 1rem;
+    transition: var(--transition-base);
+    position: relative;
+    overflow: hidden;
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .btn-primary-custom::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent
+    );
+    transition: var(--transition-base);
+  }
+
+  .btn-primary-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    color: white;
+  }
+
+  .btn-primary-custom:hover::before {
+    left: 100%;
+  }
+
+  .btn-primary-custom:active {
+    transform: translateY(0);
+  }
+
+  .btn-primary-custom:disabled {
+    opacity: 0.6;
+    transform: none;
+    cursor: not-allowed;
+  }
+
+  .btn-danger-custom {
+    background: var(--danger-gradient);
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border-radius: var(--border-radius-sm);
+    font-weight: var(--font-weight-semibold);
+    color: white;
+    transition: var(--transition-base);
+    box-shadow: 0 4px 15px rgba(238, 90, 82, 0.2);
+    font-size: 0.875rem;
+  }
+
+  .btn-danger-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(238, 90, 82, 0.4);
+    color: white;
+  }
+
+  .btn-secondary-custom {
+    background: var(--surface-overlay);
+    border: 1px solid var(--border-accent);
+    padding: var(--spacing-md) var(--spacing-2xl);
+    border-radius: var(--border-radius-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-secondary);
+    transition: var(--transition-base);
+  }
+
+  .btn-secondary-custom:hover {
+    background: var(--surface-overlay-hover);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+  }
+
+  /* Table styling */
+  .table-container {
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    background: var(--surface-dark);
+  }
+
+  .device-row {
+    transition: var(--transition-fast);
+    background: transparent !important;
+  }
+
+  .device-row:hover {
+    background: var(--surface-overlay) !important;
+  }
+
+  .badge {
+    transition: var(--transition-fast);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-semibold);
+    border-radius: var(--border-radius-xs);
+  }
+
+  .badge-success {
+    background: var(--success-gradient);
+    color: white;
+  }
+
+  .badge-warning {
+    background: var(--warning-gradient);
+    color: white;
+  }
+
+  /* DataTables customization */
+  .dataTables_wrapper {
+    color: var(--text-primary);
+  }
+
+  .dataTables_wrapper .form-control,
+  .dataTables_wrapper .form-select {
+    background-color: var(--surface-overlay);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-radius: var(--border-radius-sm);
+  }
+
+  .dataTables_wrapper .form-control:focus,
+  .dataTables_wrapper .form-select:focus {
+    background-color: var(--surface-overlay-hover);
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    color: var(--text-primary);
+  }
+
+  .dataTables_wrapper .page-link {
+    background-color: transparent !important;
+    border: 1px solid var(--border-accent) !important;
+    color: var(--text-primary) !important;
+    border-radius: var(--border-radius-xs) !important;
+    margin: 0 var(--spacing-xs) !important;
+    padding: var(--spacing-sm) var(--spacing-md) !important;
+    transition: var(--transition-fast) !important;
+  }
+
+  .dataTables_wrapper .page-link:hover {
+    background-color: var(--surface-overlay) !important;
+    border-color: var(--border-strong) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .dataTables_wrapper .page-item.active .page-link {
+    background: var(--primary-gradient) !important;
+    border-color: #764ba2 !important;
+    color: white !important;
+  }
+
+  .dataTables_wrapper .page-item.disabled .page-link {
+    color: var(--text-subtle) !important;
+    opacity: 0.5 !important;
+  }
+
+  .dataTables_wrapper .dataTables_info,
+  .dataTables_wrapper .dataTables_length label,
+  .dataTables_wrapper .dataTables_filter label {
+    color: var(--text-secondary) !important;
+  }
+
+  /* Modal styling */
+  .modal-content-custom {
+    background: linear-gradient(135deg, var(--surface-dark) 0%, var(--surface-darker) 100%);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--border-radius-xl);
+    box-shadow: var(--shadow-xl);
+    backdrop-filter: var(--blur-md);
+  }
+
+  .modal-header-custom {
+    border-bottom: 1px solid var(--border-subtle);
+    padding: var(--spacing-2xl);
+    border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
+  }
+
+  .modal-body-custom {
+    padding: var(--spacing-2xl);
+    color: var(--text-secondary);
+  }
+
+  .modal-footer-custom {
+    border-top: 1px solid var(--border-subtle);
+    padding: var(--spacing-xl) var(--spacing-2xl);
+    border-radius: 0 0 var(--border-radius-xl) var(--border-radius-xl);
+  }
+
+  .modal-icon {
+    width: 64px;
+    height: 64px;
+    background: var(--danger-gradient);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto var(--spacing-xl);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(238, 90, 82, 0.4); }
+    70% { box-shadow: 0 0 0 20px rgba(238, 90, 82, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(238, 90, 82, 0); }
+  }
+
+  .device-name-highlight {
+    color: #667eea;
+    font-weight: var(--font-weight-bold);
+    font-size: 1.1em;
+  }
+
+  .modal-backdrop-custom {
+    background: var(--backdrop-dark);
+    backdrop-filter: var(--blur-sm);
+  }
+
+  /* Loading states */
+  .loading {
+    position: relative;
+    pointer-events: none;
+  }
+
+  .loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(42, 42, 46, 0.8);
+    backdrop-filter: blur(2px);
+    border-radius: var(--border-radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: none;
+  }
+
+  .loading .spinner {
+    display: inline-block;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Status indicators */
+  .status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .status-dot.available {
+    background: #28a745;
+    animation: pulse-green 2s infinite;
+  }
+
+  .status-dot.in-use {
+    background: #ffc107;
+    animation: pulse-yellow 2s infinite;
+  }
+
+  @keyframes pulse-green {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  @keyframes pulse-yellow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  /* Form validation */
+  .form-control-error {
+    border-color: #ff6b6b !important;
+    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1) !important;
+  }
+
+  .form-control-success {
+    border-color: #28a745 !important;
+    box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1) !important;
+  }
+
+  .error-message {
+    color: #ff6b6b;
+    font-size: 0.875rem;
+    margin-top: var(--spacing-xs);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+  }
+
+  .success-message {
+    color: #28a745;
+    font-size: 0.875rem;
+    margin-top: var(--spacing-xs);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+  }
+
+  /* Responsive design */
+  @media (max-width: 992px) {
+    .device-container {
+      padding: var(--spacing-xl) var(--spacing-sm);
+    }
+
+    .device-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--spacing-lg);
+    }
+
+    .card-content {
+      padding: var(--spacing-xl);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .device-header h2 {
+      font-size: 1.5rem;
+    }
+
+    .card-content {
+      padding: var(--spacing-lg);
+    }
+
+    .modal-header-custom,
+    .modal-body-custom {
+      padding: var(--spacing-xl);
+    }
+
+    .modal-footer-custom {
+      padding: var(--spacing-lg) var(--spacing-xl);
+    }
+
+    .form-control-dark,
+    .btn-primary-custom {
+      font-size: 16px; /* Prevent zoom on iOS */
+    }
+  }
+
+  @media (max-width: 576px) {
+    .btn-secondary-custom,
+    .btn-danger-custom {
+      font-size: 0.8125rem;
+      padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    .modal-footer-custom {
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+
+    .modal-footer-custom .btn {
+      width: 100%;
+    }
+  }
+
+  /* Accessibility improvements */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  .focus-trap:focus {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+  }
+
+  /* Toast container positioning */
+  .toast-container {
+    z-index: 1100;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Toast notification container -->
+<div class="toast-container position-fixed top-0 end-0 p-3" role="region" aria-label="Notifications" aria-live="polite"></div>
+
+<!-- Delete confirmation modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content modal-content-custom">
+      <header class="modal-header modal-header-custom border-0">
+        <h5 class="modal-title text-white fw-bold" id="deleteConfirmModalLabel">
+          <i class="fa-solid fa-triangle-exclamation text-warning me-2" aria-hidden="true"></i>
+          Xác nhận xóa thiết bị
+        </h5>
+      </header>
+      
+      <div class="modal-body modal-body-custom text-center">
+        <div class="modal-icon" aria-hidden="true">
+          <i class="fa-solid fa-trash fs-2 text-white"></i>
+        </div>
+        
+        <h6 class="text-white mb-3">Bạn có chắc chắn muốn xóa thiết bị?</h6>
+        
+        <p class="mb-2">
+          <span class="device-name-highlight" id="deviceNameToDelete" aria-live="polite"></span>
+        </p>
+        
+        <p class="text-warning mb-0">
+          <i class="fa-solid fa-exclamation-triangle me-1" aria-hidden="true"></i>
+          Hành động này không thể hoàn tác!
+        </p>
+      </div>
+      
+      <footer class="modal-footer modal-footer-custom justify-content-center">
+        <button type="button" class="btn btn-secondary-custom me-3" data-bs-dismiss="modal">
+          <i class="fa-solid fa-xmark me-2" aria-hidden="true"></i>
+          Hủy bỏ
+        </button>
+        <button type="button" class="btn btn-danger-custom" id="confirmDeleteBtn">
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="btn-text">
+            <i class="fa-solid fa-trash me-2" aria-hidden="true"></i>
+            Xóa thiết bị
+          </span>
+        </button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<div class="device-container">
+    <header class="device-header">
+        <h2>
+            <i class="fa-solid fa-microchip header-icon" aria-hidden="true"></i>
+            Quản lý Thiết bị
+        </h2>
+    </header>
+
+    {% include 'admin/_nav.html' %}
+
+    <div class="row g-4">
+        <!-- Add device form -->
+        <div class="col-lg-4">
+            <section class="card card-soft" aria-labelledby="add-device-title">
+                <div class="card-content">
+                    <h4 class="card-title" id="add-device-title">
+                        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                        Thêm Thiết bị Mới
+                    </h4>
+                    
+                    <form id="addDeviceForm" novalidate>
+                        <div class="form-group">
+                            <label for="tagName" class="form-label">
+                                <i class="fa-solid fa-tag" aria-hidden="true"></i>
+                                Tên định danh (Tag Name)
+                                <span class="required-indicator" aria-label="Required">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="form-control form-control-dark focus-trap" 
+                                id="tagName" 
+                                name="tag_name" 
+                                required 
+                                placeholder="e.g., ESP32-LAB-01"
+                                aria-describedby="tagNameHelp"
+                                maxlength="50"
+                                autocomplete="off"
+                            >
+                            <div id="tagNameHelp" class="form-text text-muted">
+                                Tên duy nhất để nhận diện thiết bị
+                            </div>
+                            <div id="tagNameError" class="error-message" style="display: none;" role="alert"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="deviceType" class="form-label">
+                                <i class="fa-solid fa-microchip" aria-hidden="true"></i>
+                                Loại thiết bị
+                                <span class="required-indicator" aria-label="Required">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="form-control form-control-dark focus-trap" 
+                                id="deviceType" 
+                                name="type" 
+                                required 
+                                placeholder="e.g., ESP32"
+                                aria-describedby="deviceTypeHelp"
+                                maxlength="30"
+                                autocomplete="off"
+                            >
+                            <div id="deviceTypeHelp" class="form-text text-muted">
+                                Loại hoặc model của thiết bị
+                            </div>
+                            <div id="deviceTypeError" class="error-message" style="display: none;" role="alert"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="port" class="form-label">
+                                <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                                Cổng (Port)
+                                <span class="required-indicator" aria-label="Required">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                class="form-control form-control-dark focus-trap" 
+                                id="port" 
+                                name="port" 
+                                required 
+                                placeholder="e.g., /dev/ttyUSB0"
+                                aria-describedby="portHelp"
+                                maxlength="50"
+                                autocomplete="off"
+                            >
+                            <div id="portHelp" class="form-text text-muted">
+                                Cổng kết nối của thiết bị
+                            </div>
+                            <div id="portError" class="error-message" style="display: none;" role="alert"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn-primary-custom w-100" id="addDeviceBtn">
+                                <span class="spinner" aria-hidden="true"></span>
+                                <span class="btn-text">
+                                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                                    Thêm Thiết bị
+                                </span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </div>
+
+        <!-- Devices table -->
+        <div class="col-lg-8">
+            <section class="card card-soft" aria-labelledby="devices-list-title">
+                <div class="card-content">
+                    <h4 class="card-title" id="devices-list-title">
+                        <i class="fa-solid fa-list" aria-hidden="true"></i>
+                        Danh sách Thiết bị
+                        <span id="deviceCount" class="badge badge-success ms-2" aria-live="polite">0</span>
+                    </h4>
+                    
+                    <div class="table-responsive table-container">
+                        <table 
+                            class="table table-dark table-hover" 
+                            id="devicesTable" 
+                            style="width:100%"
+                            role="table"
+                            aria-label="Devices list"
+                        >
+                            <thead>
+                                <tr>
+                                    <th scope="col">Tag Name</th>
+                                    <th scope="col">Loại</th>
+                                    <th scope="col">Cổng</th>
+                                    <th scope="col">Trạng thái</th>
+                                    <th scope="col">Sử dụng bởi</th>
+                                    <th scope="col" class="text-center">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="devicesTableBody">
+                                <!-- Dynamic content will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script>
+(function() {
+    'use strict';
+
+    // Configuration
+    const CONFIG = {
+        API_ENDPOINTS: {
+            DEVICES: '/admin/api/devices'
+        },
+        POLLING: {
+            INTERVAL: 30000, // 30 seconds
+            MAX_RETRIES: 3
+        },
+        VALIDATION: {
+            TAG_NAME: {
+                MIN_LENGTH: 3,
+                MAX_LENGTH: 50,
+                PATTERN: /^[a-zA-Z0-9\-_]+$/
+            },
+            DEVICE_TYPE: {
+                MIN_LENGTH: 2,
+                MAX_LENGTH: 30,
+                PATTERN: /^[a-zA-Z0-9\s\-_]+$/
+            },
+            PORT: {
+                MIN_LENGTH: 3,
+                MAX_LENGTH: 50,
+                PATTERN: /^[\/\w\-_.]+$/
+            }
+        },
+        NOTIFICATION: {
+            DURATION: 5000
+        },
+        DATATABLE: {
+            PAGE_LENGTH: 10,
+            LANGUAGE_URL: "{{ url_for('static', filename='vi.json') }}"
+        }
+    };
+
+    // DOM element cache
+    const elements = {
+        form: document.getElementById('addDeviceForm'),
+        tagName: document.getElementById('tagName'),
+        deviceType: document.getElementById('deviceType'),
+        port: document.getElementById('port'),
+        addDeviceBtn: document.getElementById('addDeviceBtn'),
+        devicesTable: document.getElementById('devicesTable'),
+        devicesTableBody: document.getElementById('devicesTableBody'),
+        deviceCount: document.getElementById('deviceCount'),
+        deleteModal: document.getElementById('deleteConfirmModal'),
+        confirmDeleteBtn: document.getElementById('confirmDeleteBtn'),
+        deviceNameElement: document.getElementById('deviceNameToDelete'),
+        toastContainer: document.querySelector('.toast-container'),
+        tagNameError: document.getElementById('tagNameError'),
+        deviceTypeError: document.getElementById('deviceTypeError'),
+        portError: document.getElementById('portError')
+    };
+
+    // Application state
+    const state = {
+        dataTable: null,
+        deleteModal: null,
+        deviceToDelete: null,
+        isSubmitting: false,
+        isDeleting: false,
+        pollingTimer: null,
+        retryCount: 0,
+        lastUpdateTime: null,
+        validation: {
+            tagName: false,
+            deviceType: false,
+            port: false
+        }
+    };
+
+    /**
+     * Escape HTML to prevent XSS attacks
+     */
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    /**
+     * Display toast notification
+     */
+    function showNotification(message, type = 'success') {
+        if (!elements.toastContainer) {
+            console.warn('Toast container not found, falling back to alert');
+            alert(message);
+            return;
+        }
+
+        const alertType = type === 'error' ? 'danger' : 
+                         type === 'info' ? 'primary' : 
+                         'success';
+        
+        const iconClass = type === 'error' ? 'fa-circle-exclamation' : 
+                         type === 'info' ? 'fa-info-circle' :
+                         'fa-circle-check';
+        
+        const toastId = `toast-${Date.now()}`;
+        
+        const toastHTML = `
+            <div id="${toastId}" class="toast show align-items-center text-bg-${alertType} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <i class="fa-solid ${iconClass} me-2" aria-hidden="true"></i>
+                        ${escapeHtml(message)}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+        `;
+        
+        elements.toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+        
+        const toastElement = document.getElementById(toastId);
+        const bsToast = new bootstrap.Toast(toastElement, { 
+            delay: CONFIG.NOTIFICATION.DURATION 
+        });
+        
+        bsToast.show();
+        
+        // Clean up after toast is hidden
+        toastElement.addEventListener('hidden.bs.toast', () => {
+            toastElement.remove();
+        });
+    }
+
+    /**
+     * Validate individual form field
+     */
+    function validateField(fieldName, value) {
+        const validation = CONFIG.VALIDATION[fieldName.toUpperCase()];
+        if (!validation) return { isValid: false, message: 'Unknown field' };
+
+        const trimmedValue = value.trim();
+
+        if (!trimmedValue) {
+            return { isValid: false, message: 'Trường này là bắt buộc' };
+        }
+
+        if (trimmedValue.length < validation.MIN_LENGTH) {
+            return { isValid: false, message: `Ít nhất ${validation.MIN_LENGTH} ký tự` };
+        }
+
+        if (trimmedValue.length > validation.MAX_LENGTH) {
+            return { isValid: false, message: `Tối đa ${validation.MAX_LENGTH} ký tự` };
+        }
+
+        if (!validation.PATTERN.test(trimmedValue)) {
+            return { isValid: false, message: 'Định dạng không hợp lệ' };
+        }
+
+        return { isValid: true, message: '' };
+    }
+
+    /**
+     * Update field validation UI
+     */
+    function updateFieldValidation(fieldElement, errorElement, fieldName) {
+        const validation = validateField(fieldName, fieldElement.value);
+        
+        // Update field styling
+        fieldElement.classList.toggle('form-control-error', !validation.isValid);
+        fieldElement.classList.toggle('form-control-success', validation.isValid);
+
+        // Update error message
+        if (errorElement) {
+            if (validation.isValid) {
+                errorElement.style.display = 'none';
+                errorElement.textContent = '';
+            } else if (fieldElement.value.trim()) { // Only show error if user has typed something
+                errorElement.style.display = 'flex';
+                errorElement.innerHTML = `<i class="fa-solid fa-exclamation-triangle" aria-hidden="true"></i> ${escapeHtml(validation.message)}`;
+            }
+        }
+
+        // Update validation state
+        state.validation[fieldName] = validation.isValid;
+        
+        // Update submit button
+        updateSubmitButton();
+        
+        return validation.isValid;
+    }
+
+    /**
+     * Update submit button state
+     */
+    function updateSubmitButton() {
+        const isFormValid = Object.values(state.validation).every(valid => valid);
+        elements.addDeviceBtn.disabled = !isFormValid || state.isSubmitting;
+    }
+
+    /**
+     * Set form loading state
+     */
+    function setFormLoading(isLoading) {
+        state.isSubmitting = isLoading;
+        
+        elements.addDeviceBtn.classList.toggle('loading', isLoading);
+        elements.addDeviceBtn.disabled = isLoading;
+        
+        // Disable form inputs
+        const inputs = elements.form.querySelectorAll('input, button');
+        inputs.forEach(input => {
+            input.disabled = isLoading;
+        });
+    }
+
+    /**
+     * Initialize DataTable
+     */
+    function initializeDataTable() {
+        if (state.dataTable) {
+            state.dataTable.destroy();
+        }
+
+        state.dataTable = new DataTable(elements.devicesTable, {
+            language: { 
+                url: CONFIG.DATATABLE.LANGUAGE_URL
+            },
+            pageLength: CONFIG.DATATABLE.PAGE_LENGTH,
+            searching: true,
+            ordering: true,
+            responsive: true,
+            autoWidth: false,
+            columns: [
+                { 
+                    data: 'tag_name',
+                    render: function(data, type, row) {
+                        return `<strong>${escapeHtml(data)}</strong>`;
+                    }
+                },
+                { 
+                    data: 'type',
+                    render: function(data, type, row) {
+                        return escapeHtml(data);
+                    }
+                },
+                { 
+                    data: 'port',
+                    render: function(data, type, row) {
+                        return `<code>${escapeHtml(data)}</code>`;
+                    }
+                },
+                { 
+                    data: 'status',
+                    render: function(data, type, row) {
+                        const isAvailable = data === 'available';
+                        const badgeClass = isAvailable ? 'badge-success' : 'badge-warning';
+                        const statusText = isAvailable ? 'Sẵn sàng' : 'Đang sử dụng';
+                        const dotClass = isAvailable ? 'available' : 'in-use';
+                        
+                        return `
+                            <span class="status-indicator">
+                                <span class="status-dot ${dotClass}" aria-hidden="true"></span>
+                                <span class="badge ${badgeClass}">${statusText}</span>
+                            </span>
+                        `;
+                    }
+                },
+                { 
+                    data: 'in_use_by',
+                    render: function(data, type, row) {
+                        return data ? `<em>${escapeHtml(data)}</em>` : '<span class="text-muted">N/A</span>';
+                    }
+                },
+                { 
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data, type, row) {
+                        return `
+                            <button class="btn btn-sm btn-danger-custom btn-delete" 
+                                    data-id="${row.id}" 
+                                    data-name="${escapeHtml(row.tag_name)}"
+                                    aria-label="Xóa thiết bị ${escapeHtml(row.tag_name)}">
+                                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                <span class="d-none d-md-inline ms-1">Xóa</span>
+                            </button>
+                        `;
+                    }
+                }
+            ],
+            createdRow: function(row, data, dataIndex) {
+                row.classList.add('device-row');
+            },
+            drawCallback: function(settings) {
+                // Update device count
+                const info = this.api().page.info();
+                elements.deviceCount.textContent = info.recordsTotal;
+            }
+        });
+    }
+
+    /**
+     * Fetch devices from API
+     */
+    async function fetchDevices(showLoading = false) {
+        try {
+            if (showLoading && elements.devicesTable) {
+                elements.devicesTable.classList.add('loading');
+            }
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+            const response = await fetch(CONFIG.API_ENDPOINTS.DEVICES, {
+                signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache'
+                }
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const devices = await response.json();
+
+            if (!Array.isArray(devices)) {
+                throw new Error('Invalid response format: expected array');
+            }
+
+            // Update DataTable
+            if (state.dataTable) {
+                state.dataTable.clear().rows.add(devices).draw(false);
+            }
+
+            // Reset retry count on successful fetch
+            state.retryCount = 0;
+            state.lastUpdateTime = new Date();
+
+            return devices;
+
+        } catch (error) {
+            console.error('Failed to fetch devices:', error);
+            
+            state.retryCount++;
+            
+            if (state.retryCount <= CONFIG.POLLING.MAX_RETRIES) {
+                console.log(`Retrying... (${state.retryCount}/${CONFIG.POLLING.MAX_RETRIES})`);
+                setTimeout(() => fetchDevices(false), 2000 * state.retryCount);
+            } else {
+                showNotification('Không thể tải danh sách thiết bị. Vui lòng refresh trang.', 'error');
+            }
+            
+            return [];
+            
+        } finally {
+            if (showLoading && elements.devicesTable) {
+                elements.devicesTable.classList.remove('loading');
+            }
+        }
+    }
+
+    /**
+     * Handle add device form submission
+     */
+    async function handleAddDevice(event) {
+        event.preventDefault();
+        
+        if (state.isSubmitting) return;
+
+        // Final validation
+        const isTagNameValid = updateFieldValidation(elements.tagName, elements.tagNameError, 'tagName');
+        const isDeviceTypeValid = updateFieldValidation(elements.deviceType, elements.deviceTypeError, 'deviceType');
+        const isPortValid = updateFieldValidation(elements.port, elements.portError, 'port');
+
+        if (!isTagNameValid || !isDeviceTypeValid || !isPortValid) {
+            showNotification('Vui lòng kiểm tra và sửa các lỗi trong form', 'error');
+            return;
+        }
+
+        setFormLoading(true);
+
+        try {
+            const formData = {
+                tag_name: elements.tagName.value.trim(),
+                type: elements.deviceType.value.trim(),
+                port: elements.port.value.trim()
+            };
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+            const response = await fetch(CONFIG.API_ENDPOINTS.DEVICES, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(formData),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                showNotification(result.message || 'Thiết bị đã được thêm thành công!', 'success');
+                
+                // Reset form
+                resetForm();
+                
+                // Refresh devices list
+                await fetchDevices(false);
+                
+            } else {
+                throw new Error(result.error || 'Lỗi không xác định');
+            }
+
+        } catch (error) {
+            console.error('Add device failed:', error);
+            
+            let errorMessage = 'Đã xảy ra lỗi khi thêm thiết bị';
+            
+            if (error.name === 'AbortError') {
+                errorMessage = 'Yêu cầu bị timeout. Vui lòng thử lại.';
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            showNotification(`Lỗi: ${errorMessage}`, 'error');
+            
+        } finally {
+            setFormLoading(false);
+        }
+    }
+
+    /**
+     * Reset form to initial state
+     */
+    function resetForm() {
+        elements.form.reset();
+        
+        // Clear validation states
+        state.validation = {
+            tagName: false,
+            deviceType: false,
+            port: false
+        };
+        
+        // Clear validation UI
+        const fields = [
+            { element: elements.tagName, error: elements.tagNameError },
+            { element: elements.deviceType, error: elements.deviceTypeError },
+            { element: elements.port, error: elements.portError }
+        ];
+        
+        fields.forEach(({ element, error }) => {
+            element.classList.remove('form-control-error', 'form-control-success');
+            if (error) {
+                error.style.display = 'none';
+                error.textContent = '';
+            }
+        });
+        
+        updateSubmitButton();
+    }
+
+    /**
+     * Show delete confirmation modal
+     */
+    function showDeleteConfirmation(deviceId, tagName) {
+        if (!state.deleteModal) return;
+        
+        state.deviceToDelete = { id: deviceId, name: tagName };
+        elements.deviceNameElement.textContent = tagName;
+        state.deleteModal.show();
+    }
+
+    /**
+     * Handle device deletion
+     */
+    async function handleDeleteDevice() {
+        if (!state.deviceToDelete || state.isDeleting) return;
+        
+        state.isDeleting = true;
+        elements.confirmDeleteBtn.classList.add('loading');
+        elements.confirmDeleteBtn.disabled = true;
+        
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+            const response = await fetch(`${CONFIG.API_ENDPOINTS.DEVICES}/${state.deviceToDelete.id}`, {
+                method: 'DELETE',
+                signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            clearTimeout(timeoutId);
+
+            const result = await response.json();
+
+            if (result.success) {
+                showNotification(result.message || 'Thiết bị đã được xóa thành công!', 'success');
+                
+                // Refresh devices list
+                await fetchDevices(false);
+                
+                // Hide modal
+                state.deleteModal.hide();
+                
+            } else {
+                throw new Error(result.error || 'Lỗi không xác định');
+            }
+
+        } catch (error) {
+            console.error('Delete device failed:', error);
+            
+            let errorMessage = 'Đã xảy ra lỗi khi xóa thiết bị';
+            
+            if (error.name === 'AbortError') {
+                errorMessage = 'Yêu cầu bị timeout. Vui lòng thử lại.';
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            showNotification(`Lỗi: ${errorMessage}`, 'error');
+            
+        } finally {
+            state.isDeleting = false;
+            elements.confirmDeleteBtn.classList.remove('loading');
+            elements.confirmDeleteBtn.disabled = false;
+        }
+    }
+
+    /**
+     * Start automatic polling for device updates
+     */
+    function startPolling() {
+        if (state.pollingTimer) {
+            clearInterval(state.pollingTimer);
+        }
+
+        state.pollingTimer = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                fetchDevices(false);
+            }
+        }, CONFIG.POLLING.INTERVAL);
+    }
+
+    /**
+     * Setup event listeners
+     */
+    function setupEventListeners() {
+        // Form submission
+        elements.form.addEventListener('submit', handleAddDevice);
+
+        // Form validation
+        elements.tagName.addEventListener('input', () => {
+            updateFieldValidation(elements.tagName, elements.tagNameError, 'tagName');
+        });
+
+        elements.deviceType.addEventListener('input', () => {
+            updateFieldValidation(elements.deviceType, elements.deviceTypeError, 'deviceType');
+        });
+
+        elements.port.addEventListener('input', () => {
+            updateFieldValidation(elements.port, elements.portError, 'port');
+        });
+
+        // Delete button clicks (event delegation)
+        elements.devicesTableBody.addEventListener('click', (event) => {
+            const deleteButton = event.target.closest('.btn-delete');
+            if (deleteButton) {
+                const deviceId = deleteButton.dataset.id;
+                const deviceName = deleteButton.dataset.name;
+                showDeleteConfirmation(deviceId, deviceName);
+            }
+        });
+
+        // Modal events
+        elements.confirmDeleteBtn.addEventListener('click', handleDeleteDevice);
+
+        elements.deleteModal.addEventListener('hidden.bs.modal', () => {
+            state.deviceToDelete = null;
+        });
+
+        // Visibility change handling
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && state.lastUpdateTime) {
+                const timeSinceLastUpdate = Date.now() - state.lastUpdateTime.getTime();
+                if (timeSinceLastUpdate > CONFIG.POLLING.INTERVAL) {
+                    fetchDevices(false);
+                }
+            }
+        });
+
+        // Page unload handling
+        window.addEventListener('beforeunload', (event) => {
+            if (state.isSubmitting || state.isDeleting) {
+                event.preventDefault();
+                event.returnValue = 'Có thao tác đang thực hiện. Bạn có chắc muốn rời khỏi trang?';
+                return event.returnValue;
+            }
+        });
+    }
+
+    /**
+     * Initialize application
+     */
+    async function initialize() {
+        try {
+            // Check required elements
+            const requiredElements = ['form', 'tagName', 'deviceType', 'port', 'addDeviceBtn', 
+                                    'devicesTable', 'devicesTableBody', 'confirmDeleteBtn'];
+            
+            const missingElements = requiredElements.filter(key => !elements[key]);
+            
+            if (missingElements.length > 0) {
+                console.error('Missing required elements:', missingElements);
+                showNotification('Lỗi khởi tạo trang. Vui lòng refresh.', 'error');
+                return;
+            }
+
+            // Initialize Bootstrap modal
+            state.deleteModal = new bootstrap.Modal(elements.deleteModal, {
+                backdrop: 'static',
+                keyboard: true
+            });
+
+            // Initialize DataTable
+            initializeDataTable();
+
+            // Setup event listeners
+            setupEventListeners();
+
+            // Load initial data
+            await fetchDevices(true);
+
+            // Start polling
+            startPolling();
+
+            // Focus on first input
+            elements.tagName.focus();
+
+            console.log('Device management page initialized successfully');
+
+        } catch (error) {
+            console.error('Failed to initialize device management page:', error);
+            showNotification('Lỗi khởi tạo trang. Vui lòng refresh và thử lại.', 'error');
+        }
+    }
+
+    /**
+     * Cleanup function
+     */
+    function cleanup() {
+        if (state.pollingTimer) {
+            clearInterval(state.pollingTimer);
+        }
+        
+        if (state.dataTable) {
+            state.dataTable.destroy();
+        }
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', cleanup);
+
+    // Expose public API for debugging (only in development)
+    if (window.location.hostname === 'localhost' || window.location.hostname.includes('dev')) {
+        window.DeviceManagement = {
+            state,
+            fetchDevices,
+            resetForm,
+            validateField,
+            CONFIG
+        };
+    }
+
+})();
+</script>
+{% endblock %}
