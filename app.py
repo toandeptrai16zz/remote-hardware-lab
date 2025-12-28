@@ -1,5 +1,6 @@
 # ================== IMPORTS ==================
 import os
+import docker
 import secrets
 import time
 import requests
@@ -23,7 +24,8 @@ from functools import wraps
 from collections import defaultdict
 from werkzeug.utils import secure_filename
 import string
-import serial 
+import serial
+import sys
 import shlex
 import serial.tools.list_ports 
 from collections import defaultdict
@@ -255,8 +257,7 @@ def docker_status(cname):
     except Exception:
         return ""
 
-# Xu ly Queue
-# ▼▼▼ TÌM VÀ THAY THẾ HÀM NÀY TRONG app.py ▼▼▼
+# --- KET THUC HAM ---
 def _perform_upload_worker(username, sid, sketch_path, board_fqbn, port):
     """
     Hàm xử lý nạp code với chế độ Streaming Log (Real-time).
@@ -348,86 +349,164 @@ def _perform_upload_worker(username, sid, sketch_path, board_fqbn, port):
     
     finally:
         app.logger.info(f"Lock released for {port}.")
-# ▲▲▲ KẾT THÚC ĐOẠN CODE CẦN THAY THẾ ▲▲▲
+# --- KET THUC HAM ^^ ---
 # SỬA FUNCTION ensure_user_container
 #Cap nhat ham ensure_user de khong can set up cac board khi cac user duoc tao 
 def ensure_user_container(username):
-    cname = f"{username}-dev"
+    # 1. Chuẩn hóa tên User & Cấu hình
+    safe_username = make_safe_name(username)
+    cname = f"{safe_username}-dev"
     image = "my-dev-env:v2"
+    
+    # 2. Database logic: Lấy hoặc tạo Port mới
     db = get_db_connection()
     cur = db.cursor(dictionary=True)
     cur.execute("SELECT ssh_port FROM users WHERE username=%s", (username,))
     user_data = cur.fetchone()
     ssh_port = user_data.get("ssh_port") if user_data else None
-    status = docker_status(cname)
     
-    # Logic sửa lỗi:
-    # 1. Nếu đang chạy -> không làm gì
-    # 2. Nếu tồn tại nhưng đã dừng -> khởi động lại
-    # 3. Nếu chưa tồn tại -> tạo mới
-    if status == 'running':
-        app.logger.info(f"Container '{cname}' is already running.")
-    elif status:  # Tồn tại nhưng không chạy (ví dụ: 'exited', 'stopped')
-        app.logger.info(f"Container '{cname}' found but is stopped. Starting it...")
-        try:
-            subprocess.run(["docker", "start", cname], check=True, timeout=15)
-            app.logger.info(f"Successfully started container '{cname}'.")
-        except Exception as e:
-            app.logger.error(f"Failed to start container '{cname}'. It might be corrupted. Recreating...: {e}")
-            # Nếu không thể start, xóa đi và tạo lại để tránh bị kẹt
-            subprocess.run(["docker", "rm", "-f", cname], check=False, timeout=10)
-            # Chạy lại chính hàm này để thực hiện logic tạo mới
-            return ensure_user_container(username)
-    else:  # Container chưa tồn tại
-        app.logger.info(f"Container '{cname}' not found. Creating a new instance.")
-        if not ssh_port:
-            ssh_port = find_free_port()
-            if not ssh_port:
-                cur.close(), db.close()
-                raise Exception("No free port available for SSH.")
-            cur.execute("UPDATE users SET ssh_port=%s WHERE username=%s", (ssh_port, username))
-            db.commit()
-
-        host_user_dir = f"/home/toan/QUAN_LY_USER/{username}"
-        os.makedirs(host_user_dir, exist_ok=True)
-
-        serial_devices = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
-        device_flags = []
-        for device in serial_devices:
-            if os.path.exists(device):
-                device_flags.extend(['--device', f'{device}:{device}'])
-
-        docker_command = [
-            "docker", "run", "-d", 
-            "--name", cname, 
-            "--restart", "always",
-            "--privileged",
-            "-p", f"{ssh_port}:22", 
-            "-e", f"USERNAME={username}", 
-            "-e", "PASSWORD=password123",
-            "-v", f"{host_user_dir}:/home/{username}",
-            "-v", "/dev:/dev",
-            "--group-add", "dialout"
-        ] + device_flags + [image]
-        
-        subprocess.run(docker_command, check=True, timeout=30)
-        app.logger.info(f"Started new container '{cname}'")
-        
-        # Sau khi tạo container, chạy script setuộp user trong container
-        time.sleep(3) # Đợi một chút để container khởi đng hoàn toàn
-        try:
-            setup_cmd = ["docker", "exec", cname, "setup-user-arduino.sh", username]
-            subprocess.run(setup_cmd, check=True, timeout=20)
-            app.logger.info(f"Ran initial setup script for user {username}")
-        except Exception as e:
-            app.logger.error(f"Could not run setup script for {username}: {e}")
-            
+    if not ssh_port:
+        ssh_port = find_free_port()
+        cur.execute("UPDATE users SET ssh_port=%s WHERE username=%s", (ssh_port, username))
+        db.commit()
     cur.close()
     db.close()
-    return ssh_port
-# ▲▲▲ KẾT THÚC ĐOẠN CODE CẦN THAY THẾ ▲▲▲
 
-# THÊM FUNCTION MỚI (thêm sau function ensure_user_container)
+    # 3. Chuẩn bị thư mục trên Host
+    host_user_dir = f"/home/toan/QUAN_LY_USER/{safe_username}"
+    os.makedirs(host_user_dir, exist_ok=True)
+    os.chmod(host_user_dir, 0o777)
+
+    # ==================================================================
+    # [FINAL SCRIPT] COMMIT 3th by CHUONG
+    # ==================================================================
+    setup_script_path = os.path.join(host_user_dir, "setup_container.sh")
+    
+    script_content = f"""#!/bin/bash
+USER="{safe_username}"
+
+# --- A. CÀI SERIAL & PIP (CHẠY NGẦM KHÔNG CHẶN SSH) ---
+(
+    echo "[$(date)] Kiem tra va cai dat thu vien..." > /var/log/setup_pyserial.log
+    # Kiểm tra xem đã có serial chưa, nếu chưa thì cài
+    if ! python3 -c "import serial" &>/dev/null; then
+        # Cố gắng dùng APT trước cho nhanh
+        apt-get update -y &>/dev/null
+        apt-get install -y python3-serial python3-pip &>/dev/null
+        # Dùng PIP dự phòng
+        pip3 install pyserial esptool --break-system-packages &>/dev/null || pip3 install pyserial esptool &>/dev/null
+    fi
+    echo "[$(date)] Da cai xong hoac da co thu vien." >> /var/log/setup_pyserial.log
+) &
+
+# --- B. TẠO USER & PASS ---
+if ! id "$USER" &>/dev/null; then
+    echo "Creating user $USER..."
+    useradd -m -s /bin/bash "$USER"
+    echo "$USER:password123" | chpasswd
+    usermod -aG dialout "$USER" || true
+    usermod -aG sudo "$USER" || true
+fi
+
+# --- C. FIX LỖI SFTP (GARBAGE PACKET) ---
+# Ghi đè file cấu hình sạch sẽ
+cat > /home/"$USER"/.bashrc << 'EOF_BASHRC'
+# .bashrc for EPU Workspace
+# Nếu không phải Terminal (ví dụ SFTP), thoát ngay để tránh rác
+case $- in
+    *i*) ;;
+      *) return;;
+esac
+
+export PATH="/usr/local/bin:$PATH"
+alias ll='ls -alF'
+alias cls='clear'
+
+# Hiện Welcome khi mở Terminal
+clear
+if [ -f ~/WELCOME.txt ]; then
+    cat ~/WELCOME.txt
+fi
+EOF_BASHRC
+
+# --- D. TẠO WELCOME ---
+cat > /home/"$USER"/WELCOME.txt << EOF
+================================================================
+HE THONG THUC HANH IOT - EPU TECH
+================================================================
+[+] USER: $USER
+[+] TRANG THAI: SAN SANG (Connected)
+[+] MANG: Keep-Alive Enabled (Chong rot mang)
+
+[!] Neu nap code loi 'No module named serial', 
+    vui long doi 1 phut hoac go: pip3 install pyserial
+================================================================
+EOF
+chown -R "$USER:$USER" /home/"$USER"
+
+# --- E. CẤU HÌNH SSH CHỐNG DISCONNECT ---
+mkdir -p /run/sshd
+# Thêm cấu hình giữ kết nối cho mạng yếu/Ngrok
+echo "ClientAliveInterval 30" >> /etc/ssh/sshd_config
+echo "ClientAliveCountMax 100" >> /etc/ssh/sshd_config
+echo "TCPKeepAlive yes" >> /etc/ssh/sshd_config
+
+# --- F. KHỞI ĐỘNG SSH ---
+echo "Starting SSH Daemon..."
+exec /usr/sbin/sshd -D
+"""
+    # Ghi file script ra ổ cứng
+    with open(setup_script_path, "w", encoding="utf-8") as f:
+        f.write(script_content)
+    os.chmod(setup_script_path, 0o777)
+
+    # ==================================================================
+    # KHỞI ĐỘNG CONTAINER
+    # ==================================================================
+    status = docker_status(cname)
+    if status == 'running':
+        subprocess.run(["docker", "exec", cname, "service", "ssh", "start"], check=False)
+        return ssh_port
+    
+    # Nếu container lỗi hoặc đã tắt, xóa đi tạo lại để nhận script mới
+    if status:
+        subprocess.run(["docker", "rm", "-f", cname], check=False)
+
+    app.logger.info(f"Starting container {cname} with final script...")
+    
+    docker_command = [
+        "docker", "run", "-d", 
+        "--name", cname, 
+        "--restart", "unless-stopped",
+        "--privileged",  
+        "-p", f"{ssh_port}:22", 
+        "-e", f"USERNAME={safe_username}", 
+        "-v", f"{host_user_dir}:/home/{safe_username}",
+        "-v", f"{setup_script_path}:/startup.sh",
+        "-v", "/home/toan/flask-kerberos-demo/esp32_core:/root/.arduino15",
+        "-v", "/dev:/dev",
+        "--group-add", "dialout", 
+        "--entrypoint", "/bin/bash",
+        image,
+        "/startup.sh"
+    ]
+    
+    try:
+        subprocess.run(docker_command, check=True, timeout=30)
+        # Đợi 3s cho script kịp khởi động SSH
+        time.sleep(3)
+        
+        # Dọn dẹp file script sau khi chạy xong
+        if os.path.exists(setup_script_path):
+             os.remove(setup_script_path)
+             
+    except Exception as e:
+        app.logger.error(f"Error starting container: {e}")
+
+    return ssh_port
+# --- KET THUC HAM ^^ ---
+
+# THÊM FUNCITON MOI
 
 def setup_container_permissions(cname, username):
     """Setup quyền truy cập serial devices trong container"""
@@ -444,9 +523,7 @@ def setup_container_permissions(cname, username):
     except Exception as e:
         app.logger.error(f"Failed to setup permissions for {cname}: {e}")
 
-# Fix logic khong user khong thay cong @@
-
-# ▼▼▼ TÌM VÀ THAY THẾ TOÀN BỘ HÀM NÀY TRONG app.py ▼▼▼
+# --- KET THUC HAM ---
 @app.route('/user/<username>/serial-ports', methods=['GET'])
 @require_auth('user')
 def get_serial_ports_api(username):
@@ -457,10 +534,11 @@ def get_serial_ports_api(username):
     cname = f"{safe_username}-dev"
 
     try:
-        # BƯỚC 1: CẤP QUYỀN
+        # BƯỚC 1: CẤP QUYỀN (Để chắc chắn Docker đọc được USB)
         subprocess.run(["docker", "exec", "--user", "root", cname, "sh", "-c", "chmod 666 /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || true"], check=False, timeout=5)
 
-        # BƯỚC 2: QUÉT BẰNG ARDUINO-CLI
+        # BƯỚC 2: QUÉT CƠ BẢN BẰNG ARDUINO-CLI
+        # (Lấy danh sách cổng trước, chưa cần tin tên thiết bị vội)
         scan_cmd = ["docker", "exec", cname, "arduino-cli", "board", "list", "--format", "json"]
         scan_result = subprocess.run(scan_cmd, capture_output=True, text=True, timeout=10)
         
@@ -469,50 +547,61 @@ def get_serial_ports_api(username):
         if scan_result.returncode == 0:
             try:
                 data = json.loads(scan_result.stdout)
-                
-                # --- XỬ LÝ CẤU TRÚC JSON LINH HOẠT ---
-                # 1. Xác định danh sách items (List)
+                # Xử lý cấu trúc JSON linh hoạt
                 items_list = []
-                if isinstance(data, list):
-                    items_list = data
-                elif isinstance(data, dict) and "detected_ports" in data:
-                    items_list = data["detected_ports"] # <--- FIX CHO TRƯỜNG HỢP CỦA BẠN
-                elif isinstance(data, dict):
-                    # Trường hợp dict lạ, log ra xem (như bạn đã thấy) nhưng không crash
-                    app.logger.info(f"Arduino CLI returned other Dict: {data.keys()}")
+                if isinstance(data, list): items_list = data
+                elif isinstance(data, dict) and "detected_ports" in data: items_list = data["detected_ports"]
 
-                # 2. Duyệt qua từng item
                 for item in items_list:
-                    # Item có thể là object port trực tiếp HOẶC bọc trong key 'port'
-                    # Log của bạn: {'port': {'address': ...}} -> cần lấy value của key 'port'
+                    # Lấy thông tin cổng cơ bản
                     port_info = item.get('port', item)
-
-                    # Kiểm tra kỹ phải là dict và đúng giao thức serial
                     if isinstance(port_info, dict) and port_info.get("protocol") == "serial":
                         port_address = port_info.get("address")
                         
-                        # Lấy danh sách board (Matching boards)
+                        # --- [SMART SCAN] BẮT ĐẦU THUẬT TOÁN ĐỌC CHIP ID ---
+                        # Mặc định lấy tên từ Arduino CLI
                         boards = []
-                        # Thông tin board thường nằm cùng cấp với 'port' hoặc bên trong (tùy version CLI)
-                        # Thử lấy 'boards' từ item gốc hoặc port_info
-                        boards_data = item.get("boards", port_info.get("boards", []))
+                        is_smart_detected = False
                         
-                        if isinstance(boards_data, list):
-                            for b in boards_data:
-                                if isinstance(b, dict):
+                        # Chỉ chạy Smart Scan với các cổng USB (tránh ttyS0...)
+                        if "USB" in port_address:
+                            try:
+                                # Chạy esptool để hỏi Chip ID (Timeout 2s để không bị treo)
+                                # Lưu ý: Container cần có esptool (đã cài qua pip pyserial/esptool hoặc có sẵn trong core)
+                                # Ta thử gọi python3 -m esptool vì nó ổn định hơn gọi thẳng lệnh
+                                chip_cmd = ["docker", "exec", cname, "python3", "-m", "esptool", "--port", port_address, "chip_id"]
+                                chip_res = subprocess.run(chip_cmd, capture_output=True, text=True, timeout=3)
+                                output = chip_res.stdout
+
+                                if "ESP32" in output:
+                                    # PHÁT HIỆN ESP32 (Gán cứng là ESP32-CAM AI Thinker cho bác)
+                                    boards = [{"name": "AI Thinker ESP32-CAM (Auto-Detected)", "fqbn": "esp32:esp32:esp32cam"}]
+                                    is_smart_detected = True
+                                elif "ESP8266" in output:
+                                    # PHÁT HIỆN ESP8266
+                                    boards = [{"name": "NodeMCU ESP8266 (Auto-Detected)", "fqbn": "esp8266:esp8266:nodemcuv2"}]
+                                    is_smart_detected = True
+                                
+                            except Exception:
+                                # Nếu Smart Scan lỗi (do cổng bận hoặc không phải ESP), bỏ qua
+                                pass
+
+                        # Nếu Smart Scan không ra gì, dùng lại logic cũ của Arduino CLI
+                        if not is_smart_detected:
+                            boards_data = item.get("boards", port_info.get("boards", []))
+                            if isinstance(boards_data, list) and boards_data:
+                                for b in boards_data:
                                     boards.append({"name": b.get("name", "Unknown"), "fqbn": b.get("fqbn", "")})
-                        
-                        # Fallback board
-                        if not boards:
-                            # Nếu là ttyUSB -> Khả năng cao là ESP hoặc Arduino clone
-                            if "USB" in port_address:
-                                boards = [
-                                    {"name": "Generic ESP8266 (NodeMCU)", "fqbn": "esp8266:esp8266:nodemcuv2"},
-                                    {"name": "Generic ESP32", "fqbn": "esp32:esp32:esp32"},
-                                    {"name": "Arduino Uno (Generic)", "fqbn": "arduino:avr:uno"}
-                                ]
                             else:
-                                boards = [{"name": "Serial Device", "fqbn": ""}]
+                                # Fallback nếu CLI không nhận ra (Generic CH340)
+                                if "USB" in port_address:
+                                    boards = [
+                                        {"name": "Generic ESP8266 (NodeMCU)", "fqbn": "esp8266:esp8266:nodemcuv2"},
+                                        {"name": "Generic ESP32 Dev Module", "fqbn": "esp32:esp32:esp32"},
+                                        {"name": "Arduino Uno", "fqbn": "arduino:avr:uno"}
+                                    ]
+                                else:
+                                    boards = [{"name": "Serial Device", "fqbn": ""}]
 
                         container_ports.append({
                             "port": {"address": port_address, "label": port_address, "protocol": "serial"},
@@ -524,8 +613,7 @@ def get_serial_ports_api(username):
             except Exception as e:
                 app.logger.error(f"Error parsing port logic: {e}")
 
-        # BƯỚC 3: FALLBACK (DÙNG LS NẾU ARDUINO-CLI KHÔNG RA GÌ)
-        # Lưu ý: Nếu bước 2 đã tìm thấy cổng, thì không cần chạy bước 3 để tránh trùng lặp
+        # BƯỚC 3: FALLBACK (DÙNG LS NẾU ARDUINO-CLI TRẢ VỀ RỖNG)
         if not container_ports:
             fallback_cmd = ["docker", "exec", cname, "sh", "-c", "ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null"]
             fallback_res = subprocess.run(fallback_cmd, capture_output=True, text=True, timeout=5)
@@ -533,24 +621,26 @@ def get_serial_ports_api(username):
                 for line in fallback_res.stdout.strip().split('\n'):
                     line = line.strip()
                     if line:
+                        # Mặc định fallback cũng ưu tiên ESP32-CAM cho bác đỡ phải chọn
                         container_ports.append({
                             "port": {"address": line, "label": line, "protocol": "serial"},
                             "matching_boards": [
-                                {"name": "Generic Device (Detected via LS)", "fqbn": "esp8266:esp8266:nodemcuv2"}
+                                {"name": "AI Thinker ESP32-CAM (Default)", "fqbn": "esp32:esp32:esp32cam"},
+                                {"name": "Generic ESP8266", "fqbn": "esp8266:esp8266:nodemcuv2"}
                             ]
                         })
 
-        log_action(username, f"Get serial ports: Found {len(container_ports)} ports")
+        log_action(username, f"Smart Scan: Found {len(container_ports)} ports")
         return jsonify(success=True, ports=container_ports, message=f"Tìm thấy {len(container_ports)} cổng.")
 
     except Exception as e:
         app.logger.error(f"Serial ports API error for {safe_username}: {e}")
         return jsonify(success=False, error=str(e)), 500
-# ▲▲▲ KẾT THÚC ĐOẠN CODE CẦN THAY THẾ ▲▲▲
+# --- KET THUC HAM ^^ ---
 # Ket thuc ham
     
 platform_cache = {}
-# ▲▲▲ KẾT THÚC ĐOẠN CODE CẦN THAY THẾ ▲▲▲
+# ---SET UP MOI TRUONG THU VIEN CHO USERS ---
 def setup_arduino_cli_for_user(cname, username):
     """Sets up arduino-cli with necessary board URLs and cores."""
     app.logger.info(f"Setting up Arduino CLI for container '{cname}'...")
@@ -632,87 +722,53 @@ def check_platform_installed(cname, platform_id):
         platform_cache[cache_key] = (time.time(), True)
         return True
 
+# HAM DIEU PHOI TOAN BO MOI TRUONG CHO USER
 def ensure_user_container_and_setup(username):
-    """Ensures container exists and runs one-time setup if needed."""
-    
-    # --- 1. QUAN TRỌNG NHẤT: Lọc tên user trước ---
-    # Biến "a b" thành "a_b"
     safe_username = make_safe_name(username) 
-    
-    # --- 2. Tạo tên container từ safe_username ---
     cname = f"{safe_username}-dev"
     
-    # First, ensure container is up and running. This is idempotent.
-    # LƯU Ý: Hàm ensure_user_container bên dưới CŨNG PHẢI dùng safe_username
-    # để đặt tên cho Docker (--name). Nếu hàm đó vẫn dùng username gốc thì vẫn lỗi.
-    ssh_port = ensure_user_container(safe_username) 
+    # 1. Đảm bảo Container ĐANG CHẠY (Gọi hàm con)
+    ssh_port = ensure_user_container(username) 
 
-    # Các đoạn dưới này dùng cname (đã an toàn) là OK rồi
+    # 2. Kiểm tra/Cài đặt nền tảng Arduino
     if not check_platform_installed(cname, "esp8266:esp8266"):
-        app.logger.info(f"ESP8266 platform not found for {safe_username}. Triggering environment setup.")
         try:
-            # Truyền cname đã an toàn vào đây
             setup_arduino_cli_for_user(cname, safe_username)
         except Exception as e:
-            app.logger.error(f"Initial Arduino setup for {safe_username} failed: {e}")
-            flash("Could not complete initial Arduino environment setup. Compilation may fail.", "warning")
-    else:
-        app.logger.info(f"Arduino environment for {safe_username} appears to be correctly configured.")
+            app.logger.error(f"Setup Arduino failed: {e}")
+    
     return ssh_port
 
-# ▼▼▼ THAY THẾ TOÀN BỘ HÀM NÀY MỘT LẦN CUỐI ▼▼▼
+# KET THUC HAM
+def get_ssh_client(username_raw):
+    # 1. Lấy Port bằng tên GỐC (ví dụ: "sinh vien")
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("SELECT ssh_port FROM users WHERE username=%s", (username_raw,))
+    user_data = cur.fetchone()
+    cur.close()
+    db.close()
 
-def get_ssh_client(username):
-    import docker
-    import paramiko
+    ssh_port = user_data.get("ssh_port") if user_data else None
     
-    # 1. Khởi tạo docker client để fix lỗi "not defined"
-    try:
-        docker_client = docker.from_env() # <--- QUAN TRỌNG NHẤT
-    except Exception as e:
-        raise Exception(f"Không thể kết nối tới Docker Service: {e}")
+    if not ssh_port:
+        app.logger.error(f"DB search failed for port with username: '{username_raw}'")
+        raise Exception("Không tìm thấy thông tin Port trong Database")
 
-    # 2. Xử lý tên user
-    safe_username = make_safe_name(username) 
-
-    # 3. Lấy Port
-    try:
-        container = docker_client.containers.get(f"{safe_username}-dev")
-        if container.status != 'running':
-            raise Exception("Container is not running")
-
-        ports = container.attrs['NetworkSettings']['Ports']
-        ssh_port = int(ports['22/tcp'][0]['HostPort'])
-    except Exception as e:
-        app.logger.error(f"Lỗi lấy thông tin Container của {safe_username}: {e}")
-        raise Exception("Môi trường chưa sẵn sàng (Container not found or stopped)")
-
-    max_retries = 10
-    retry_delay = 1
-
-    for attempt in range(max_retries):
+    # 2. Kết nối SSH dùng SAFE name (ví dụ: "sinh_vien")
+    safe_username = make_safe_name(username_raw)
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    for i in range(5):
         try:
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            
-            client.connect(
-                '127.0.0.1',
-                port=ssh_port,
-                username=safe_username,
-                password='password123',
-                timeout=5
-            )
+            # client = paramiko.SSHClient()
+            # client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect('127.0.0.1', port=int(ssh_port), username=safe_username, password='password123', timeout=5) 
             return client
-
-        except Exception as e:
-            if attempt == max_retries - 1:
-                app.logger.error(f"SSH Connect Failed for {safe_username}: {e}")
-                raise e
-            socketio.sleep(retry_delay)
-            
-    raise Exception(f"Failed to establish SSH connection for {safe_username}")
-
-# ▲▲▲ KẾT THÚC PHẦN THAY THẾ ▲▲▲
+        except Exception:
+            time.sleep(1)
+    raise Exception(f"KHONG THE KET NOI SSH TOI PORT {ssh_port} SAU 5 GIAY")
+# KET THUC HAM
 
 
 # ================== AUTHENTICATION ROUTES ==================
@@ -732,23 +788,51 @@ def login_page():
 
 @app.route("/api/login", methods=["POST"])
 def login_api():
-    ip_address = request.remote_addr
+    # --- DEBUG LOG (Để soi lỗi) ---
+    print(f"--- LOGIN REQUEST ---", file=sys.stderr)
+    print(f"Content-Type: {request.content_type}", file=sys.stderr)
     
-    # === SỬA ĐỔI TẠI ĐÂY: Thêm .lower() ===
-    username = request.form.get("username", "").strip().lower()
-    
-    password = request.form.get("password", "").strip()
-    captcha = request.form.get("captcha", "").strip()
-    captcha_token = request.form.get("captcha_token", "")
-    csrf_token = request.form.get("csrf_token", "")
+    # 1. Xác định nguồn dữ liệu (JSON hay Form)
+    data = {}
+    if request.is_json:
+        print("Data Source: JSON", file=sys.stderr)
+        data = request.get_json()
+    else:
+        print("Data Source: FORM", file=sys.stderr)
+        data = request.form
 
-    if not all([username, password, captcha, captcha_token, csrf_token]):
-        return jsonify({'success': False, 'message': 'Vui lòng điền đầy đủ thông tin'}), 400
+    # 2. Lấy dữ liệu (An toàn)
+    username = data.get("username", "").strip().lower()
+    password = data.get("password", "").strip()
+    captcha = data.get("captcha", "").strip()
+    captcha_token = data.get("captcha_token", "")
+    csrf_token = data.get("csrf_token", "")
+    
+    ip_address = request.remote_addr
+
+    # --- DEBUG DỮ LIỆU THIẾU ---
+    missing = []
+    if not username: missing.append("username")
+    if not password: missing.append("password")
+    if not captcha: missing.append("captcha")
+    if not captcha_token: missing.append("captcha_token")
+    if not csrf_token: missing.append("csrf_token")
+    
+    if missing:
+        print(f"❌ MISSING FIELDS: {missing}", file=sys.stderr)
+        # Trả về lỗi chi tiết để Frontend biết thiếu gì (tạm thời)
+        return jsonify({'success': False, 'message': f'Thiếu thông tin: {", ".join(missing)}'}), 400
+
+    # 3. Validate Token (Logic cũ)
     if not validate_csrf_token(csrf_token):
+        print("❌ Invalid CSRF Token", file=sys.stderr)
         return jsonify({'success': False, 'message': 'Token bảo mật không hợp lệ'}), 400
+        
     if not validate_captcha(captcha, captcha_token):
+        print(f"❌ Invalid Captcha. Input: {captcha}", file=sys.stderr)
         return jsonify({'success': False, 'message': 'Mã xác thực không đúng'}), 400
 
+    # 4. Xử lý Database (Giữ nguyên logic cũ)
     db = get_db_connection()
     cur = db.cursor(dictionary=True)
     cur.execute("SELECT * FROM users WHERE username=%s", (username,))
@@ -801,6 +885,72 @@ def verify_otp():
             return jsonify({'success': True, 'redirect': url_for('admin_dashboard' if user['role'] == 'admin' else 'user_redirect')})
     return jsonify({'success': False, 'error': 'Mã OTP không đúng'}), 400
 
+# Cap nhat ham resend OTP
+@app.route("/api/resend-otp", methods=["POST"])
+def resend_otp_api():
+    """API gửi lại mã OTP cho cả Đăng ký và Đăng nhập"""
+    
+    # TRƯỜNG HỢP 1: ĐANG ĐĂNG KÝ (Dữ liệu nằm trong Session)
+    if 'registration_data' in session:
+        try:
+            reg_data = session['registration_data']
+            new_otp = generate_otp()
+            
+            # Cập nhật OTP mới vào session
+            reg_data['otp'] = new_otp
+            reg_data['expires_at'] = time.time() + SECURITY_CONFIG['OTP_EXPIRY']
+            session['registration_data'] = reg_data # Lưu lại thay đổi
+            
+            if send_otp_email(reg_data['email'], new_otp, reg_data['username']):
+                return jsonify({'success': True, 'message': 'Đã gửi lại mã OTP vào email đăng ký.'})
+            else:
+                return jsonify({'success': False, 'message': 'Lỗi hệ thống gửi email.'}), 500
+        except Exception as e:
+            app.logger.error(f"Resend Register OTP Error: {e}")
+            return jsonify({'success': False, 'message': 'Lỗi không xác định.'}), 500
+
+    # TRƯỜNG HỢP 2: ĐANG ĐĂNG NHẬP (Dữ liệu nằm trong bộ nhớ RAM otp_storage)
+    # Lấy username từ request hoặc tìm theo IP người dùng
+    data = request.get_json(silent=True) or {}
+    username = data.get("username")
+    
+    # Nếu frontend không gửi username, thử mò lại trong otp_storage theo IP (fallback)
+    if not username:
+        username = next((u for u, d in otp_storage.items() if d.get('ip') == request.remote_addr), None)
+
+    if username:
+        try:
+            # Lấy email từ Database vì otp_storage không lưu email
+            db = get_db_connection()
+            cur = db.cursor(dictionary=True)
+            cur.execute("SELECT email FROM users WHERE username=%s", (username,))
+            user = cur.fetchone()
+            cur.close()
+            db.close()
+            
+            if user and user['email']:
+                new_otp = generate_otp()
+                # Cập nhật OTP mới vào bộ nhớ
+                otp_storage[username] = {
+                    'otp': new_otp, 
+                    'expires_at': time.time() + SECURITY_CONFIG['OTP_EXPIRY'],
+                    'ip': request.remote_addr
+                }
+                
+                if send_otp_email(user['email'], new_otp, username):
+                    log_action(username, "Resend Login OTP")
+                    return jsonify({'success': True, 'message': 'Đã gửi lại mã OTP đăng nhập.'})
+                else:
+                    return jsonify({'success': False, 'message': 'Lỗi gửi email.'}), 500
+            else:
+                return jsonify({'success': False, 'message': 'Không tìm thấy email liên kết hoặc user không tồn tại.'}), 400
+        except Exception as e:
+            app.logger.error(f"Resend Login OTP Error: {e}")
+            return jsonify({'success': False, 'message': 'Lỗi Database.'}), 500
+            
+    return jsonify({'success': False, 'message': 'Không tìm thấy phiên xác thực. Vui lòng thực hiện lại từ đầu.'}), 400
+
+# Ket Thuc Ham ^^^^^^^^^^^^
 @app.route("/logout")
 def logout():
     log_action(session.get("username", "unknown"), "Logout: Success")
@@ -888,70 +1038,90 @@ def user_workspace(username):
         flash(f"Lỗi khởi tạo môi trường làm việc: {e}", "error")
     return render_template("user.html", username=username)
 
+# --- CẤU HÌNH DANH SÁCH FILE CẦN ẨN TUYỆT ĐỐI ---
+HIDDEN_SYSTEM_FILES = {
+    "setup_container.sh",
+    "startup.sh",
+    ".bashrc",
+    ".profile",
+    ".bash_logout",
+    ".local",
+    ".cache",
+    ".config",
+    ".wget-hsts",
+    ".sudo_as_admin_successful"
+}
+
 @app.route('/user/<username>/files', methods=['POST'])
 @require_auth('user')
 def list_files_api(username):
-    # 1. QUAN TRỌNG: Lọc tên user để khớp với Container (mai yeu -> mai_yeu)
+    # 1. Chuẩn hóa tên user
     safe_username = make_safe_name(username)
     
-    # 2. Check quyền: User chỉ được xem file của chính mình
+    # 2. Check quyền
     if session['username'] != username: 
         return jsonify(error="Unauthorized"), 403
     
     path = request.json.get("path", ".")
     
-    # 3. Validate đường dẫn để chống hack (Directory Traversal)
+    # 3. Validate đường dẫn
     if '..' in path or path.startswith('/'): 
         return jsonify(error="Invalid path"), 400
     
     try:
-        # 4. Kết nối SSH dùng tên AN TOÀN (safe_username)
-        # Lưu ý: Container tên là a_b-dev" nên phải dùng safe_username mới tìm thấy
-        client = get_ssh_client(safe_username)
+        # 4. Kết nối SFTP
+        client = get_ssh_client(username)
         sftp = client.open_sftp()
         
-        # 5. Xác định đường dẫn home
-        # Mặc định linux home sẽ là /home/a_b
+        # 5. Xác định đường dẫn
         base_path = os.path.join("/home", safe_username, path)
         
         files = []
         try:
-            # Lấy danh sách file
             dir_items = sftp.listdir_attr(base_path)
         except FileNotFoundError:
-            # Nếu thư mục chưa có, trả về rỗng hoặc lỗi nhẹ thay vì lỗi 500
-            app.logger.warning(f"Directory not found: {base_path}")
             return jsonify(error="Directory not found"), 404
             
         for attr in dir_items:
-            if not attr.filename.startswith('.'): # Ẩn file hệ thống (.)
-                files.append({
-                    'name': attr.filename, 
-                    'is_dir': stat.S_ISDIR(attr.st_mode), 
-                    'size': attr.st_size, 
-                    'modified': attr.st_mtime
-                })
+            filename = attr.filename
+            
+            # LOGIC CHẶN FILE HỆ THỐNG
+            
+            # 1. Chặn file ẩn của Linux (bắt đầu bằng dấu chấm)
+            if filename.startswith('.'):
+                continue
+                
+            # 2. Chặn các file nằm trong Danh sách đen (setup_container.sh...)
+            if filename in HIDDEN_SYSTEM_FILES:
+                continue
+
+            files.append({
+                'name': filename, 
+                'is_dir': stat.S_ISDIR(attr.st_mode), 
+                'size': attr.st_size, 
+                'modified': attr.st_mtime
+            })
         
         sftp.close()
         client.close()
         
-        # Sắp xếp: Folder lên đầu, File xuống dưới
+        # Sắp xếp: Folder lên đầu
         files.sort(key=lambda x: (not x['is_dir'], x['name']))
         
-        # Log hành động thành công
-        log_action(username, f"List files: {base_path}")
+        # Log (Optional - có thể bỏ qua nếu sợ rác log)
+        # log_action(username, f"List files: {base_path}")
         
         return jsonify(files=files, path=path)
 
     except Exception as e:
-        # 6. Log lỗi chi tiết ra Terminal để debug
         app.logger.error(f"ERROR List Files user '{safe_username}': {str(e)}")
         return jsonify(error=str(e)), 500
+# KET THUC HAM
 
 @app.route('/user/<username>/create-folder', methods=['POST'])
 @require_auth('user')
 def create_folder_api(username):
-    # 1. Chuẩn hóa tên (mai yeu -> mai_yeu)
+    # 1. Chuẩn hóa tên ( a b c -> a_b_c)upload_files_apiupload_files_api
     safe_username = make_safe_name(username)
 
     # 2. Check quyền (So sánh session với tên gốc)
@@ -971,7 +1141,7 @@ def create_folder_api(username):
         return jsonify(success=False, error="Invalid path"), 400
 
     try:
-        client = get_ssh_client(safe_username) # Dùng tên an toàn
+        client = get_ssh_client(username) # Dùng tên an toàn
         sftp = client.open_sftp()
         
         full_path = os.path.join(home_dir, path, folder_name)
@@ -1002,7 +1172,7 @@ def load_file_api(username):
         return jsonify(success=False, error="Invalid file path"), 400
 
     try:
-        client = get_ssh_client(safe_username)
+        client = get_ssh_client(username)
         sftp = client.open_sftp()
         
         filepath = os.path.join(home_dir, path, filename)
@@ -1023,7 +1193,7 @@ def load_file_api(username):
 @app.route('/user/<username>/editor/save', methods=['POST'])
 @require_auth('user')
 def save_file_api(username):
-    safe_username = make_safe_name(username) # FIX: Phải có dòng này
+    safe_username = make_safe_name(username) # FIX
     
     if session.get('username') != username: return jsonify(success=False, error="Unauthorized"), 403
 
@@ -1037,8 +1207,8 @@ def save_file_api(username):
         return jsonify(success=False, error="Invalid file path"), 400
 
     try:
-        # FIX QUAN TRỌNG: Phải dùng safe_username, code cũ dùng username -> Lỗi kết nối
-        client = get_ssh_client(safe_username) 
+        # FIX:  Dùng safe_username, code cũ dùng username -> Lỗi kết nối
+        client = get_ssh_client(username) 
         sftp = client.open_sftp()
         
         filepath = os.path.join(home_dir, path, filename)
@@ -1059,7 +1229,7 @@ def save_file_api(username):
 @app.route('/user/<username>/rename-item', methods=['POST'])
 @require_auth('user')
 def rename_item_api(username):
-    safe_username = make_safe_name(username) # FIX: Code cũ thiếu dòng này
+    safe_username = make_safe_name(username)
     
     if session.get('username') != username: return jsonify(success=False, error="Unauthorized"), 403
     
@@ -1073,11 +1243,11 @@ def rename_item_api(username):
 
     try:
         # FIX: Dùng safe_username
-        client = get_ssh_client(safe_username)
+        client = get_ssh_client(username)
         sftp = client.open_sftp()
         
         # Xây dựng đường dẫn tuyệt đối với safe_username
-        # Code cũ dùng username -> Dẫn tới /home/mai yeu/... (Sai)
+        # Code cũ dùng username -> Dẫn tới /home/a b c/... (Sai)
         base_dir_rel = os.path.dirname(old_path)
         old_full_path = os.path.join("/home", safe_username, old_path)
         new_full_path = os.path.join("/home", safe_username, base_dir_rel, new_name)
@@ -1106,7 +1276,7 @@ def delete_item_api(username):
         return jsonify(success=False, error="Invalid path"), 400
 
     try:
-        client = get_ssh_client(safe_username)
+        client = get_ssh_client(username)
 
         full_path = os.path.normpath(os.path.join(home_dir, path))
         
@@ -1149,7 +1319,7 @@ def upload_files_api(username):
     if not is_safe_path(home_dir, path): return jsonify(success=False, error="Invalid path"), 400
 
     try:
-        client = get_ssh_client(safe_username)
+        client = get_ssh_client(username)
         sftp = client.open_sftp()
         
         count = 0
@@ -1344,7 +1514,7 @@ def extract_warning_info(warning_line, all_lines, line_index):
 # ================== ARDUINO UPLOAD APIs ==================
 
 
-# ▼▼▼ THAY THẾ TOÀN BỘ HÀM upload_to_board_api
+#  upload_to_board_api
 @app.route('/user/<username>/upload', methods=['POST'])
 @require_auth('user')
 def upload_to_board_api(username):
@@ -1378,7 +1548,7 @@ def upload_to_board_api(username):
     # Trả về ngay lập tức cho client biết yêu cầu đã được tiếp nhận
     return jsonify(success=True, message="Yêu cầu nạp code đã được đưa vào hàng đợi.")
 
-# ▲▲▲ KẾT THÚC PHẦN THAY THẾ ▲▲▲
+# KET THUC HAM 
 
 
 
@@ -1561,52 +1731,56 @@ def add_user():
 @require_auth('admin')
 def delete_user(user_id):
     db = get_db_connection()
+    if not db: return jsonify(success=False, error="Database connection error"), 500
     cur = db.cursor(dictionary=True)
     
-    # Lấy thông tin user TRƯỚC KHI xóa khỏi DB
-    cur.execute("SELECT username FROM users WHERE id=%s AND role='user'", (user_id,))
+    # 1. Lấy thông tin username gốc từ DB
+    cur.execute("SELECT username FROM users WHERE id=%s", (user_id,))
     user = cur.fetchone()
     
     if user:
-        target_username = user['username']
-        cname = f"{target_username}-dev"
-        host_user_dir = f"/home/toan/QUAN_LY_USER/{target_username}" # Đảm bảo đường dẫn này khớp với cấu hình của bạn
+        username_raw = user['username']
+        # --- BƯỚC QUAN TRỌNG: CHUẨN HÓA TÊN ---
+        # Chuyển 'A B C' thành 'A_B_C' để khớp với tên folder và container đã tạo
+        safe_username = make_safe_name(username_raw)
+        cname = f"{safe_username}-dev"
+        host_user_dir = f"/home/toan/QUAN_LY_USER/{safe_username}"
+        # --------------------------------------
 
-        # BƯỚC 1: Dừng và xóa Docker container
+        app.logger.info(f"Admin action: Deleting user {username_raw} (Safe name: {safe_username})")
+
+        # BƯỚC 1: Ép buộc xóa Docker container
         try:
-            app.logger.info(f"Attempting to remove container: {cname}")
-            # Dùng `docker rm -f` để ép buộc xóa container kể cả khi nó đang chạy
-            subprocess.run(["docker", "rm", "-f", cname], check=False, timeout=20)
-            log_action(session["username"], f"Admin action: Removed container for user '{target_username}'")
+            subprocess.run(["docker", "rm", "-f", cname], check=False, timeout=15)
+            app.logger.info(f"Removed container: {cname}")
         except Exception as e:
-            app.logger.error(f"Failed to remove container {cname} for user '{target_username}': {e}")
-            log_action(session["username"], f"Admin action: FAILED to remove container for '{target_username}'", success=False, details={"error": str(e)})
-            # Dù có lỗi, chúng ta vẫn tiếp tục để thử xóa các dữ liệu khác
+            app.logger.error(f"Failed to remove container {cname}: {e}")
         
-        # BƯỚC 2: Xóa thư mục dữ liệu của user trên máy chủ
+        # BƯỚC 2: Xóa thư mục dữ liệu trên máy chủ Ubuntu
         try:
             if os.path.exists(host_user_dir):
-                app.logger.info(f"Attempting to delete host directory: {host_user_dir}")
+                # rmtree sẽ xóa sạch folder và file bên trong
                 shutil.rmtree(host_user_dir)
-                log_action(session["username"], f"Admin action: Deleted host directory for user '{target_username}'")
+                app.logger.info(f"Deleted directory: {host_user_dir}")
+            else:
+                app.logger.warning(f"Directory not found, skipping: {host_user_dir}")
         except Exception as e:
-            app.logger.error(f"Failed to delete directory {host_user_dir} for user '{target_username}': {e}")
-            log_action(session["username"], f"Admin action: FAILED to delete host directory for '{target_username}'", success=False, details={"error": str(e)})
+            app.logger.error(f"Failed to delete directory {host_user_dir}: {e}")
 
-        # BƯỚC 3: Xóa user khỏi cơ sở dữ liệu
+        # BƯỚC 3: Xóa user khỏi Database (Xóa sau cùng để đảm bảo có thông tin ở các bước trên)
         cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
         db.commit()
-        log_action(session["username"], f"Admin action: Deleted user '{target_username}' from database")
         
-        flash(f"Đã xóa hoàn toàn user '{target_username}' và tất cả dữ liệu liên quan.", "success")
+        log_action(session["username"], f"Deleted user '{username_raw}' and folder '{safe_username}'")
+        flash(f"Đã xóa hoàn toàn user '{username_raw}' và thư mục dữ liệu.", "success")
     else:
-        flash("User không tồn tại hoặc không có quyền để xóa!", "error")
+        flash("Người dùng không tồn tại!", "error")
         
     cur.close()
     db.close()
     return redirect(url_for("admin_manage"))
 
-# ▲▲▲ KẾT THÚC ĐOẠN CODE CẦN THAY THẾ ▲▲▲
+# --- KET THUC HAM ^^ ---
 
 @app.route("/admin/change_user_status/<action>/<username>", methods=["POST"])
 @require_auth('admin')
@@ -1860,7 +2034,6 @@ def terminal_connect():
         
     except Exception as e:
         app.logger.error(f"SOCKET CONNECT ERROR for {username}: {e}")
-        # ✅ SỬA LỖI: Thêm room=sid để gửi lỗi về đúng client
         emit('output', f'\r\n\x1b[31mError connecting to terminal: {e}\x1b[0m\r\n', room=sid)
         return False
 
@@ -1902,52 +2075,58 @@ def terminal_disconnect():
             session.pop('ssh_client', None)
             
     log_action(username, "Terminal: User disconnected")
-# ▼▼▼ TÌM VÀ THAY THẾ HÀM NÀY TRONG app.py ▼▼▼
+#---KET THUC HAM ---
 
+@require_auth('user')
 @app.route('/user/<username>/editor/new', methods=['POST'])
 @require_auth('user')
 def new_file_api(username):
-    if session['username'] != username:
+    # 1. PHẢI chuẩn hóa tên trước khi làm bất cứ việc gì
+    safe_username = make_safe_name(username)
+    
+    if session.get('username') != username:
         return jsonify(success=False, error="Unauthorized"), 403
 
     data = request.get_json()
-    filename = data.get("filename", "").strip() # Lấy filename và loại bỏ khoảng trắng thừa
+    filename = data.get("filename", "").strip()
     path = data.get("path", ".")
 
     if not filename or '..' in filename or '/' in filename:
         return jsonify(success=False, error="Tên file không hợp lệ"), 400
 
-    # === LOGIC MỚI ĐƯỢC THÊM VÀO ĐÂY ===
-    # Tự động thêm đuôi .ino nếu người dùng không cung cấp đuôi file
     if '.' not in filename:
         filename += '.ino'
-    # === KẾT THÚC LOGIC MỚI ===
 
     try:
+        # 2. Dung lai bien username de lay tu db goc
         client = get_ssh_client(username)
         sftp = client.open_sftp()
-        filepath = os.path.join("/home", username, path, filename)
+        
+        # 3. Đường dẫn trong container phải dùng safe_username (/home/sinh_vien/...)
+        filepath = os.path.join("/home", safe_username, path, filename)
 
-        # Kiểm tra nếu file đã tồn tại
         try:
             sftp.stat(filepath)
-            sftp.close(); client.close()
+            sftp.close()
+            client.close()
             return jsonify(success=False, error="File đã tồn tại"), 400
         except FileNotFoundError:
-            # File không tồn tại, có thể tạo mới
             pass
 
         with sftp.open(filepath, 'w') as f:
-            f.write("")  # Tạo file rỗng
+            f.write("")  
 
         sftp.close()
         client.close()
+        
+        # Log hành động dùng username gốc cho dễ đọc
         log_action(username, f"Create new file: {filepath}")
         return jsonify(success=True)
     except Exception as e:
+        app.logger.error(f"New File Error for {safe_username}: {e}")
         return jsonify(success=False, error=str(e)), 500
 
-# ▲▲▲ KẾT THÚC ĐOẠN CODE CẦN THAY THẾ ▲▲▲
+# ---- KET THUC HAM ---
 
 
 @app.route('/user/<username>/upload', methods=['POST'])
@@ -1966,7 +2145,6 @@ def debug_devices_api(username):
     # --- FIX: Dùng tên an toàn ---
     safe_username = make_safe_name(username)
     cname = f"{safe_username}-dev"
-    # -----------------------------
     
     try:
         # Kiểm tra trên host
@@ -2056,7 +2234,7 @@ def require_internal_secret(f):
             return jsonify(success=False, error="Unauthorized - Invalid Secret Key"), 403
         return f(*args, **kwargs)
     return decorated_function
-# ▲▲▲ KẾT THÚC ĐOẠN CODE CẦN THAY THẾ ▲▲▲
+# --- KET THUV HAM ^^ ---
 
 
 @app.route('/api/hardware/event', methods=['POST'])
@@ -2111,10 +2289,6 @@ def hardware_event_api():
     
 @app.route('/api/hardware/rescan', methods=['POST'])
 def hardware_rescan_api():
-    """
-    Scans for available ttyUSB/ttyACM devices on the host and syncs with the database.
-    This is called by the watcher script when a udev event is detected.
-    """
     try:
         # Lấy danh sách các cổng đang thực sự tồn tại trên máy chủ
         physical_ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
@@ -2296,7 +2470,7 @@ def get_all_running_users():
         app.logger.error(f"Failed to get running user containers: {e}")
         return []
 
-# ▼▼▼ TÌM VÀ THAY THẾ HÀM rescan_hardware_and_update_db CŨ BẰNG HÀM NÀY ▼▼▼
+# rescan_hardware_and_update_db 
 @app.route('/api/hardware/rescan', methods=['POST'])
 def rescan_hardware_and_update_db():
     """
@@ -2313,7 +2487,7 @@ def rescan_hardware_and_update_db():
         physical_ports = set(physical_ports_list)
         app.logger.info(f"Physical scan found: {physical_ports}")
 
-        db = get_db_connection() # <--- SỬA LỖI QUAN TRỌNG: get_db() -> get_db_connection()
+        db = get_db_connection()
         if db:
             cur = db.cursor(dictionary=True)
 
@@ -2341,7 +2515,6 @@ def rescan_hardware_and_update_db():
             db.close()
     except Exception as e:
         app.logger.error(f"Error during DB update: {e}")
-        # Không return lỗi ngay, vẫn cố gắng restart container để user không bị gián đoạn
 
     # --- PHẦN 2: KHỞI ĐỘNG LẠI CONTAINER ĐỂ NHẬN DIỆN THIẾT BỊ MỚI ---
     # Docker container cần restart (hoặc dùng cgroup rules) để nhận thiết bị mới cắm vào
@@ -2350,19 +2523,59 @@ def rescan_hardware_and_update_db():
         if running_users:
             app.logger.info(f"Checking containers for users: {', '.join(running_users)}")
             for username in running_users:
-                # Gọi hàm ensure để đảm bảo container chạy và có quyền truy cập
-                # Lưu ý: Hàm này sẽ tự động mount lại /dev nếu container được tạo lại
+
                 ensure_user_container_and_setup(username)
-        
+
         return jsonify(success=True, message="Rescan and container sync complete.")
 
     except Exception as e:
         app.logger.error(f"Error checking user containers: {e}")
         return jsonify(success=False, error=str(e)), 500
 # ket Thuc Ham
+
+# ------ HAM CHAY NGAM THU HOI QUYEN TAT CONTAINER KHI TIMEOUT
+def resource_cleanup_worker():
+    while True:
+        try:
+            db = get_db_connection()
+            if db:
+                cur = db.cursor(dictionary=True)
+                # Chỉ lấy những đứa THỰC SỰ hết hạn (khác NULL và nhỏ hơn hiện tại)
+                cur.execute("""
+                    SELECT da.id, u.username 
+                    FROM device_assignments da
+                    JOIN users u ON da.user_id = u.id
+                    WHERE da.expires_at IS NOT NULL 
+                      AND da.expires_at < NOW()
+                      AND da.expires_at > '2000-01-01 00:00:00'
+                """)
+                expired = cur.fetchall()
+                
+                for item in expired:
+                    username = item['username']
+                    safe_username = make_safe_name(username)
+                    cname = f"{safe_username}-dev"
+                    
+                    # Bước 1: Xóa quyền trong DB trước
+                    cur.execute("DELETE FROM device_assignments WHERE id = %s", (item['id'],))
+                    # Bước 2: Kiểm tra xem user còn quyền nào khác không rồi mới xóa container
+                    cur.execute("SELECT COUNT(*) as count FROM device_assignments WHERE user_id = (SELECT id FROM users WHERE username=%s)", (username,))
+                    if cur.fetchone()['count'] == 0:
+                        subprocess.run(["docker", "rm", "-f", cname], check=False)
+                        app.logger.info(f"[CLEANUP] Da xoa container het han cua: {username}")
+
+                db.commit()
+                cur.close(), db.close()
+        except Exception as e:
+            app.logger.error(f"Cleanup Error: {e}")
+        time.sleep(60) 
+# Khởi động luồng dọn dẹp khi Server chạy
+# cleanup_thread = threading.Thread(target=resource_cleanup_worker, daemon=True)
+# cleanup_thread.start()
+#----KET THUC HAM ^^ ---
 # ================== MAIN EXECUTION ==================
 if __name__ == "__main__":
     init_db()
     app.logger.info("Enhanced Flask App with Security Features Started")
     # Dùng socketio.run thay cho app.run
-    socketio.run(app, host="::", port=5000, debug=False)
+    socketio.run(app, host="::", port=5000, debug=True)

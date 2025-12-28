@@ -761,6 +761,7 @@
 let editor, terminal, fitAddon, webLinksAddon, socket;
 let currentFile = null;
 const openFiles = new Map();
+let uploadPath = '.';     // Thieu Dinh Nghia Ham (DA FIX - by CHUONG)
 let selectedTreeItem = null;
 let selectedPort = null;
 let availablePorts = [];
@@ -776,7 +777,6 @@ let currentSid = null;
 
 // Unsaved changes modal state
 let pendingCloseFile = null;
-// ▼▼▼ THÊM DÒNG NÀY ▼▼▼
 let pendingDeleteItemPath = null;
 
 // Serial monitor variables
@@ -1225,13 +1225,31 @@ document.addEventListener('DOMContentLoaded', () => {
         function toggleSerialMonitor() {
             const serialWindow = document.getElementById('serial-monitor-window');
             
+            // Nếu đang ẩn -> Hiện lên
             if (serialWindow.style.display === 'none') {
-                openSerialWindow();
-            } else {
-                closeSerialWindow();
+                serialWindow.style.display = 'flex';
+                
+                // Set vị trí mặc định nếu chưa có
+                if (!serialWindow.style.top || !serialWindow.style.left) {
+                     serialWindow.style.top = '100px';
+                     serialWindow.style.right = '20px';
+                     serialWindow.style.left = 'auto'; // Reset left để dùng right
+                }
+                
+                // ▼▼▼ THÊM ĐOẠN NÀY ĐỂ KÍCH HOẠT KÉO THẢ ▼▼▼
+                makeDraggable(serialWindow); 
+                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+                const portSelect = document.getElementById('serial-port-select');
+                if (portSelect.options.length <= 1) {
+                    refreshSerialPorts();
+                }
+            } 
+            // Nếu đang hiện -> Ẩn đi
+            else {
+                serialWindow.style.display = 'none';
             }
         }
-
         function openSerialWindow() {
             const serialWindow = document.getElementById('serial-monitor-window');
             serialWindow.style.display = 'flex';
@@ -1248,29 +1266,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function closeSerialWindow() {
             const serialWindow = document.getElementById('serial-monitor-window');
+            
+            // 1. Ẩn giao diện
             serialWindow.style.display = 'none';
             
-            // Disconnect serial if connected
+            // 2. Ngắt kết nối socket (Để giải phóng tài nguyên server)
             if (socketSerial && socketSerial.connected) {
                 socketSerial.disconnect();
+                
+                // Reset giao diện về trạng thái "Chưa kết nối" để lần sau mở lại
+                const connectSerialBtn = document.getElementById('connect-serial-btn');
+                const serialStatus = document.getElementById('serial-status');
+                if(connectSerialBtn) {
+                    connectSerialBtn.textContent = '▶️ Connect';
+                    connectSerialBtn.disabled = false;
+                }
+                if(serialStatus) serialStatus.textContent = 'Disconnected';
             }
         }
 
         function minimizeSerialWindow() {
             const serialWindow = document.getElementById('serial-monitor-window');
-            const content = serialWindow.querySelector('.floating-window-content');
-            
-            if (content.style.display === 'none') {
-                // Restore
-                content.style.display = 'flex';
-                serialWindow.style.height = '400px';
-            } else {
-                // Minimize
-                content.style.display = 'none';
-                serialWindow.style.height = 'auto';
-            }
+            serialWindow.style.display = 'none';
         }
-
         function makeDraggable(element) {
             const header = element.querySelector('.floating-window-header');
             let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
@@ -1280,8 +1298,23 @@ document.addEventListener('DOMContentLoaded', () => {
             function dragMouseDown(e) {
                 e = e || window.event;
                 e.preventDefault();
+                
+                // --- [FIX CHÍNH XÁC] ---
+                // 1. Lấy vị trí thực tế hiện tại của cửa sổ trên màn hình
+                const rect = element.getBoundingClientRect();
+                
+                // 2. Gỡ bỏ thuộc tính 'right' đang ghim cửa sổ vào lề phải
+                element.style.right = 'auto'; 
+                
+                // 3. Gán cứng vị trí hiện tại vào 'left' và 'top' để JS điều khiển
+                element.style.left = rect.left + 'px';
+                element.style.top = rect.top + 'px';
+                // -----------------------
+
+                // Lấy tọa độ chuột bắt đầu
                 pos3 = e.clientX;
                 pos4 = e.clientY;
+                
                 document.onmouseup = closeDragElement;
                 document.onmousemove = elementDrag;
             }
@@ -1289,23 +1322,20 @@ document.addEventListener('DOMContentLoaded', () => {
             function elementDrag(e) {
                 e = e || window.event;
                 e.preventDefault();
+                
+                // Tính toán khoảng cách di chuyển
                 pos1 = pos3 - e.clientX;
                 pos2 = pos4 - e.clientY;
                 pos3 = e.clientX;
                 pos4 = e.clientY;
                 
-                const newTop = element.offsetTop - pos2;
-                const newLeft = element.offsetLeft - pos1;
-                
-                // Boundary checking
-                const maxTop = window.innerHeight - element.offsetHeight;
-                const maxLeft = window.innerWidth - element.offsetWidth;
-                
-                element.style.top = Math.max(0, Math.min(newTop, maxTop)) + "px";
-                element.style.left = Math.max(0, Math.min(newLeft, maxLeft)) + "px";
+                // Cập nhật vị trí mới
+                element.style.top = (element.offsetTop - pos2) + "px";
+                element.style.left = (element.offsetLeft - pos1) + "px";
             }
             
             function closeDragElement() {
+                // Dừng kéo thả
                 document.onmouseup = null;
                 document.onmousemove = null;
             }
@@ -1456,21 +1486,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function getFileIcon(filename) {
             const ext = filename.split('.').pop().toLowerCase();
+            
+            // Map định nghĩa full class để phân biệt Brand và Solid
             const map = { 
-                js: 'fa-js', 
-                html: 'fa-html5', 
-                css: 'fa-css3-alt', 
-                py: 'fa-python', 
-                json: 'fa-brackets-curly', 
-                md: 'fa-markdown', 
-                sh: 'fa-terminal', 
-                dockerfile: 'fa-docker', 
-                ino: 'fa-microchip', 
-                cpp: 'fa-code', 
-                c: 'fa-code', 
-                h: 'fa-code' 
+                // --- Nhóm Brands (Logo) ---
+                js: 'fa-brands fa-js',
+                html: 'fa-brands fa-html5',
+                css: 'fa-brands fa-css3-alt',
+                py: 'fa-brands fa-python',
+                md: 'fa-brands fa-markdown',
+                dockerfile: 'fa-brands fa-docker',
+                
+                // --- Nhóm Solid (Hệ thống) ---
+                sh: 'fa-solid fa-terminal',       // <--- Đã fix cho file .sh
+                ino: 'fa-solid fa-microchip',     // <--- Đã fix cho file .ino
+                json: 'fa-solid fa-file-code',
+                cpp: 'fa-solid fa-file-code',
+                c: 'fa-solid fa-file-code',
+                h: 'fa-solid fa-file-code',
+                txt: 'fa-solid fa-file-lines'
             };
-            return { icon: `fa-brands ${map[ext] || 'fa-solid fa-file-lines'}`, color: '' };
+
+            // Lấy class tương ứng, nếu không có thì dùng icon file mặc định
+            const iconClass = map[ext] || 'fa-solid fa-file';
+            
+            return { icon: iconClass, color: '' };
         }
 
         async function refreshRootFiles() {
@@ -1622,7 +1662,11 @@ document.addEventListener('DOMContentLoaded', () => {
             currentRenamePath = null;
             DOM.renameInput.value = '';
         }
-
+        // Them Ham handleUpLoadClick bi thieu 
+        function handleUpLoadClick(path){
+        uploadPath = path || '.'
+        DOM.fileUploadInput.click();
+        }
         // 3. Xử lý đổi tên (Gọi API)
         async function performRename() {
             const newName = DOM.renameInput.value.trim();
@@ -2009,14 +2053,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 DOM.portList.innerHTML = '';
                 availablePorts.forEach(portInfo => {
-                    const portDiv = document.createElement('div');
-                    portDiv.className = 'port-item';
-                    portDiv.onclick = () => selectPort(portInfo);
-                    const portName = portInfo.port.address;
-                    const boardName = portInfo.matching_boards ? portInfo.matching_boards[0].name : 'Unknown Board';
-                    portDiv.innerHTML = `<div class="port-name">${portName}</div><div class="port-desc">${boardName}</div>`;
-                    DOM.portList.appendChild(portDiv);
-                });
+                const portDiv = document.createElement('div');
+                portDiv.className = 'port-item';
+                portDiv.onclick = () => selectPort(portInfo);
+    
+                const portAddress = portInfo.port.address; // /dev/ttyUSB...
+                const boardName = portInfo.matching_boards ? portInfo.matching_boards[0].name : 'Unknown Device';
+
+    // LOGIC MỚI: Đưa boardName lên class 'port-name' (to/đậm), đưa portAddress xuống 'port-desc' (nhỏ/mờ)
+                portDiv.innerHTML = `
+                    <div class="port-name">
+                        <i class="fa-solid fa-microchip"></i> ${boardName}
+                    </div>
+                    <div class="port-desc" style="font-family: monospace; opacity: 0.6;">
+                        ${portAddress}
+                    </div>
+                `;
+    
+                DOM.portList.appendChild(portDiv);
+});
                 
                 // Also populate serial monitor port selector
                 updateSerialPortSelector(availablePorts);

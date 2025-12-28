@@ -169,7 +169,7 @@ class Client(base_client.BaseClient):
                 self.disconnect()
                 raise exceptions.ConnectionError(
                     'One or more namespaces failed to connect: '
-                    ', '.join(self.failed_namespaces))
+                    + ', '.join(self.failed_namespaces))
 
         self.connected = True
 
