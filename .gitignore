@@ -11,7 +11,7 @@ QUAN_LY_USER/
 
 # Thư mục Core Arduino (Rất nặng, không nên đẩy lên)
 esp32_core/
-
+backups/
 # --- LOG & DATABASE ---
 *.log
 *.sqlite3
