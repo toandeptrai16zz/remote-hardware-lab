@@ -1,0 +1,2261 @@
+{% extends "layout.html" %}
+
+{% block title %}CodeSpace IDE - {{ username }}{% endblock %}
+
+{% block extra_head %}
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <style>
+        body { overflow: hidden !important; user-select: none; }
+        .content-wrapper { height: calc(100vh - 58px); padding: 0; overflow: hidden; display: flex; }
+        .ide-container { display: flex; width: 100%; height: 100%; background-color: #0d1117; color: #e6edf3; font-family: 'Inter', sans-serif; }
+        .file-panel { width: 280px; min-width: 200px; max-width: 40%; background: #161b22; display: flex; flex-direction: column; flex-shrink: 0; border-right: 1px solid #30363d; }
+        .panel-header { padding: 12px 16px; font-weight: 600; color: #f0f6fc; display: flex; align-items: center; gap: 10px; font-size: 13px; text-transform: uppercase; border-bottom: 1px solid #30363d; flex-shrink: 0; }
+        .panel-actions { margin-left: auto; display: flex; gap: 4px; }
+        .panel-content { flex-grow: 1; overflow-y: auto; padding: 8px; }
+        .resizer { width: 5px; background: #30363d; cursor: col-resize; flex-shrink: 0; transition: background 0.2s ease; }
+        .resizer:hover { background: #58a6ff; }
+        .main-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .editor-header { display: flex; align-items: center; padding: 0 8px; background: #161b22; border-bottom: 1px solid #30363d; flex-shrink: 0; }
+        .editor-tabs { display: flex; flex-grow: 1; }
+        .editor-tab { background: transparent; border: none; color: #8b949e; padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; border-bottom: 2px solid transparent; transition: all 0.2s ease; }
+        .editor-tab:hover { background: #21262d; color: #e6edf3; }
+        .editor-tab.active { color: #e6edf3; border-bottom-color: #58a6ff; }
+        .editor-tab .close-icon { font-size: 12px; padding: 4px; border-radius: 4px; }
+        .editor-tab .close-icon:hover { background: #444; }
+        .editor-actions { padding-right: 8px; display: flex; align-items: center; gap: 8px; }
+        .editor-container { flex-grow: 1; overflow: hidden; position: relative; }
+        #editor { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+        #terminal-container { 
+            height: 240px; 
+            flex-shrink: 0; 
+            display: flex; 
+            flex-direction: column; 
+            background: #0d1117; 
+            min-height: 40px;
+            max-height: calc(100vh - 200px);
+        }
+        #terminal { 
+            width: 100%; 
+            flex-grow: 1; 
+            position: relative; 
+            overflow: hidden;
+        }
+        
+        /* Terminal Improvements - VS Code Style */
+        .xterm { 
+            padding: 8px; 
+            height: 100%; 
+            box-sizing: border-box; 
+            font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+            background: #0d1117 !important;
+            overflow: hidden;
+        }
+        .xterm .xterm-viewport { 
+            overflow-y: auto !important;
+            scrollbar-width: thin;
+            scrollbar-color: #30363d #161b22;
+            background: #0d1117 !important;
+        }
+        .xterm .xterm-viewport::-webkit-scrollbar { 
+            width: 8px; 
+        }
+        .xterm .xterm-viewport::-webkit-scrollbar-track { 
+            background: #161b22; 
+            border-radius: 4px;
+        }
+        .xterm .xterm-viewport::-webkit-scrollbar-thumb { 
+            background: #30363d; 
+            border-radius: 4px; 
+            border: 1px solid #161b22; 
+        }
+        .xterm .xterm-viewport::-webkit-scrollbar-thumb:hover { 
+            background: #484f58; 
+        }
+        .xterm .xterm-screen { 
+            user-select: text !important; 
+            background: #0d1117 !important;
+        }
+        .xterm-selection { 
+            background-color: rgba(88, 166, 255, 0.3) !important; 
+        }
+        .xterm .xterm-rows { 
+            line-height: 1.3 !important; 
+        }
+        .xterm .xterm-cursor-layer { 
+            background: #d4d4d4 !important; 
+        }
+        .xterm .xterm-cursor-blink { 
+            animation: xterm-cursor-blink 1s infinite; 
+        }
+        @keyframes xterm-cursor-blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        .file-tree, .file-tree ul { list-style: none; padding: 0; margin: 0; }
+        .file-tree ul { padding-left: 18px; }
+        .tree-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .tree-item:hover { background: #21262d; }
+        .tree-item.is-selected { background: #005cc5; }
+        .tree-chevron { width: 16px; text-align: center; transition: transform 0.2s ease; }
+        .tree-item.is-folder.is-open > .tree-chevron { transform: rotate(90deg); }
+        .tree-icon { width: 18px; }
+        .tree-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-tree ul { display: none; }
+        .file-tree li.is-open > ul { display: block; }
+        .context-menu { position: fixed; background: #21262d; border: 1px solid #444; border-radius: 6px; box-shadow: 0 8px 16px rgba(0,0,0,0.3); z-index: 1000; min-width: 180px; padding: 4px; display: none; }
+        .context-menu-item { padding: 8px 12px; color: #e6edf3; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 13px; border-radius: 4px; background: none; border: none; width: 100%; text-align: left; }
+        .context-menu-item:hover { background: #58a6ff; }
+        .context-menu-item.danger:hover { background: #da3633; }
+        .context-menu-separator { height: 1px; background: #444; margin: 4px 0; }
+        .context-menu-icon { width: 14px; text-align: center; }
+        .btn-ide { background: #238636; color: white; border: 1px solid #339d4b; }
+        .btn-ide:hover { background: #2da44e; }
+        .btn-upload { background: #fd7e14; color: white; border: 1px solid #fd7e14; }
+        .btn-upload:hover { background: #e76f05; }
+        .file-btn { background: none; border: none; color: #8b949e; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+        .file-btn:hover { background: #30363d; color: #e6edf3; }
+        .fa-spin { animation: fa-spin 1s infinite linear; }
+        @keyframes fa-spin { to { transform: rotate(360deg); } }
+        .resizer-horizontal { height: 5px; background: #30363d; cursor: row-resize; flex-shrink: 0; transition: background 0.2s ease; }
+        .resizer-horizontal:hover { background: #58a6ff; }
+        .main-panel.terminal-hidden #terminal-container,
+        .main-panel.terminal-hidden .resizer-horizontal { display: none; }
+        .main-panel.serial-hidden #serial-monitor-container,
+        .main-panel.serial-hidden #serialResizerHorizontal { display: none; }
+        
+        /* Custom File Creation Dialog */
+        .file-creation-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        
+        .file-creation-content {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 24px;
+            min-width: 400px;
+            max-width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        .file-creation-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .file-creation-title {
+            color: #f0f6fc;
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .file-creation-subtitle {
+            color: #8b949e;
+            font-size: 14px;
+            margin: 0;
+        }
+        
+        .file-creation-form {
+            margin-bottom: 20px;
+        }
+        
+        .file-creation-input-group {
+            margin-bottom: 16px;
+        }
+        
+        .file-creation-label {
+            display: block;
+            color: #e6edf3;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        
+        .file-creation-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            color: #e6edf3;
+            font-size: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+        }
+        
+        .file-creation-input:focus {
+            outline: none;
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+        }
+        
+        .file-creation-input::placeholder {
+            color: #6e7681;
+        }
+        
+        .file-creation-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .file-creation-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            min-width: 80px;
+        }
+        
+        .file-creation-btn.primary {
+            background: #238636;
+            color: white;
+            border-color: #339d4b;
+        }
+        
+        .file-creation-btn.primary:hover {
+            background: #2da44e;
+            border-color: #2da44e;
+            transform: translateY(-1px);
+        }
+        
+        .file-creation-btn.secondary {
+            background: #21262d;
+            color: #e6edf3;
+            border-color: #30363d;
+        }
+        
+        .file-creation-btn.secondary:hover {
+            background: #30363d;
+            border-color: #484f58;
+        }
+        
+        .file-creation-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        /* Custom Unsaved Changes Dialog */
+        .unsaved-changes-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10001;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        
+        .unsaved-changes-content {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 24px;
+            min-width: 400px;
+            max-width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        .unsaved-changes-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .unsaved-changes-title {
+            color: #f0f6fc;
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .unsaved-changes-message {
+            color: #8b949e;
+            font-size: 14px;
+            margin: 0;
+        }
+        
+        .unsaved-changes-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .unsaved-changes-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            min-width: 80px;
+        }
+        
+        .unsaved-changes-btn.primary {
+            background: #da3633;
+            color: white;
+            border-color: #f85149;
+        }
+        
+        .unsaved-changes-btn.primary:hover {
+            background: #f85149;
+            border-color: #f85149;
+            transform: translateY(-1px);
+        }
+        
+        .unsaved-changes-btn.secondary {
+            background: #21262d;
+            color: #e6edf3;
+            border-color: #30363d;
+        }
+        
+        .unsaved-changes-btn.secondary:hover {
+            background: #30363d;
+            border-color: #484f58;
+        }
+        
+        /* Floating Serial Monitor Window */
+        .floating-window {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            width: 500px;
+            height: 400px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            resize: both;
+            overflow: auto;
+            min-width: 350px;
+            min-height: 250px;
+        }
+        
+        .floating-window-header {
+            background: #21262d;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: move;
+            user-select: none;
+            border-bottom: 1px solid #30363d;
+            border-radius: 7px 7px 0 0;
+        }
+        
+        .window-title {
+            color: #e6edf3;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .window-controls {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .window-control-btn {
+            background: none;
+            border: none;
+            color: #8b949e;
+            padding: 4px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .window-control-btn:hover {
+            background: #30363d;
+            color: #e6edf3;
+        }
+        
+        .floating-window-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .serial-controls {
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            flex-shrink: 0;
+        }
+        
+        .serial-controls select {
+            background-color: #30363d;
+            color: white;
+            border-color: #444;
+            font-size: 12px;
+        }
+        
+        .serial-controls .btn {
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+        
+        .status-text {
+            font-size: 11px;
+            color: #8b949e;
+            margin-left: auto;
+        }
+        
+        .serial-output-area {
+            flex: 1;
+            background: #0d1117;
+            color: #d4d4d4;
+            font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+            font-size: 13px;
+            padding: 10px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            user-select: text;
+            line-height: 1.4;
+            /* Custom scrollbar for serial output */
+            scrollbar-width: thin;
+            scrollbar-color: #30363d #0d1117;
+        }
+        
+        .serial-output-area::-webkit-scrollbar { width: 12px; }
+        .serial-output-area::-webkit-scrollbar-track { background: #0d1117; }
+        .serial-output-area::-webkit-scrollbar-thumb { 
+            background: #30363d; 
+            border-radius: 6px; 
+            border: 2px solid #0d1117; 
+        }
+        .serial-output-area::-webkit-scrollbar-thumb:hover { background: #484f58; }
+        
+        /* Port selection modal styles */
+        .port-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: none; align-items: center; justify-content: center; }
+        .port-modal-content { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; min-width: 400px; max-width: 90%; }
+        .port-modal-header { margin-bottom: 20px; }
+        .port-modal-title { color: #f0f6fc; font-size: 18px; font-weight: 600; margin: 0; }
+        .port-list { max-height: 300px; overflow-y: auto; margin-bottom: 20px; }
+        .port-item { padding: 12px; border: 1px solid #30363d; border-radius: 6px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s ease; }
+        .port-item:hover { background: #21262d; border-color: #58a6ff; }
+        .port-item.selected { background: #005cc5; border-color: #58a6ff; }
+        .port-name { font-weight: 500; color: #e6edf3; }
+        .port-desc { font-size: 12px; color: #8b949e; margin-top: 4px; }
+        .port-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+        .port-modal-btn { padding: 8px 16px; border-radius: 4px; border: 1px solid; cursor: pointer; font-size: 14px; }
+        .port-modal-btn.primary { background: #238636; color: white; border-color: #339d4b; }
+        .port-modal-btn.primary:hover { background: #2da44e; }
+        .port-modal-btn.secondary { background: #21262d; color: #e6edf3; border-color: #30363d; }
+        .port-modal-btn.secondary:hover { background: #30363d; }
+        .terminal-header { background: #161b22; padding: 4px 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #30363d; flex-shrink: 0; }
+        .terminal-title { font-size: 13px; font-weight: 500; color: #8b949e; text-transform: uppercase; }
+        .terminal-actions { margin-left: auto; display: flex; gap: 4px; }
+        .terminal-btn { background: none; border: none; color: #8b949e; padding: 2px 5px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: all 0.2s ease; }
+        .terminal-btn:hover { background: #30363d; color: #e6edf3; }
+        .terminal-btn:active { background: #21262d; }
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .toast { margin-bottom: 10px; max-width: 350px; }
+        /* Serial Monitor styles */
+        #serial-monitor-container {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            border-top: 2px solid #555;
+            display: flex;
+            flex-direction: column;
+            height: 300px;
+        }
+        #serial-output {
+            flex-grow: 1;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+        }
+        #serial-controls {
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="ide-container">
+        <div class="file-panel" id="filePanel">
+            <div class="panel-header"><i class="fas fa-folder-tree"></i><span>Explorer</span>
+                <div class="panel-actions">
+                    <button class="file-btn" onclick="handleUploadClick()" title="Upload Files"><i class="fa-solid fa-upload"></i></button>
+                    <button class="file-btn" onclick="createNewItem('file')" title="New File"><i class="fa-solid fa-file-plus"></i></button>
+                    <button class="file-btn" onclick="createNewItem('folder')" title="New Folder"><i class="fa-solid fa-folder-plus"></i></button>
+                    <button class="file-btn" onclick="refreshRootFiles()" title="Refresh"><i class="fa-solid fa-rotate" id="refreshIcon"></i></button>
+                </div>
+            </div>
+            <div class="panel-content"><ul class="file-tree" id="file-tree-root"></ul></div>
+        </div>
+        <div class="resizer" id="resizer"></div>
+        <div class="main-panel" id="mainPanel">
+            <div class="editor-header">
+                <div class="editor-tabs" id="editorTabs"></div>
+                <div class="editor-actions">
+                    <button class="btn btn-sm btn-dark" onclick="toggleTerminal()" title="Bật/Tắt Terminal" style="border-color: #444;"><i class="fa-solid fa-terminal"></i></button>
+                    <button class="btn btn-sm btn-dark" onclick="toggleSerialMonitor()" title="Bật/Tắt Serial Monitor" style="border-color: #444;"><i class="fa-solid fa-plug"></i></button>
+                    <span class="border-end" style="height: 20px;"></span>
+                    <select id="boardSelector" class="form-select form-select-sm d-inline-block w-auto" style="background-color: #30363d; color: white; border-color: #444;">
+                        <option value="arduino:avr:uno">Arduino Uno</option>
+                        <option value="arduino:avr:nano">Arduino Nano (ATmega328P)</option>
+                        <option value="esp8266:esp8266:nodemcuv2">ESP8266 (NodeMCU 1.0)</option>
+                        <option value="esp32:esp32:esp32doit-devkit-v1">ESP32 Dev Module</option>
+                    </select>
+                    <button class="btn btn-sm btn-success" onclick="compileCode(event)"><i class="fa-solid fa-cogs"></i><span>Biên dịch</span></button>
+                    <button class="btn btn-sm btn-upload" onclick="uploadToBoard(event)"><i class="fa-solid fa-microchip"></i><span>Nạp code</span></button>
+                    <button class="btn btn-sm btn-ide" onclick="saveCurrentFile()"><i class="fa-solid fa-save"></i><span>Save</span></button>
+                </div>
+            </div>
+            <div class="editor-container" id="editorContainer"><div id="editor"></div></div>
+            <div class="resizer-horizontal" id="resizerHorizontal"></div>
+            <div id="terminal-container">
+                <div class="terminal-header">
+                    <span class="terminal-title">Terminal</span>
+                    <div class="terminal-actions">
+                        <button class="terminal-btn" onclick="copyFromTerminal()" title="Copy Selection (Ctrl+Shift+C)"><i class="fa-solid fa-copy"></i></button>
+                        <button class="terminal-btn" onclick="pasteToTerminal()" title="Paste (Ctrl+Shift+V)"><i class="fa-solid fa-paste"></i></button>
+                        <button class="terminal-btn" onclick="clearTerminal()" title="Clear Terminal"><i class="fa-solid fa-ban"></i></button>
+                        <button class="terminal-btn" onclick="scrollToTop()" title="Scroll to Top"><i class="fa-solid fa-arrow-up"></i></button>
+                        <button class="terminal-btn" onclick="scrollToBottom()" title="Scroll to Bottom"><i class="fa-solid fa-arrow-down"></i></button>
+                    </div>
+                </div>
+                <div id="terminal"></div>
+            </div>
+        </div>
+
+        </div>
+
+        <!-- Floating Serial Monitor Window -->
+        <div id="serial-monitor-window" class="floating-window" style="display: none;">
+            <div class="floating-window-header" id="serialWindowHeader">
+                <span class="window-title">📡 Serial Monitor</span>
+                <div class="window-controls">
+                    <button class="window-control-btn" onclick="minimizeSerialWindow()" title="Minimize"><i class="fa-solid fa-minus"></i></button>
+                    <button class="window-control-btn" onclick="closeSerialWindow()" title="Close"><i class="fa-solid fa-times"></i></button>
+                </div>
+            </div>
+            <div class="floating-window-content">
+                <div class="serial-controls">
+                    <select id="serial-port-select" class="form-select form-select-sm">
+                        <option value="">Select Port...</option>
+                    </select>
+                    <select id="baud-rate-select" class="form-select form-select-sm">
+                        <option value="9600">9600</option>
+                        <option value="115200" selected>115200</option>
+                        <option value="57600">57600</option>
+                        <option value="38400">38400</option>
+                        <option value="19200">19200</option>
+                    </select>
+                    <button id="connect-serial-btn" class="btn btn-sm btn-primary">▶️</button>
+                    <button class="btn btn-sm btn-secondary" onclick="clearSerialOutput()" title="Clear"><i class="fa-solid fa-ban"></i></button>
+                    <button class="btn btn-sm btn-secondary" onclick="copyFromSerialOutput()" title="Copy Selected Text"><i class="fa-solid fa-copy"></i></button>
+                    <span id="serial-status" class="status-text">Disconnected</span>
+                </div>
+                <div id="serial-output" class="serial-output-area"></div>
+            </div>
+    </div>
+
+    <!-- Port Selection Modal -->
+    <div class="port-modal" id="portModal">
+        <div class="port-modal-content">
+            <div class="port-modal-header">
+                <h3 class="port-modal-title">Chọn cổng nạp chương trình</h3>
+            </div>
+            <div class="port-list" id="portList">
+                <div style="padding: 20px; text-align: center; color: #8b949e;">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Đang tìm kiếm cổng...
+                </div>
+            </div>
+            <div class="port-modal-actions">
+                <button class="port-modal-btn secondary" onclick="closePortModal()">Hủy</button>
+                <button class="port-modal-btn secondary" onclick="refreshPorts()"><i class="fa-solid fa-refresh"></i> Làm mới</button>
+                <button class="port-modal-btn primary" id="uploadBtn" onclick="performUpload()" disabled>Nạp chương trình</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom File Creation Modal -->
+    <div class="file-creation-modal" id="fileCreationModal">
+        <div class="file-creation-content">
+            <div class="file-creation-header">
+                <h3 class="file-creation-title" id="fileCreationTitle">
+                    <i class="fa-solid fa-file-plus"></i>
+                    Tạo file mới
+                </h3>
+                <p class="file-creation-subtitle" id="fileCreationSubtitle">Nhập tên file và chọn vị trí lưu trữ</p>
+            </div>
+            <div class="file-creation-form">
+                <div class="file-creation-input-group">
+                    <label class="file-creation-label" for="fileNameInput">Tên file</label>
+                    <input 
+                        type="text" 
+                        id="fileNameInput" 
+                        class="file-creation-input" 
+                        placeholder="Nhập tên file (ví dụ: main.cpp)"
+                        autocomplete="off"
+                    >
+                </div>
+            </div>
+            <div class="file-creation-actions">
+                <button class="file-creation-btn secondary" onclick="closeFileCreationModal()">Hủy</button>
+                <button class="file-creation-btn primary" id="createFileBtn" onclick="confirmFileCreation()">
+                    <i class="fa-solid fa-plus"></i> Tạo
+                </button>
+            </div>
+        </div>
+    </div>
+
+<div class="file-creation-modal" id="renameModal">
+        <div class="file-creation-content">
+            <div class="file-creation-header">
+                <h3 class="file-creation-title">
+                    <i class="fa-solid fa-pen-to-square"></i> Đổi tên
+                </h3>
+            </div>
+            <div class="file-creation-form">
+                <div class="file-creation-input-group">
+                    <label class="file-creation-label">Nhập tên mới</label>
+                    <input type="text" id="renameInput" class="file-creation-input" autocomplete="off">
+                </div>
+            </div>
+            <div class="file-creation-actions">
+                <button class="file-creation-btn secondary" onclick="closeRenameModal()">Hủy</button>
+                <button class="file-creation-btn primary" id="confirmRenameBtn" onclick="performRename()">Lưu</button>
+            </div>
+        </div>
+    </div>
+    <!-- Custom Unsaved Changes Modal -->
+    <div class="unsaved-changes-modal" id="unsavedChangesModal">
+    <div class="unsaved-changes-content">
+        <div class="unsaved-changes-header">
+            <h3 class="unsaved-changes-title">
+                <i class="fa-solid fa-exclamation-triangle"></i>
+                Thay đổi chưa lưu
+            </h3>
+            <p class="unsaved-changes-message" id="unsavedChangesMessage">Bạn có thay đổi chưa lưu. Đóng file này?</p>
+        </div>
+        <div class="unsaved-changes-actions">
+            <button class="unsaved-changes-btn secondary" onclick="cancelCloseFile()">Hủy</button>
+            <button class="unsaved-changes-btn primary" onclick="confirmCloseFile()">Đóng file</button>
+        </div>
+    </div>
+</div>
+
+<div class="unsaved-changes-modal" id="deleteConfirmationModal" style="display: none;">
+    <div class="unsaved-changes-content">
+        <div class="unsaved-changes-header">
+            <h3 class="unsaved-changes-title" style="color: #f85149;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                Xác nhận Xóa
+            </h3>
+            <p class="unsaved-changes-message" id="deleteConfirmationMessage">Bạn có chắc chắn muốn xóa file này?</p>
+        </div>
+        <div class="unsaved-changes-actions">
+            <button class="unsaved-changes-btn secondary" onclick="cancelDelete()">Hủy</button>
+            <button class="unsaved-changes-btn primary" id="confirmDeleteBtn" onclick="confirmDelete()">Xóa</button>
+        </div>
+    </div>
+</div>
+<div class="toast-container" id="toastContainer"></div>
+<div class="context-menu" id="contextMenu"></div>
+<input type="file" id="fileUploadInput" multiple hidden onchange="handleFileUpload(this.files)">
+{% endblock %}
+{% block scripts %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.33.0/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.33.0/ext-language_tools.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.33.0/ext-modelist.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+
+    <script>
+        const DOM = {
+        filePanel: document.getElementById('filePanel'),
+        resizer: document.getElementById('resizer'),
+        mainPanel: document.getElementById('mainPanel'),
+        editorContainer: document.getElementById('editorContainer'),
+        terminalContainer: document.getElementById('terminal-container'),
+        resizerHorizontal: document.getElementById('resizerHorizontal'),
+        editorTabs: document.getElementById('editorTabs'),
+        fileTreeRoot: document.getElementById('file-tree-root'),
+        refreshIcon: document.getElementById('refreshIcon'),
+        contextMenu: document.getElementById('contextMenu'),
+        saveButton: document.querySelector('.btn-ide span'),
+        fileUploadInput: document.getElementById('fileUploadInput'),
+        toastContainer: document.getElementById('toastContainer'),
+        portModal: document.getElementById('portModal'),
+        portList: document.getElementById('portList'),
+        uploadBtn: document.getElementById('uploadBtn'),
+        fileCreationModal: document.getElementById('fileCreationModal'),
+        fileNameInput: document.getElementById('fileNameInput'),
+        createFileBtn: document.getElementById('createFileBtn'),
+        fileCreationTitle: document.getElementById('fileCreationTitle'),
+        fileCreationSubtitle: document.getElementById('fileCreationSubtitle'),
+        unsavedChangesModal: document.getElementById('unsavedChangesModal'),
+        unsavedChangesMessage: document.getElementById('unsavedChangesMessage'),
+        
+        // Modal Xóa
+        deleteConfirmationModal: document.getElementById('deleteConfirmationModal'),
+        deleteConfirmationMessage: document.getElementById('deleteConfirmationMessage'),
+
+        // Modal Đổi tên (Thêm mới)
+        renameModal: document.getElementById('renameModal'),
+        renameInput: document.getElementById('renameInput'),
+        confirmRenameBtn: document.getElementById('confirmRenameBtn')
+    };
+
+let editor, terminal, fitAddon, webLinksAddon, socket;
+let currentFile = null;
+const openFiles = new Map();
+let uploadPath = '.';     // Thieu Dinh Nghia Ham (DA FIX - by CHUONG)
+let selectedTreeItem = null;
+let selectedPort = null;
+let availablePorts = [];
+const username = "{{ username }}";
+
+// File creation modal state
+let currentFileCreationType = 'file';
+let currentFileCreationPath = '.';
+
+// Bien cuc bo cho Queue
+let socketUpload = null;
+let currentSid = null;
+
+// Unsaved changes modal state
+let pendingCloseFile = null;
+let pendingDeleteItemPath = null;
+
+// Serial monitor variables
+let socketSerial = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    setupEditor();
+    setupTerminal();
+    setupResizer();
+    setupHorizontalResizer();
+    setupEventListeners();
+    setupSerialMonitor();
+    setupFileCreationModal();
+    refreshRootFiles();
+    loadIDEState();
+    connectTerminalSocket();
+    connectUploadSocket();
+});
+
+        // =================================================================
+        // FILE CREATION MODAL
+        // =================================================================
+        function setupFileCreationModal() {
+            // Close modal on escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && DOM.fileCreationModal.style.display !== 'none') {
+                    closeFileCreationModal();
+                }
+            });
+
+            // Close modal on backdrop click
+            DOM.fileCreationModal.addEventListener('click', (e) => {
+                if (e.target === DOM.fileCreationModal) {
+                    closeFileCreationModal();
+                }
+            });
+
+            // Handle enter key in input
+            DOM.fileNameInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    confirmFileCreation();
+                }
+            });
+
+            // Auto-focus input when modal opens
+            DOM.fileCreationModal.addEventListener('animationend', () => {
+                if (DOM.fileCreationModal.style.display !== 'none') {
+                    DOM.fileNameInput.focus();
+                    DOM.fileNameInput.select();
+                }
+            });
+        }
+        function connectUploadSocket() {
+            socketUpload = io('/upload_status');
+
+            socketUpload.on('connect', () => {
+                currentSid = socketUpload.id;
+                console.log('Connected to upload status namespace with SID:', currentSid);
+            });
+
+            socketUpload.on('upload_status', (data) => {
+                console.log('Upload status update:', data);
+                const color = data.status === 'success' ? '\x1b[1;32m' : 
+                              data.status === 'error' ? '\x1b[1;31m' : '\x1b[1;33m';
+        
+                terminal.write(`\r\n${color}[UPLOAD STATUS]\x1b[0m ${data.message}\r\n`);
+        
+                if (data.output) {
+                    terminal.write(`\x1b[90m${data.output}\x1b[0m\r\n`);
+                }
+        
+                if(data.status === 'success' || data.status === 'error') {
+                    terminal.write(`\r\n$ `);
+                }
+                terminal.scrollToBottom();
+            });
+        }
+
+        function showFileCreationModal(type, path = '.') {
+            currentFileCreationType = type;
+            currentFileCreationPath = path;
+            
+            // Update modal content based on type
+            if (type === 'file') {
+                DOM.fileCreationTitle.innerHTML = '<i class="fa-solid fa-file-plus"></i> Tạo file mới';
+                DOM.fileCreationSubtitle.textContent = 'Nhập tên file và chọn vị trí lưu trữ';
+                DOM.fileNameInput.placeholder = 'Nhập tên file (ví dụ: main.cpp)';
+            } else {
+                DOM.fileCreationTitle.innerHTML = '<i class="fa-solid fa-folder-plus"></i> Tạo thư mục mới';
+                DOM.fileCreationSubtitle.textContent = 'Nhập tên thư mục và chọn vị trí lưu trữ';
+                DOM.fileNameInput.placeholder = 'Nhập tên thư mục (ví dụ: src)';
+            }
+            
+            // Clear input and show modal
+            DOM.fileNameInput.value = '';
+            DOM.fileCreationModal.style.display = 'flex';
+            
+            // Focus input after animation
+            setTimeout(() => {
+                DOM.fileNameInput.focus();
+                DOM.fileNameInput.select();
+            }, 100);
+        }
+
+        function closeFileCreationModal() {
+            DOM.fileCreationModal.style.display = 'none';
+            DOM.fileNameInput.value = '';
+        }
+
+        async function confirmFileCreation() {
+            const fileName = DOM.fileNameInput.value.trim();
+            if (!fileName) {
+                showNotification('Vui lòng nhập tên file/thư mục', 'error');
+                return;
+            }
+
+            // Validate filename
+            if (!/^[^<>:"/\\|?*]+$/.test(fileName)) {
+                showNotification('Tên file/thư mục chứa ký tự không hợp lệ', 'error');
+                return;
+            }
+
+            // Disable button and show loading
+            DOM.createFileBtn.disabled = true;
+            DOM.createFileBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo...';
+
+            try {
+                await createNewItem(currentFileCreationType, currentFileCreationPath, fileName);
+                closeFileCreationModal();
+            } catch (error) {
+                showNotification('Có lỗi xảy ra khi tạo file/thư mục', 'error');
+            } finally {
+                DOM.createFileBtn.disabled = false;
+                DOM.createFileBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Tạo';
+            }
+        }
+
+        // =================================================================
+        // IDE State Management
+        // =================================================================
+        function saveIDEState() {
+            try {
+                const openFileKeys = Array.from(openFiles.keys()).filter(key => key !== 'Welcome');
+                const state = {
+                    openFileKeys: openFileKeys,
+                    currentFileKey: (currentFile !== 'Welcome' ? currentFile : null)
+                };
+                localStorage.setItem(`codeSpaceState_${username}`, JSON.stringify(state));
+            } catch (e) {
+                console.warn("Could not save IDE state:", e);
+            }
+        }
+
+        async function loadIDEState() {
+            try {
+                const savedStateJSON = localStorage.getItem(`codeSpaceState_${username}`);
+                if (!savedStateJSON) {
+                    openWelcomeTab();
+                    return;
+                }
+
+                const savedState = JSON.parse(savedStateJSON);
+                const filesToOpen = savedState.openFileKeys || [];
+                
+                if (filesToOpen.length > 0) {
+                    for (const key of filesToOpen) {
+                        const shortName = key.split('/').pop();
+                        await openFile(key, shortName, false);
+                    }
+
+                    const activeFile = savedState.currentFileKey && openFiles.has(savedState.currentFileKey)
+                        ? savedState.currentFileKey
+                        : filesToOpen[filesToOpen.length - 1];
+                    
+                    if (activeFile) switchToFile(activeFile);
+                    else openWelcomeTab();
+                } else {
+                    openWelcomeTab();
+                }
+            } catch (e) {
+                console.error("Failed to load IDE state:", e);
+                localStorage.removeItem(`codeSpaceState_${username}`);
+                openWelcomeTab();
+            }
+        }
+
+        function setupEditor() {
+            editor = ace.edit("editor");
+            ace.require("ace/ext/language_tools");
+            editor.setTheme("ace/theme/tomorrow_night_eighties");
+            editor.session.setMode("ace/mode/javascript");
+            editor.setFontSize(14);
+            editor.setOptions({
+                fontFamily: 'JetBrains Mono, monospace',
+                enableLiveAutocompletion: true,
+                enableBasicAutocompletion: true,
+                showPrintMargin: false,
+                wrap: true,
+            });
+            editor.on("change", () => {
+                if (currentFile && openFiles.has(currentFile)) {
+                    const fileData = openFiles.get(currentFile);
+                    if (fileData.saved) {
+                        fileData.saved = false;
+                        updateTabAppearance(currentFile);
+                        DOM.saveButton.textContent = 'Save*';
+                    }
+                }
+            });
+        }
+
+        function setupTerminal() {
+            terminal = new Terminal({
+                cursorBlink: true,
+                fontFamily: 'JetBrains Mono, monospace',
+                fontSize: 13,
+                lineHeight: 1.3,
+                theme: { 
+                    background: '#0d1117', 
+                    foreground: '#d4d4d4', 
+                    cursor: '#d4d4d4',
+                    selection: 'rgba(88, 166, 255, 0.3)'
+                },
+                scrollback: 10000,
+                rightClickSelectsWord: true,
+                allowTransparency: false,
+                convertEol: true,
+                macOptionIsMeta: true,
+                disableStdin: false,
+                scrollOnUserInput: true,
+                fastScrollModifier: 'alt',
+                fastScrollSensitivity: 5,
+                minimumContrastRatio: 1
+            });
+            
+            fitAddon = new FitAddon.FitAddon();
+            webLinksAddon = new WebLinksAddon.WebLinksAddon();
+            
+            terminal.loadAddon(fitAddon);
+            terminal.loadAddon(webLinksAddon);
+            terminal.open(document.getElementById('terminal'));
+            
+            // Enhanced scrolling configuration
+            const viewport = terminal.element.querySelector('.xterm-viewport');
+            if (viewport) {
+                viewport.style.overflowY = 'auto';
+                viewport.style.scrollBehavior = 'smooth';
+                viewport.style.scrollbarWidth = 'thin';
+            }
+            
+            // Enhanced mouse wheel scrolling with better sensitivity
+            const screen = terminal.element.querySelector('.xterm-screen');
+            if (screen) {
+                screen.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const delta = e.deltaY > 0 ? 1 : -1;
+                    terminal.scrollLines(delta);
+                }, { passive: false });
+            }
+            
+            // Better terminal interaction
+            terminal.onSelectionChange(() => {
+                const selection = terminal.getSelection();
+                if (selection) {
+                    terminal.element.style.cursor = 'text';
+                } else {
+                    terminal.element.style.cursor = 'default';
+                }
+            });
+            
+            // Auto-fit when terminal is resized
+            terminal.onResize(() => {
+                if (fitAddon) {
+                    fitAddon.fit();
+                }
+            });
+            
+            fitAddon.fit();
+            setupTerminalEventListeners();
+        }
+
+        function setupTerminalEventListeners() {
+            terminal.attachCustomKeyEventHandler((e) => {
+                if (e.ctrlKey && e.shiftKey) {
+                    if (e.code === 'KeyC' && e.type === 'keydown') {
+                        e.preventDefault();
+                        copyFromTerminal();
+                        return false;
+                    }
+                    if (e.code === 'KeyV' && e.type === 'keydown') {
+                        e.preventDefault();
+                        pasteToTerminal();
+                        return false;
+                    }
+                }
+                return true;
+            });
+            
+            const terminalElement = document.getElementById('terminal');
+            terminalElement.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                showTerminalContextMenu(e);
+            });
+        }
+
+        function showTerminalContextMenu(e) {
+            DOM.contextMenu.innerHTML = '';
+            
+            const createMenuItem = (text, icon, action) => {
+                const button = document.createElement('button');
+                button.className = 'context-menu-item';
+                button.innerHTML = `<i class="context-menu-icon fa-solid ${icon}"></i> ${text}`;
+                button.onclick = (event) => {
+                    event.stopPropagation();
+                    DOM.contextMenu.style.display = 'none';
+                    action();
+                };
+                return button;
+            };
+            
+            const menuItems = [];
+            menuItems.push(createMenuItem('Copy', 'fa-copy', copyFromTerminal));
+            menuItems.push(createMenuItem('Paste', 'fa-paste', pasteToTerminal));
+            
+            const separator = document.createElement('div');
+            separator.className = 'context-menu-separator';
+            menuItems.push(separator);
+            
+            menuItems.push(createMenuItem('Clear', 'fa-ban', clearTerminal));
+            menuItems.push(createMenuItem('Scroll to Top', 'fa-arrow-up', scrollToTop));
+            menuItems.push(createMenuItem('Scroll to Bottom', 'fa-arrow-down', scrollToBottom));
+            
+            DOM.contextMenu.append(...menuItems);
+            DOM.contextMenu.style.left = `${e.clientX}px`;
+            DOM.contextMenu.style.top = `${e.clientY}px`;
+            DOM.contextMenu.style.display = 'block';
+        }
+        
+        function connectTerminalSocket() {
+            socket = io('/terminal');
+            socket.on('connect', () => {
+                terminal.write('\r\n\x1b[32m✔\x1b[0m Terminal connected.\r\n$ ');
+            });
+            socket.on('output', (data) => {
+                terminal.write(data);
+            });
+            terminal.onData((data) => {
+                if (socket && socket.connected) {
+                    socket.emit('input', data);
+                }
+            });
+            socket.on('disconnect', () => {
+                terminal.write('\r\n\x1b[31m✖\x1b[0m Terminal disconnected.\r\n');
+            });
+        }
+
+        function setupResizer() {
+            const handleMouseMove = (e) => {
+                const newWidth = Math.max(200, Math.min(window.innerWidth * 0.4, e.clientX));
+                DOM.filePanel.style.width = `${newWidth}px`;
+            };
+            const handleMouseUp = () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+                editor.resize();
+                if (fitAddon) fitAddon.fit();
+            };
+            DOM.resizer.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+            });
+        }
+
+        function setupHorizontalResizer() {
+            const resizer = DOM.resizerHorizontal;
+            const handleMouseMove = (e) => {
+                const mainPanelRect = DOM.mainPanel.getBoundingClientRect();
+                const newTerminalHeight = mainPanelRect.bottom - e.clientY;
+                const minHeight = 40;
+                const maxHeight = mainPanelRect.height - 100;
+                const clampedHeight = Math.max(minHeight, Math.min(newTerminalHeight, maxHeight));
+                DOM.terminalContainer.style.height = `${clampedHeight}px`;
+            };
+            const handleMouseUp = () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+                // Use requestAnimationFrame for better timing
+                requestAnimationFrame(() => {
+                    editor.resize();
+                    if (fitAddon) {
+                        fitAddon.fit();
+                    }
+                });
+            };
+            resizer.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+            });
+        }
+
+        function setupEventListeners() {
+            document.addEventListener('click', (e) => {
+                if (!DOM.contextMenu.contains(e.target)) {
+                    DOM.contextMenu.style.display = 'none';
+                }
+            });
+            
+            DOM.filePanel.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                const targetItem = e.target.closest('.tree-item');
+                showContextMenu(e, targetItem);
+            });
+            
+            document.addEventListener('keydown', e => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 's') { 
+                    e.preventDefault(); 
+                    saveCurrentFile(); 
+                }
+            });
+            
+            window.addEventListener('resize', () => {
+                editor.resize();
+                if (fitAddon) fitAddon.fit();
+            });
+        }
+        
+        function toggleTerminal() {
+            const isHidden = DOM.mainPanel.classList.contains('terminal-hidden');
+            DOM.mainPanel.classList.toggle('terminal-hidden');
+            
+            // Use requestAnimationFrame for better timing
+            requestAnimationFrame(() => {
+                editor.resize();
+                if (fitAddon) {
+                    fitAddon.fit();
+                }
+                // Force terminal to recalculate its size
+                if (!isHidden) {
+                    terminal.refresh(0, terminal.rows - 1);
+                }
+            });
+        }
+
+        function toggleSerialMonitor() {
+            const serialWindow = document.getElementById('serial-monitor-window');
+            
+            // Nếu đang ẩn -> Hiện lên
+            if (serialWindow.style.display === 'none') {
+                serialWindow.style.display = 'flex';
+                
+                // Set vị trí mặc định nếu chưa có
+                if (!serialWindow.style.top || !serialWindow.style.left) {
+                     serialWindow.style.top = '100px';
+                     serialWindow.style.right = '20px';
+                     serialWindow.style.left = 'auto'; // Reset left để dùng right
+                }
+                
+                // ▼▼▼ THÊM ĐOẠN NÀY ĐỂ KÍCH HOẠT KÉO THẢ ▼▼▼
+                makeDraggable(serialWindow); 
+                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+                const portSelect = document.getElementById('serial-port-select');
+                if (portSelect.options.length <= 1) {
+                    refreshSerialPorts();
+                }
+            } 
+            // Nếu đang hiện -> Ẩn đi
+            else {
+                serialWindow.style.display = 'none';
+            }
+        }
+        function openSerialWindow() {
+            const serialWindow = document.getElementById('serial-monitor-window');
+            serialWindow.style.display = 'flex';
+            
+            // Load ports when opening
+            refreshSerialPorts();
+            
+            // Make window draggable if not already done
+            if (!serialWindow.hasAttribute('data-draggable')) {
+                makeDraggable(serialWindow);
+                serialWindow.setAttribute('data-draggable', 'true');
+            }
+        }
+
+        function closeSerialWindow() {
+            const serialWindow = document.getElementById('serial-monitor-window');
+            
+            // 1. Ẩn giao diện
+            serialWindow.style.display = 'none';
+            
+            // 2. Ngắt kết nối socket (Để giải phóng tài nguyên server)
+            if (socketSerial && socketSerial.connected) {
+                socketSerial.disconnect();
+                
+                // Reset giao diện về trạng thái "Chưa kết nối" để lần sau mở lại
+                const connectSerialBtn = document.getElementById('connect-serial-btn');
+                const serialStatus = document.getElementById('serial-status');
+                if(connectSerialBtn) {
+                    connectSerialBtn.textContent = '▶️ Connect';
+                    connectSerialBtn.disabled = false;
+                }
+                if(serialStatus) serialStatus.textContent = 'Disconnected';
+            }
+        }
+
+        function minimizeSerialWindow() {
+            const serialWindow = document.getElementById('serial-monitor-window');
+            serialWindow.style.display = 'none';
+        }
+        function makeDraggable(element) {
+            const header = element.querySelector('.floating-window-header');
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            
+            header.onmousedown = dragMouseDown;
+            
+            function dragMouseDown(e) {
+                e = e || window.event;
+                e.preventDefault();
+                
+                // --- [FIX CHÍNH XÁC] ---
+                // 1. Lấy vị trí thực tế hiện tại của cửa sổ trên màn hình
+                const rect = element.getBoundingClientRect();
+                
+                // 2. Gỡ bỏ thuộc tính 'right' đang ghim cửa sổ vào lề phải
+                element.style.right = 'auto'; 
+                
+                // 3. Gán cứng vị trí hiện tại vào 'left' và 'top' để JS điều khiển
+                element.style.left = rect.left + 'px';
+                element.style.top = rect.top + 'px';
+                // -----------------------
+
+                // Lấy tọa độ chuột bắt đầu
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+            }
+            
+            function elementDrag(e) {
+                e = e || window.event;
+                e.preventDefault();
+                
+                // Tính toán khoảng cách di chuyển
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                
+                // Cập nhật vị trí mới
+                element.style.top = (element.offsetTop - pos2) + "px";
+                element.style.left = (element.offsetLeft - pos1) + "px";
+            }
+            
+            function closeDragElement() {
+                // Dừng kéo thả
+                document.onmouseup = null;
+                document.onmousemove = null;
+            }
+        }
+
+        function clearTerminal() {
+            if (terminal) {
+                terminal.clear();
+                showNotification('Terminal cleared', 'success');
+            }
+        }
+
+        function copyFromTerminal() {
+            if (!terminal) return;
+
+            const selection = terminal.hasSelection() ? terminal.getSelection() : null;
+            if (!selection) {
+                showNotification('Please select text first', 'info');
+                return;
+            }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(selection)
+                    .then(() => showNotification('Copied to clipboard!', 'success'))
+                    .catch(err => {
+                        console.error('Copy failed: ', err);
+                        showNotification('Copy failed. Please use Ctrl+Shift+C', 'error');
+                    });
+            } else {
+                // fallback if browser doesn't support navigator.clipboard
+                try {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = selection;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    showNotification('Copied to clipboard!', 'success');
+                } catch (err) {
+                    console.error('Fallback copy failed: ', err);
+                    showNotification('Copy failed. Please use Ctrl+Shift+C', 'error');
+                }
+            }
+        }
+
+        function pasteToTerminal() {
+            if (!terminal) return;
+            
+            navigator.clipboard.readText().then(text => {
+                if (text && socket && socket.connected) {
+                    socket.emit('input', text);
+                }
+            }).catch(err => {
+                console.error('Paste failed: ', err);
+                showNotification('Paste failed. Permission might be denied.', 'error');
+            });
+        }
+
+        function scrollToTop() {
+            if (terminal) {
+                terminal.scrollToTop();
+            }
+        }
+
+        function scrollToBottom() {
+            if (terminal) {
+                terminal.scrollToBottom();
+            }
+        }
+
+        // New function for copying from Serial Monitor
+        function copyFromSerialOutput() {
+            const serialOutput = document.getElementById('serial-output');
+            if (!serialOutput) return;
+
+            const selection = window.getSelection();
+            let textToCopy = '';
+            
+            if (selection.toString()) {
+                textToCopy = selection.toString();
+            } else {
+                // If nothing selected, copy all text
+                textToCopy = serialOutput.textContent;
+            }
+            
+            if (!textToCopy.trim()) {
+                showNotification('No text to copy', 'info');
+                return;
+            }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(textToCopy)
+                    .then(() => showNotification('Serial output copied to clipboard!', 'success'))
+                    .catch(err => {
+                        console.error('Copy failed: ', err);
+                        fallbackCopy(textToCopy);
+                    });
+            } else {
+                fallbackCopy(textToCopy);
+            }
+        }
+
+        function fallbackCopy(text) {
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showNotification('Serial output copied to clipboard!', 'success');
+            } catch (err) {
+                console.error('Fallback copy failed: ', err);
+                showNotification('Copy failed. Please select text manually and use Ctrl+C', 'error');
+            }
+        }
+
+        async function apiCall(endpoint, options = {}) {
+            try {
+                const response = await fetch(endpoint, options);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                return data;
+            } catch (error) {
+                showNotification(`API Error: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        function showNotification(message, type = 'success') {
+            const alertType = type === 'error' ? 'danger' : (type === 'info' ? 'primary' : 'success');
+            const toast = document.createElement('div');
+            toast.className = `toast show align-items-center text-bg-${alertType} border-0`;
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="this.parentElement.parentElement.remove()"></button>
+                </div>
+            `;
+            DOM.toastContainer.appendChild(toast);
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 4000);
+        }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            
+            // Map định nghĩa full class để phân biệt Brand và Solid
+            const map = { 
+                // --- Nhóm Brands (Logo) ---
+                js: 'fa-brands fa-js',
+                html: 'fa-brands fa-html5',
+                css: 'fa-brands fa-css3-alt',
+                py: 'fa-brands fa-python',
+                md: 'fa-brands fa-markdown',
+                dockerfile: 'fa-brands fa-docker',
+                
+                // --- Nhóm Solid (Hệ thống) ---
+                sh: 'fa-solid fa-terminal',       // <--- Đã fix cho file .sh
+                ino: 'fa-solid fa-microchip',     // <--- Đã fix cho file .ino
+                json: 'fa-solid fa-file-code',
+                cpp: 'fa-solid fa-file-code',
+                c: 'fa-solid fa-file-code',
+                h: 'fa-solid fa-file-code',
+                txt: 'fa-solid fa-file-lines'
+            };
+
+            // Lấy class tương ứng, nếu không có thì dùng icon file mặc định
+            const iconClass = map[ext] || 'fa-solid fa-file';
+            
+            return { icon: iconClass, color: '' };
+        }
+
+        async function refreshRootFiles() {
+            DOM.fileTreeRoot.innerHTML = '<div style="padding: 8px; color: #888;"><i>Loading...</i></div>';
+            DOM.refreshIcon.classList.add('fa-spin');
+            try {
+                await loadFolderContents('.', DOM.fileTreeRoot);
+            } finally {
+                DOM.refreshIcon.classList.remove('fa-spin');
+            }
+        }
+
+        async function loadFolderContents(path, parentElement) {
+            try {
+                const data = await apiCall(`/user/${username}/files`, {
+                    method: "POST", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ path: path })
+                });
+                parentElement.innerHTML = '';
+                if (data.files?.length > 0) {
+                    data.files.forEach(item => parentElement.appendChild(createTreeItem(item, path)));
+                } else if (path !== '.') {
+                    parentElement.innerHTML = '<li style="padding-left: 20px; color: #888; font-style: italic;">(empty)</li>';
+                }
+            } catch (e) {
+                parentElement.innerHTML = `<div style="padding: 8px; color: #f85149;"><i>Failed to load files.</i></div>`;
+            }
+        }
+
+        function createTreeItem(item, parentPath) {
+            const li = document.createElement('li');
+            const fullPath = parentPath === '.' ? item.name : `${parentPath}/${item.name}`;
+            const itemDiv = document.createElement('div');
+            itemDiv.className = `tree-item ${item.is_dir ? 'is-folder' : 'is-file'}`;
+            itemDiv.dataset.path = fullPath;
+            const iconData = item.is_dir ? { icon: 'fa-solid fa-folder', color: '#58a6ff'} : getFileIcon(item.name);
+            itemDiv.innerHTML = `<div class="tree-chevron"><i class="fa-solid fa-chevron-right fa-xs"></i></div><div class="tree-icon"><i class="${iconData.icon}" style="color: ${iconData.color || 'inherit'}"></i></div><span class="tree-name">${item.name}</span>`;
+            if (!item.is_dir) itemDiv.querySelector('.tree-chevron').style.visibility = 'hidden';
+            li.appendChild(itemDiv);
+            itemDiv.addEventListener('click', () => {
+                if (selectedTreeItem) selectedTreeItem.classList.remove('is-selected');
+                selectedTreeItem = itemDiv;
+                itemDiv.classList.add('is-selected');
+                item.is_dir ? toggleFolder(li) : openFile(fullPath, item.name);
+            });
+            return li;
+        }
+
+        function toggleFolder(liElement) {
+            const isOpen = liElement.classList.toggle('is-open');
+            const itemDiv = liElement.querySelector('.tree-item');
+            itemDiv.classList.toggle('is-open');
+            if (isOpen) {
+                let childUl = liElement.querySelector('ul');
+                if (!childUl) {
+                    childUl = document.createElement('ul');
+                    liElement.appendChild(childUl);
+                }
+                loadFolderContents(itemDiv.dataset.path, childUl);
+            }
+        }
+        
+        async function createNewItem(type, parentPath = '.', name = '') {
+            if (!name) {
+                // Sử dụng modal đẹp thay vì prompt mặc định
+                showFileCreationModal(type, parentPath);
+                return;
+            }
+            const url = type === 'folder' ? `/user/${username}/create-folder` : `/user/${username}/editor/save`;
+            const body = type === 'folder' ? { folder_name: name, path: parentPath } : { filename: name, path: parentPath, content: '' };
+            try {
+                await apiCall(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+                showNotification(`'${name}' created successfully.`, 'success');
+                if (parentPath === '.') {
+                    refreshRootFiles();
+                } else {
+                    const parentFolderLi = document.querySelector(`.tree-item[data-path="${parentPath}"]`)?.parentElement;
+                    if (parentFolderLi && parentFolderLi.classList.contains('is-open')) {
+                        const childUl = parentFolderLi.querySelector('ul');
+                        if (childUl) loadFolderContents(parentPath, childUl);
+                    } else { refreshRootFiles(); }
+                }
+            } catch (error) {}
+        }
+
+        function showContextMenu(e, targetItem) {
+            DOM.contextMenu.innerHTML = '';
+            const path = targetItem?.dataset.path;
+            const isFolder = targetItem?.classList.contains('is-folder');
+            const createMenuItem = (text, icon, action, isDanger = false) => {
+                const button = document.createElement('button');
+                button.className = `context-menu-item ${isDanger ? 'danger' : ''}`;
+                button.innerHTML = `<i class="context-menu-icon fa-solid ${icon}"></i> ${text}`;
+                button.onclick = (event) => {
+                    event.stopPropagation();
+                    DOM.contextMenu.style.display = 'none';
+                    action();
+                };
+                return button;
+            };
+            const menuItems = [];
+            if (isFolder) {
+                menuItems.push(createMenuItem('New File', 'fa-file-plus', () => createNewItem('file', path)));
+                menuItems.push(createMenuItem('New Folder', 'fa-folder-plus', () => createNewItem('folder', path)));
+                menuItems.push(createMenuItem('Upload Files', 'fa-upload', () => handleUploadClick(path)));
+            } else if (!targetItem) {
+                menuItems.push(createMenuItem('New File', 'fa-file-plus', () => createNewItem('file')));
+                menuItems.push(createMenuItem('New Folder', 'fa-folder-plus', () => createNewItem('folder')));
+                menuItems.push(createMenuItem('Upload Files', 'fa-upload', () => handleUploadClick('.')));
+            }
+            if (targetItem) {
+                const separator = document.createElement('div');
+                separator.className = 'context-menu-separator';
+                menuItems.push(separator);
+                menuItems.push(createMenuItem('Rename', 'fa-i-cursor', () => handleRenameItem(path)));
+                menuItems.push(createMenuItem('Delete', 'fa-trash', () => handleDeleteItem(path), true));
+            }
+            DOM.contextMenu.append(...menuItems);
+            DOM.contextMenu.style.left = `${e.clientX}px`;
+            DOM.contextMenu.style.top = `${e.clientY}px`;
+            DOM.contextMenu.style.display = 'block';
+        }
+
+        // 1. Mở Modal (Thay thế prompt)
+        function handleRenameItem(oldPath) {
+            currentRenamePath = oldPath; 
+            const oldName = oldPath.split('/').pop();
+            
+            // Reset và điền tên cũ
+            DOM.renameInput.value = oldName;
+            DOM.renameModal.style.display = 'flex';
+            
+            // Focus vào ô nhập
+            setTimeout(() => {
+                DOM.renameInput.focus();
+                DOM.renameInput.select();
+            }, 100);
+
+            // Bắt sự kiện Enter trong ô nhập
+            DOM.renameInput.onkeydown = (e) => {
+                if(e.key === 'Enter') performRename();
+                if(e.key === 'Escape') closeRenameModal();
+            };
+        }
+
+        // 2. Đóng Modal
+        function closeRenameModal() {
+            DOM.renameModal.style.display = 'none';
+            currentRenamePath = null;
+            DOM.renameInput.value = '';
+        }
+        // Them Ham handleUpLoadClick bi thieu 
+        function handleUpLoadClick(path){
+        uploadPath = path || '.'
+        DOM.fileUploadInput.click();
+        }
+        // 3. Xử lý đổi tên (Gọi API)
+        async function performRename() {
+            const newName = DOM.renameInput.value.trim();
+            const oldPath = currentRenamePath;
+            
+            if (!newName || !oldPath) return;
+            
+            const oldName = oldPath.split('/').pop();
+            if (newName === oldName) {
+                closeRenameModal();
+                return;
+            }
+
+            // Khóa nút để tránh bấm liên tục
+            DOM.confirmRenameBtn.disabled = true;
+            DOM.confirmRenameBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ...';
+
+            try {
+                await apiCall(`/user/${username}/rename-item`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ old_path: oldPath, new_name: newName })
+                });
+                
+                showNotification('Đổi tên thành công!', 'success');
+                
+                // Nếu file đang mở bị đổi tên -> đóng tab cũ
+                if (openFiles.has(oldPath)) {
+                    // Tìm tab trên giao diện và đóng nó (giả lập click nút X)
+                    const tabElement = Array.from(DOM.editorTabs.children).find(t => t.title === oldPath);
+                    if(tabElement && tabElement.querySelector('.close-icon')) {
+                        // Đóng tab cũ
+                        closeTab({ stopPropagation: ()=>{} }, oldPath, true);
+                    }
+                }
+
+                refreshRootFiles();
+                closeRenameModal();
+            } catch (error) {
+                // Lỗi đã được apiCall xử lý hiển thị
+            } finally {
+                DOM.confirmRenameBtn.disabled = false;
+                DOM.confirmRenameBtn.innerHTML = 'Lưu';
+            }
+        }
+        
+        function handleDeleteItem(path) {
+            showDeleteConfirmationModal(path);
+        }
+        function showDeleteConfirmationModal(path) {
+            pendingDeleteItemPath = path;
+    // Cập nhật nội dung thông báo cho cụ thể hơn
+            DOM.deleteConfirmationMessage.innerHTML = `Bạn có chắc chắn muốn xóa "<strong>${path}</strong>"?<br>Hành động này không thể hoàn tác.`;
+            DOM.deleteConfirmationModal.style.display = 'flex';
+        }
+
+        function cancelDelete() {
+            DOM.deleteConfirmationModal.style.display = 'none';
+            pendingDeleteItemPath = null;
+        }
+
+        async function confirmDelete() {
+            if (!pendingDeleteItemPath) return;
+
+            const pathToDelete = pendingDeleteItemPath;
+    
+    // Đóng modal và reset trạng thái trước khi gọi API
+            DOM.deleteConfirmationModal.style.display = 'none';
+            pendingDeleteItemPath = null;
+
+            try {
+                await apiCall(`/user/${username}/delete-item`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ path: pathToDelete })
+            });
+        
+        // Nếu file đang xóa được mở, hãy đóng tab của nó
+                if (openFiles.has(pathToDelete)) {
+            // Tham số 'true' để buộc đóng tab mà không hỏi lại
+                    closeTab({ stopPropagation: () => {} }, pathToDelete, true);
+                }
+        
+                showNotification(`'${pathToDelete}' đã được xóa.`, 'success');
+                refreshRootFiles(); // Làm mới cây thư mục
+                } catch (error) {
+        // Lỗi đã được xử lý trong hàm apiCall
+            }
+}
+        async function handleFileUpload(files) {
+            if (files.length === 0) return;
+            const formData = new FormData();
+            for (const file of files) {
+                formData.append('files', file);
+            }
+            formData.append('path', uploadPath);
+            showNotification(`Uploading ${files.length} file(s)...`, 'info');
+            try {
+                await apiCall(`/user/${username}/upload-files`, { method: 'POST', body: formData });
+                showNotification('Upload complete!', 'success');
+                const parentFolderLi = document.querySelector(`.tree-item[data-path="${uploadPath}"]`)?.parentElement;
+                if(uploadPath === '.' || !parentFolderLi) {
+                    refreshRootFiles();
+                } else if (parentFolderLi.classList.contains('is-open')) {
+                     const childUl = parentFolderLi.querySelector('ul');
+                     if(childUl) loadFolderContents(uploadPath, childUl);
+                }
+            } catch (error) {}
+            DOM.fileUploadInput.value = '';
+        }
+        
+        function openWelcomeTab() {
+            const content = `// Welcome to CodeSpace IDE!\n// Features:\n// - Full terminal support with copy/paste\n// - Scrollable terminal with mouse wheel\n// - Context menus\n// - File management\n// - Arduino/ESP compilation\n\nconsole.log("Happy Coding!");`; 
+            if (!openFiles.has('Welcome')) {
+                openFiles.set('Welcome', { content, saved: true, shortName: 'Welcome', path: '.' }); 
+            }
+            switchToFile('Welcome'); 
+        }
+
+        async function openFile(fullPath, shortName, autoSwitch = true) {
+            if (openFiles.has(fullPath)) { 
+                if (autoSwitch) switchToFile(fullPath);
+                return; 
+            } 
+            const parentPath = fullPath.includes('/') ? fullPath.split('/').slice(0, -1).join('/') : '.'; 
+            try { 
+                const data = await apiCall(`/user/${username}/editor/load`, { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ filename: shortName, path: parentPath }) 
+                }); 
+                openFiles.set(fullPath, { 
+                    content: data.content, 
+                    saved: true, 
+                    shortName, 
+                    path: parentPath 
+                }); 
+                if (autoSwitch) switchToFile(fullPath);
+                else renderTabs();
+            } catch (error) { /* Error handled by apiCall */ } 
+        }
+
+        function switchToFile(fullPathKey) { 
+            if (!openFiles.has(fullPathKey)) return; 
+            currentFile = fullPathKey; 
+            const fileData = openFiles.get(fullPathKey); 
+            editor.setValue(fileData.content, -1); 
+            const modelist = ace.require("ace/ext/modelist"); 
+            editor.session.setMode(modelist.getModeForPath(fileData.shortName).mode); 
+            editor.focus(); 
+            renderTabs(); 
+            saveIDEState();
+        }
+
+        function renderTabs() { 
+            DOM.editorTabs.innerHTML = ''; 
+            for (const [key, data] of openFiles.entries()) { 
+                const tab = document.createElement('button'); 
+                tab.className = `editor-tab ${key === currentFile ? 'active' : ''}`; 
+                tab.title = key; 
+                tab.innerHTML = `<span>${data.shortName}${data.saved ? '' : ' •'}</span>`; 
+                tab.onclick = () => switchToFile(key); 
+                if (key !== 'Welcome') { 
+                    const closeIcon = document.createElement('i'); 
+                    closeIcon.className = 'fa-solid fa-times close-icon'; 
+                    closeIcon.onclick = (e) => closeTab(e, key); 
+                    tab.appendChild(closeIcon); 
+                } 
+                DOM.editorTabs.appendChild(tab); 
+            } 
+            DOM.saveButton.textContent = (currentFile && openFiles.get(currentFile)?.saved === false) ? 'Save*' : 'Save'; 
+        }
+
+        function updateTabAppearance(fullPathKey) { 
+            const tabEl = Array.from(DOM.editorTabs.children).find(t => t.title === fullPathKey); 
+            if (tabEl && openFiles.has(fullPathKey)) { 
+                const fileData = openFiles.get(fullPathKey); 
+                tabEl.querySelector('span').textContent = fileData.shortName + (fileData.saved ? '' : ' •'); 
+            } 
+        }
+
+        function closeTab(e, fullPathKey, force = false) {
+            e.stopPropagation(); 
+            const fileData = openFiles.get(fullPathKey); 
+            if (!force && fileData && !fileData.saved) { 
+                // Show custom modal instead of confirm()
+                showUnsavedChangesModal(fullPathKey);
+                return; 
+            } 
+            performCloseTab(fullPathKey);
+        }
+        
+        function showUnsavedChangesModal(fullPathKey) {
+            pendingCloseFile = fullPathKey;
+            const fileData = openFiles.get(fullPathKey);
+            const fileName = fileData ? fileData.shortName : fullPathKey.split('/').pop();
+            DOM.unsavedChangesMessage.textContent = `File "${fileName}" có thay đổi chưa lưu. Đóng file này?`;
+            DOM.unsavedChangesModal.style.display = 'flex';
+        }
+        
+        function cancelCloseFile() {
+            DOM.unsavedChangesModal.style.display = 'none';
+            pendingCloseFile = null;
+        }
+        
+        function confirmCloseFile() {
+            if (pendingCloseFile) {
+                performCloseTab(pendingCloseFile);
+                DOM.unsavedChangesModal.style.display = 'none';
+                pendingCloseFile = null;
+            }
+        }
+        
+        function performCloseTab(fullPathKey) {
+            openFiles.delete(fullPathKey); 
+            if (currentFile === fullPathKey) { 
+                const keys = Array.from(openFiles.keys());
+                const newCurrentFile = keys.length > 0 ? keys[keys.length - 1] : null;
+                if (newCurrentFile) {
+                    switchToFile(newCurrentFile);
+                } else {
+                    openWelcomeTab();
+                }
+            } else { 
+                renderTabs(); 
+                saveIDEState();
+            } 
+        }
+        
+        async function saveCurrentFile() { 
+            if (!currentFile || currentFile === 'Welcome') return; 
+            const fileData = openFiles.get(currentFile); 
+            if (!fileData || fileData.saved) return; 
+            const content = editor.getValue(); 
+            try { 
+                await apiCall(`/user/${username}/editor/save`, { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ 
+                        filename: fileData.shortName, 
+                        content: content, 
+                        path: fileData.path 
+                    }) 
+                }); 
+                fileData.content = content; 
+                fileData.saved = true; 
+                updateTabAppearance(currentFile); 
+                DOM.saveButton.textContent = 'Save'; 
+                showNotification(`Saved ${fileData.shortName}`, 'success'); 
+            } catch (error) { } 
+        }
+
+        async function compileCode(event) {
+            if (!currentFile || currentFile === 'Welcome') {
+                showNotification('Vui lòng mở một file .ino để biên dịch!', 'error');
+                return;
+            }
+            if (!currentFile.toLowerCase().endsWith('.ino')) {
+                showNotification('Chỉ có thể biên dịch file .ino (Arduino sketch)!', 'error');
+                return;
+            }
+            //Logic auto save before compile or loaded
+            if(openFiles.has(currentFile) && !openFiles.get(currentFile).saved){
+                terminal.write('\r\n\x1b[90m[IDE]\x1b[0m File chưa được lưu. Tự động lưu...\r\n');
+                await saveCurrentFile() // save and continue
+            }
+
+            const boardSelector = document.getElementById('boardSelector');
+            const boardFqbn = boardSelector.value;
+            const sketchPath = currentFile;
+            
+            terminal.write(`\r\n\x1b[1;33m[COMPILE]\x1b[0m Đang biên dịch '${sketchPath}' cho ${boardFqbn}...\r\n`);
+            
+            const compileBtn = event.currentTarget;
+            const originalBtnHTML = compileBtn.innerHTML;
+            compileBtn.disabled = true;
+            compileBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Đang xử lý...`;
+            
+            try {
+                const response = await fetch(`/user/${username}/compile`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ sketch_path: sketchPath, board_fqbn: boardFqbn })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || `Server responded with status ${response.status}`);
+                }
+                if (data.success) {
+                    terminal.write(`\x1b[1;32m✓ Biên dịch thành công!\x1b[0m\r\n`);
+                    if (data.memory_analysis) {
+                        writeMemoryUsageToTerminal(data.memory_analysis);
+                    }
+                    showNotification('Biên dịch thành công!', 'success');
+                } else {
+                    terminal.write(`\x1b[1;31m✗ Biên dịch thất bại!\x1b[0m\r\n`);
+                    if (data.error_analysis) {
+                        writeErrorAnalysisToTerminal(data.error_analysis);
+                    } else {
+                        terminal.write(`\x1b[90m${data.output}\x1b[0m\r\n`);
+                    }
+                    const errorCount = data.error_analysis ? data.error_analysis.error_count : 0;
+                    const warningCount = data.error_analysis ? data.error_analysis.warning_count : 0;
+                    showNotification(`Biên dịch thất bại! ${errorCount} lỗi, ${warningCount} cảnh báo`, 'error');
+                }
+            } catch (error) {
+                const errorMessage = error.message.includes('not valid JSON') 
+                    ? 'Phản hồi từ server không hợp lệ. Vui lòng đăng nhập lại.' 
+                    : error.message;
+                terminal.write(`\r\n\x1b[1;31m✗ Lỗi hệ thống: ${errorMessage}\x1b[0m\r\n`);
+                showNotification(`Lỗi hệ thống: ${errorMessage}`, 'error');
+                console.error("Compile API call failed:", error);
+            } finally {
+                compileBtn.disabled = false;
+                compileBtn.innerHTML = originalBtnHTML;
+                terminal.write(`\r\n$ `); // Show new prompt
+                terminal.scrollToBottom();
+            }
+        }
+        
+        function writeMemoryUsageToTerminal(analysis) {
+            const formatBytes = (bytes) => bytes.toLocaleString('en-US');
+            const createProgressBar = (percent) => {
+                const totalBars = 20;
+                const filledBars = Math.round((percent / 100) * totalBars);
+                const emptyBars = totalBars - filledBars;
+                return `\x1b[90m[\x1b[0m` + `\x1b[32m█\x1b[0m`.repeat(filledBars) + `\x1b[90m-\x1b[0m`.repeat(emptyBars) + `\x1b[90m]\x1b[0m`;
+            };
+
+            terminal.write(`\r\n\x1b[1;34m📊 Thống kê bộ nhớ:\x1b[0m\r\n`);
+            if (analysis.flash) {
+                const f = analysis.flash;
+                terminal.write(`   \x1b[36mFlash:\x1b[0m ${createProgressBar(f.percent)} ${f.percent}% (${formatBytes(f.used)} / ${formatBytes(f.total)} bytes)\r\n`);
+            }
+            if (analysis.ram) {
+                const r = analysis.ram;
+                terminal.write(`   \x1b[35mRAM:  \x1b[0m ${createProgressBar(r.percent)} ${r.percent}% (${formatBytes(r.used)} / ${formatBytes(r.total)} bytes)\r\n`);
+            }
+        }
+
+        function writeErrorAnalysisToTerminal(analysis) {
+            if (analysis.errors && analysis.errors.length > 0) {
+                terminal.write(`\r\n\x1b[1;31m━━━ ${analysis.error_count} LỖI CẦN SỬA ━━━\x1b[0m\r\n`);
+                analysis.errors.forEach((error, index) => {
+                    terminal.write(` \x1b[90m${index + 1}.\x1b[0m \x1b[33m${error.file}:${error.line}:${error.column}\x1b[0m\r\n`);
+                    terminal.write(`    \x1b[31merror:\x1b[0m ${error.message}\r\n\r\n`);
+                });
+            }
+            if (analysis.warnings && analysis.warnings.length > 0) {
+                terminal.write(`\r\n\x1b[1;33m━━━ ${analysis.warning_count} CẢNH BÁO ━━━\x1b[0m\r\n`);
+                analysis.warnings.forEach((warning, index) => {
+                    terminal.write(` \x1b[90m${index + 1}.\x1b[0m \x1b[33m${warning.file}:${warning.line}:${warning.column}\x1b[0m\r\n`);
+                    terminal.write(`    \x1b[33mwarning:\x1b[0m ${warning.message}\r\n\r\n`);
+                });
+            }
+        }
+
+        // =================================================================
+        // UPLOAD LOGIC
+        // =================================================================
+        async function uploadToBoard(event) {
+            if (!currentFile || !currentFile.toLowerCase().endsWith('.ino')) {
+                showNotification('Vui lòng mở một file .ino để nạp chương trình!', 'error');
+                return;
+            }
+            DOM.portModal.style.display = 'flex';
+            await refreshPorts();
+        }
+
+        function closePortModal() {
+            DOM.portModal.style.display = 'none';
+            selectedPort = null;
+        }
+
+        async function refreshPorts() {
+            DOM.portList.innerHTML = `<div style="padding: 20px; text-align: center; color: #8b949e;"><i class="fa-solid fa-spinner fa-spin"></i> Đang tìm kiếm cổng...</div>`;
+            DOM.uploadBtn.disabled = true;
+            try {
+                const data = await apiCall(`/user/${username}/serial-ports`);
+                availablePorts = data.ports || [];
+                if (availablePorts.length === 0) {
+                    DOM.portList.innerHTML = `<div style="padding: 20px; text-align: center; color: #f85149;"><i class="fa-solid fa-plug-circle-xmark"></i> Không tìm thấy thiết bị nào. Vui lòng kiểm tra kết nối.</div>`;
+                    return;
+                }
+                DOM.portList.innerHTML = '';
+                availablePorts.forEach(portInfo => {
+                const portDiv = document.createElement('div');
+                portDiv.className = 'port-item';
+                portDiv.onclick = () => selectPort(portInfo);
+    
+                const portAddress = portInfo.port.address; // /dev/ttyUSB...
+                const boardName = portInfo.matching_boards ? portInfo.matching_boards[0].name : 'Unknown Device';
+
+    // LOGIC MỚI: Đưa boardName lên class 'port-name' (to/đậm), đưa portAddress xuống 'port-desc' (nhỏ/mờ)
+                portDiv.innerHTML = `
+                    <div class="port-name">
+                        <i class="fa-solid fa-microchip"></i> ${boardName}
+                    </div>
+                    <div class="port-desc" style="font-family: monospace; opacity: 0.6;">
+                        ${portAddress}
+                    </div>
+                `;
+    
+                DOM.portList.appendChild(portDiv);
+});
+                
+                // Also populate serial monitor port selector
+                updateSerialPortSelector(availablePorts);
+            } catch (error) {
+                DOM.portList.innerHTML = `<div style="padding: 20px; text-align: center; color: #f85149;"><i class="fa-solid fa-triangle-exclamation"></i> Lỗi khi lấy danh sách cổng.</div>`;
+                console.error("Failed to fetch ports:", error);
+            }
+        }
+
+        function selectPort(portInfo) {
+            selectedPort = portInfo;
+            Array.from(DOM.portList.children).forEach((child, index) => {
+                if (availablePorts[index].port.address === selectedPort.port.address) {
+                    child.classList.add('selected');
+                } else {
+                    child.classList.remove('selected');
+                }
+            });
+            DOM.uploadBtn.disabled = false;
+        }
+
+        async function performUpload() {
+            if (!selectedPort) {
+                showNotification('Vui lòng chọn một cổng để nạp!', 'error');
+                return;
+            }
+            if(!currentSid){
+                showNotification('Could not connect to server to get status. Please try again. Server !', 'error');
+                return;
+            }
+            if (openFiles.has(currentFile) && !openFiles.get(currentFile).saved) {
+                terminal.write('\r\n\x1b[90m[IDE]\x1b[0m File chưa được lưu. Tự động lưu...\r\n');
+                await saveCurrentFile(); // Đợi lưu xong rồi mới tiếp tục
+            }
+            const boardSelector = document.getElementById('boardSelector');
+            const boardFqbn = boardSelector.value;
+            const sketchPath = currentFile;
+            const portAddress = selectedPort.port.address;
+            closePortModal();
+            terminal.write(`\r\n\x1b[1;33m[UPLOAD]\x1b[0m Đang nạp '${sketchPath}' vào ${portAddress}...\r\n`);
+            const uploadButtonInHeader = document.querySelector('.btn-upload');
+            const originalBtnHTML = uploadButtonInHeader.innerHTML;
+            uploadButtonInHeader.disabled = true;
+            uploadButtonInHeader.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Đang nạp...`;
+            try {
+                const data = await apiCall(`/user/${username}/upload`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ sketch_path: sketchPath, board_fqbn: boardFqbn, port: portAddress, sid: currentSid})
+                });
+                if (data.success) {
+                    terminal.write(`\x1b[1;32m✓ Nạp chương trình thành công!\x1b[0m\r\n`);
+                    showNotification('Nạp chương trình thành công!', 'success');
+                } else {
+                    terminal.write(`\x1b[1;31m✗ Nạp chương trình thất bại!\x1b[0m\r\n`);
+                    terminal.write(`\x1b[90m${data.output}\x1b[0m\r\n`);
+                    showNotification('Nạp chương trình thất bại. Xem terminal để biết chi tiết.', 'error');
+                }
+            } catch (error) {
+                terminal.write(`\r\n\x1b[1;31m✗ Lỗi hệ thống khi nạp: ${error.message}\x1b[0m\r\n`);
+            } finally {
+                uploadButtonInHeader.disabled = false;
+                uploadButtonInHeader.innerHTML = originalBtnHTML;
+                terminal.write(`\r\n$ `);
+                terminal.scrollToBottom();
+            }
+        }
+
+        // =================================================================
+        // Dang on cam sua code khi chua xin phep (LOGIC MONITER)
+        // =================================================================
+        function setupSerialMonitor() {
+            const connectSerialBtn = document.getElementById('connect-serial-btn');
+            const baudRateSelect = document.getElementById('baud-rate-select');
+            const serialOutput = document.getElementById('serial-output');
+            const serialStatus = document.getElementById('serial-status');
+
+            connectSerialBtn.addEventListener('click', () => {
+                const selectedPortValue = document.getElementById('serial-port-select').value;
+                
+                if (!selectedPortValue) {
+                    showNotification("Vui lòng chọn một cổng Serial trước!", 'error');
+                    return;
+                }
+
+                if (socketSerial && socketSerial.connected) {
+                    // If connected -> Disconnect
+                    socketSerial.disconnect();
+                } else {
+                    // If not connected -> Connect
+                    const baudRate = baudRateSelect.value;
+                    connectSerial(selectedPortValue, baudRate);
+                }
+            });
+        }
+
+        function updateSerialPortSelector(ports) {
+            const serialPortSelect = document.getElementById('serial-port-select');
+            if (!serialPortSelect) return;
+            
+            // Clear existing options except the first one
+            serialPortSelect.innerHTML = '<option value="">Select Port...</option>';
+            
+            // Add available ports
+            ports.forEach(portInfo => {
+                const option = document.createElement('option');
+                option.value = portInfo.port.address;
+                option.textContent = `${portInfo.port.address} - ${portInfo.matching_boards ? portInfo.matching_boards[0].name : 'Unknown'}`;
+                serialPortSelect.appendChild(option);
+            });
+        }
+
+        async function refreshSerialPorts() {
+            try {
+                const data = await apiCall(`/user/${username}/serial-ports`);
+                updateSerialPortSelector(data.ports || []);
+            } catch (error) {
+                console.error('Failed to refresh serial ports:', error);
+            }
+        }
+
+        function clearSerialOutput() {
+            const serialOutput = document.getElementById('serial-output');
+            if (serialOutput) {
+                serialOutput.innerHTML = '';
+                showNotification('Serial output cleared', 'success');
+            }
+        }
+
+        function connectSerial(port, baudRate) {
+            if (socketSerial) {
+                socketSerial.disconnect();
+            }
+
+            const connectSerialBtn = document.getElementById('connect-serial-btn');
+            const serialOutput = document.getElementById('serial-output');
+            const serialStatus = document.getElementById('serial-status');
+
+            // Connect to namespace /serial
+            socketSerial = io('/serial');
+            
+            serialOutput.innerHTML = ''; // Clear old output
+            serialStatus.textContent = 'Connecting...';
+            connectSerialBtn.textContent = 'Connecting...';
+            connectSerialBtn.disabled = true;
+
+            socketSerial.on('connect', () => {
+                serialStatus.textContent = 'Connected. Starting monitor...';
+                connectSerialBtn.textContent = '⏹️ Disconnect';
+                connectSerialBtn.disabled = false;
+                // Send request to start monitor with selected port and baud rate
+                socketSerial.emit('start_monitor', { port: port, baud_rate: parseInt(baudRate) });
+            });
+
+            socketSerial.on('disconnect', () => {
+                serialStatus.textContent = 'Disconnected.';
+                connectSerialBtn.textContent = '▶️ Connect';
+                connectSerialBtn.disabled = false;
+                socketSerial = null;
+            });
+
+            socketSerial.on('status', (msg) => {
+                serialStatus.textContent = msg.message;
+            });
+
+            socketSerial.on('serial_data', (msg) => {
+                // Print received data to screen
+                serialOutput.textContent += msg.data;
+                // Auto scroll to bottom
+                serialOutput.scrollTop = serialOutput.scrollHeight;
+            });
+
+            socketSerial.on('serial_error', (msg) => {
+                serialOutput.innerHTML += `<span style="color: #ff6b6b;">ERROR: ${msg.error}</span>\n`;
+                serialStatus.textContent = 'Error!';
+                serialOutput.scrollTop = serialOutput.scrollHeight;
+            });
+        }
+
+        function escapeHtml(text) {
+            if (typeof text !== 'string') return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+{% endblock %} 

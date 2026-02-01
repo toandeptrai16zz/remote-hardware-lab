@@ -1,0 +1,70 @@
+# Sử dụng Ubuntu 22.04
+FROM ubuntu:22.04
+
+# Thiết lập biến môi trường
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH="/usr/local/bin:${PATH}"
+
+# 1. Cài đặt các gói hệ thống
+RUN apt-get update && apt-get install -y \
+    openssh-server sudo curl wget vim git ca-certificates coreutils dos2unix python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Cấu hình SSH và Tắt log rác
+RUN mkdir -p /var/run/sshd && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
+    sed -i 's/^session.*pam_motd.so/#&/' /etc/pam.d/sshd && \
+    sed -i 's/^session.*pam_motd.so/#&/' /etc/pam.d/login && \
+    rm -rf /etc/update-motd.d/* && rm -f /etc/motd && touch /etc/motd
+
+# 3. Cài đặt Arduino CLI
+RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+
+# 4. Tải file index về (Để sẵn đó cho đỡ phải tải lại)
+RUN mkdir -p /root/.arduino15
+RUN wget -O /root/.arduino15/package_esp8266com_index.json https://arduino.esp8266.com/stable/package_esp8266com_index.json
+RUN wget -O /root/.arduino15/package_esp32_index.json https://espressif.github.io/arduino-esp32/package_esp32_index.json
+
+# 5. Cấu hình Index giả lập để cài AVR và ESP8266 (Bỏ ESP32 ra cài sau)
+RUN arduino-cli config init --overwrite
+RUN echo "board_manager:" > /root/.arduino15/arduino-cli.yaml && \
+    echo "  additional_urls:" >> /root/.arduino15/arduino-cli.yaml && \
+    echo "    - http://localhost:9999/package_esp8266com_index.json" >> /root/.arduino15/arduino-cli.yaml && \
+    echo "    - http://localhost:9999/package_esp32_index.json" >> /root/.arduino15/arduino-cli.yaml
+
+# 6. Chạy Server giả lập để cài các gói NHẸ (AVR, ESP8266)
+# LƯU Ý: Đã xóa dòng cài ESP32 ở đây để tránh Timeout
+RUN cd /root/.arduino15 && \
+    python3 -m http.server 9999 & \
+    SERVER_PID=$! && \
+    sleep 3 && \
+    arduino-cli core update-index && \
+    arduino-cli core install arduino:avr && \
+    arduino-cli core install esp8266:esp8266 && \
+    kill $SERVER_PID
+
+# 7. Trả lại cấu hình URL gốc (Để sau này User cài ESP32 không bị lỗi)
+RUN arduino-cli config set board_manager.additional_urls https://arduino.esp8266.com/stable/package_esp8266com_index.json,https://espressif.github.io/arduino-esp32/package_esp32_index.json
+
+# 8. Cài thư viện
+RUN arduino-cli lib install "ArduinoJson" "PubSubClient" "DHT sensor library" "Adafruit NeoPixel"
+
+# 9. Copy scripts
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY setup-user-arduino.sh /usr/local/bin/setup-user-arduino.sh
+
+# Tạo thêm script cài ESP32 thủ công
+RUN echo '#!/bin/bash' > /usr/local/bin/install-esp32.sh && \
+    echo 'echo "Dang cai dat ESP32 Core (Khoang 500MB)... Vui long cho..."' >> /usr/local/bin/install-esp32.sh && \
+    echo 'arduino-cli core install esp32:esp32' >> /usr/local/bin/install-esp32.sh && \
+    echo 'echo "Cai dat ESP32 Hoan tat!"' >> /usr/local/bin/install-esp32.sh
+
+RUN dos2unix /usr/local/bin/entrypoint.sh && \
+    dos2unix /usr/local/bin/setup-user-arduino.sh && \
+    chmod +x /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/setup-user-arduino.sh && \
+    chmod +x /usr/local/bin/install-esp32.sh
+
+EXPOSE 22
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

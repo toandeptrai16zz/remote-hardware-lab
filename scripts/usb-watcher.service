@@ -1,0 +1,19 @@
+[Unit]
+Description=USB Watcher Service for Flask IoT Lab
+After=network.target
+
+[Service]
+Type=simple
+User=toan
+WorkingDirectory=/home/toan/flask-kerberos-demo
+ExecStart=/home/toan/flask-kerberos-demo/venv/bin/python /home/toan/flask-kerberos-demo/scripts/watcher.py
+Restart=on-failure
+RestartSec=5s
+StandardOutput=append:/home/toan/flask-kerberos-demo/logs/watcher.log
+StandardError=append:/home/toan/flask-kerberos-demo/logs/watcher-error.log
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target

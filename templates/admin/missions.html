@@ -1,0 +1,1085 @@
+{% extends "layout.html" %}
+{% block title %}Giao Mission{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<style>
+  :root {
+    /* Color palette */
+    --primary-gradient: linear-gradient(135deg, #667eea, #764ba2);
+    --surface-dark: #2a2a2e;
+    --surface-overlay: rgba(255, 255, 255, 0.05);
+    --border-subtle: rgba(255, 255, 255, 0.1);
+    --border-accent: rgba(255, 255, 255, 0.2);
+    --text-primary: #fff;
+    --text-muted: rgba(255, 255, 255, 0.7);
+    
+    /* Design tokens */
+    --border-radius-lg: 16px;
+    --border-radius-md: 12px;
+    --border-radius-sm: 10px;
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 0.75rem;
+    --spacing-lg: 1rem;
+    --spacing-xl: 1.5rem;
+    --spacing-2xl: 2rem;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --transition-base: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow-soft: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-medium: 0 8px 15px rgba(0, 0, 0, 0.15);
+    --shadow-strong: 0 20px 25px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Main layout */
+  .mission-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--spacing-2xl) var(--spacing-lg);
+  }
+
+  /* Header section */
+  .mission-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-2xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .mission-header h2 {
+    margin: 0;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+
+  .mission-header .header-icon {
+    color: #667eea;
+    font-size: 1.5rem;
+  }
+
+  /* Card styling */
+  .card-soft {
+    background: var(--surface-dark);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-soft);
+    transition: var(--transition-base);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-soft::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--primary-gradient);
+  }
+
+  .card-soft:hover {
+    box-shadow: var(--shadow-medium);
+    border-color: var(--border-accent);
+  }
+
+  .mission-form {
+    padding: var(--spacing-2xl);
+  }
+
+  /* Form controls */
+  .form-label {
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+  }
+
+  .form-label .required-indicator {
+    color: #ff6b6b;
+    font-size: 0.875rem;
+  }
+
+  .form-control-dark {
+    background-color: var(--surface-overlay);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    min-height: 48px;
+    font-size: 0.9375rem;
+    transition: var(--transition-fast);
+    position: relative;
+  }
+
+  .form-control-dark:focus {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    color: var(--text-primary);
+  }
+
+  .form-control-dark::placeholder {
+    color: var(--text-muted);
+    opacity: 0.8;
+  }
+
+  /* Form groups */
+  .form-group {
+    margin-bottom: var(--spacing-xl);
+    position: relative;
+  }
+
+  .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Submit button */
+  .btn-mission-submit {
+    background: var(--primary-gradient);
+    border: none;
+    padding: var(--spacing-md) var(--spacing-2xl);
+    border-radius: var(--border-radius-sm);
+    font-weight: var(--font-weight-semibold);
+    color: white;
+    font-size: 1rem;
+    transition: var(--transition-base);
+    position: relative;
+    overflow: hidden;
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+  }
+
+  .btn-mission-submit::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent
+    );
+    transition: var(--transition-base);
+  }
+
+  .btn-mission-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-medium);
+  }
+
+  .btn-mission-submit:hover::before {
+    left: 100%;
+  }
+
+  .btn-mission-submit:active {
+    transform: translateY(0);
+  }
+
+  .btn-mission-submit:disabled {
+    opacity: 0.6;
+    transform: none;
+    cursor: not-allowed;
+  }
+
+  .btn-mission-submit.loading {
+    pointer-events: none;
+  }
+
+  .btn-mission-submit .spinner {
+    display: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  .btn-mission-submit.loading .spinner {
+    display: inline-block;
+  }
+
+  .btn-mission-submit.loading .btn-text {
+    display: none;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Select2 customization */
+  .select2-container--bootstrap-5 .select2-selection {
+    background-color: var(--surface-overlay) !important;
+    border: 1px solid var(--border-subtle) !important;
+    color: var(--text-primary) !important;
+    border-radius: var(--border-radius-sm) !important;
+    padding: var(--spacing-xs) var(--spacing-md) !important;
+    min-height: 48px !important;
+    transition: var(--transition-fast) !important;
+  }
+
+  .select2-container--bootstrap-5.select2-container--focus .select2-selection {
+    border-color: #667eea !important;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+  }
+
+  .select2-container--bootstrap-5 .select2-dropdown {
+    background-color: var(--surface-dark) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: var(--border-radius-sm) !important;
+    box-shadow: var(--shadow-medium) !important;
+  }
+
+  .select2-container--bootstrap-5 .select2-results__option {
+    color: var(--text-primary) !important;
+    padding: var(--spacing-sm) var(--spacing-lg) !important;
+    transition: var(--transition-fast) !important;
+  }
+
+  .select2-container--bootstrap-5 .select2-results__option--highlighted {
+    background-color: #667eea !important;
+    color: white !important;
+  }
+
+  .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
+    background-color: #667eea !important;
+    border: none !important;
+    color: white !important;
+    border-radius: var(--spacing-xs) !important;
+    padding: var(--spacing-xs) var(--spacing-sm) !important;
+    margin: var(--spacing-xs) !important;
+    font-size: 0.875rem !important;
+  }
+
+  .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove {
+    color: rgba(255, 255, 255, 0.8) !important;
+    font-weight: bold !important;
+  }
+
+  .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove:hover {
+    color: white !important;
+  }
+
+  .select2-container--bootstrap-5 .select2-search--inline .select2-search__field {
+    background: transparent !important;
+    color: var(--text-primary) !important;
+    border: none !important;
+  }
+
+  .select2-container--bootstrap-5 .select2-selection__placeholder {
+    color: var(--text-muted) !important;
+  }
+
+  /* Loading states */
+  .form-loading {
+    position: relative;
+  }
+
+  .form-loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(42, 42, 46, 0.8);
+    backdrop-filter: blur(2px);
+    border-radius: var(--border-radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .mission-container {
+      padding: var(--spacing-lg) var(--spacing-sm);
+    }
+
+    .mission-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--spacing-lg);
+    }
+
+    .mission-form {
+      padding: var(--spacing-xl);
+    }
+
+    .form-control-dark,
+    .btn-mission-submit {
+      font-size: 16px; /* Prevent zoom on iOS */
+    }
+  }
+
+  @media (max-width: 576px) {
+    .mission-header h2 {
+      font-size: 1.5rem;
+    }
+
+    .mission-form {
+      padding: var(--spacing-lg);
+    }
+  }
+
+  /* Accessibility improvements */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Focus management */
+  .focus-trap:focus {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+  }
+
+  /* Error states */
+  .form-control-error {
+    border-color: #ff6b6b !important;
+    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1) !important;
+  }
+
+  .error-message {
+    color: #ff6b6b;
+    font-size: 0.875rem;
+    margin-top: var(--spacing-xs);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+  }
+
+  /* Success states */
+  .form-control-success {
+    border-color: #28a745 !important;
+    box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1) !important;
+  }
+
+  .success-message {
+    color: #28a745;
+    font-size: 0.875rem;
+    margin-top: var(--spacing-xs);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+  }
+
+  /* Validation indicators */
+  .validation-indicator {
+    position: absolute;
+    top: 50%;
+    right: var(--spacing-lg);
+    transform: translateY(-50%);
+    font-size: 1.25rem;
+  }
+
+  .validation-indicator.valid {
+    color: #28a745;
+  }
+
+  .validation-indicator.invalid {
+    color: #ff6b6b;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mission-container">
+    <header class="mission-header">
+        <h2>
+            <i class="fa-solid fa-bullseye header-icon" aria-hidden="true"></i>
+            Giao Mission
+            <small class="text-muted" style="font-size: 0.875rem; font-weight: 400;">
+                (Cấp quyền hàng loạt)
+            </small>
+        </h2>
+    </header>
+
+    {% include 'admin/_nav.html' %}
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card card-soft">
+                <form id="createMissionForm" class="mission-form" novalidate>
+                    <div class="form-group">
+                        <label for="missionName" class="form-label">
+                            <i class="fa-solid fa-tag" aria-hidden="true"></i>
+                            Tên Mission
+                            <span class="required-indicator" aria-label="Required">*</span>
+                        </label>
+                        <div class="position-relative">
+                            <input 
+                                type="text" 
+                                class="form-control form-control-dark focus-trap" 
+                                id="missionName" 
+                                name="mission_name" 
+                                required 
+                                placeholder="e.g., Lab 1 - IoT cơ bản"
+                                aria-describedby="missionNameHelp"
+                                maxlength="100"
+                                autocomplete="off"
+                            >
+                            <div class="validation-indicator" id="missionNameIndicator" aria-hidden="true"></div>
+                        </div>
+                        <div id="missionNameHelp" class="form-text text-muted">
+                            Nhập tên mô tả cho mission này
+                        </div>
+                        <div id="missionNameError" class="error-message" style="display: none;" role="alert"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="usersSelect" class="form-label">
+                            <i class="fa-solid fa-users" aria-hidden="true"></i>
+                            Chọn Users
+                            <span class="required-indicator" aria-label="Required">*</span>
+                        </label>
+                        <select 
+                            class="form-select focus-trap" 
+                            id="usersSelect" 
+                            name="user_ids" 
+                            multiple="multiple" 
+                            required
+                            aria-describedby="usersSelectHelp"
+                        ></select>
+                        <div id="usersSelectHelp" class="form-text text-muted">
+                            Chọn một hoặc nhiều user để giao mission
+                        </div>
+                        <div id="usersSelectError" class="error-message" style="display: none;" role="alert"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="devicesSelect" class="form-label">
+                            <i class="fa-solid fa-microchip" aria-hidden="true"></i>
+                            Chọn Thiết bị
+                            <span class="required-indicator" aria-label="Required">*</span>
+                        </label>
+                        <select 
+                            class="form-select focus-trap" 
+                            id="devicesSelect" 
+                            name="device_ids" 
+                            multiple="multiple" 
+                            required
+                            aria-describedby="devicesSelectHelp"
+                        ></select>
+                        <div id="devicesSelectHelp" class="form-text text-muted">
+                            Chọn một hoặc nhiều thiết bị cho mission
+                        </div>
+                        <div id="devicesSelectError" class="error-message" style="display: none;" role="alert"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <button type="submit" class="btn-mission-submit w-100" id="submitBtn">
+                            <div class="spinner" aria-hidden="true"></div>
+                            <span class="btn-text">
+                                <i class="fa-solid fa-rocket" aria-hidden="true"></i>
+                                Giao Mission
+                            </span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+(function() {
+    'use strict';
+
+    // Configuration
+    const CONFIG = {
+        API_ENDPOINTS: {
+            USERS: '/admin/api/users',
+            DEVICES: '/admin/api/devices',
+            MISSIONS: '/admin/api/missions'
+        },
+        VALIDATION: {
+            MISSION_NAME: {
+                MIN_LENGTH: 3,
+                MAX_LENGTH: 100,
+                PATTERN: /^[a-zA-Z0-9\s\-_\u00C0-\u1EF9]+$/
+            }
+        },
+        NOTIFICATION: {
+            DURATION: 5000,
+            POSITION: 'top-end'
+        },
+        SELECT2: {
+            THEME: 'bootstrap-5',
+            WIDTH: '100%',
+            SEARCH_DELAY: 300
+        }
+    };
+
+    // DOM element cache
+    const elements = {
+        form: document.getElementById('createMissionForm'),
+        missionName: document.getElementById('missionName'),
+        usersSelect: document.getElementById('usersSelect'),
+        devicesSelect: document.getElementById('devicesSelect'),
+        submitBtn: document.getElementById('submitBtn'),
+        missionNameIndicator: document.getElementById('missionNameIndicator'),
+        missionNameError: document.getElementById('missionNameError'),
+        usersSelectError: document.getElementById('usersSelectError'),
+        devicesSelectError: document.getElementById('devicesSelectError')
+    };
+
+    // Application state
+    const state = {
+        isSubmitting: false,
+        isInitialized: false,
+        usersLoaded: false,
+        devicesLoaded: false,
+        validation: {
+            missionName: false,
+            users: false,
+            devices: false
+        }
+    };
+
+    /**
+     * Display notification message
+     */
+    function showNotification(message, type = 'success') {
+        const toastContainer = document.querySelector('.toast-container');
+        
+        if (!toastContainer) {
+            // Fallback to alert if toast container is not available
+            alert(message);
+            return;
+        }
+
+        const alertType = type === 'error' ? 'danger' : 
+                         type === 'info' ? 'primary' : 
+                         'success';
+        
+        const toastId = `toast-${Date.now()}`;
+        const iconClass = type === 'error' ? 'fa-exclamation-circle' : 
+                         type === 'info' ? 'fa-info-circle' : 
+                         'fa-check-circle';
+        
+        const toastHTML = `
+            <div id="${toastId}" class="toast show align-items-center text-bg-${alertType} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <i class="fa-solid ${iconClass} me-2" aria-hidden="true"></i>
+                        ${escapeHtml(message)}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+        `;
+        
+        toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+        
+        const toastElement = document.getElementById(toastId);
+        const bsToast = new bootstrap.Toast(toastElement, { 
+            delay: CONFIG.NOTIFICATION.DURATION 
+        });
+        
+        bsToast.show();
+        
+        toastElement.addEventListener('hidden.bs.toast', () => {
+            toastElement.remove();
+        });
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    /**
+     * Fetch data and populate select element
+     */
+    async function fetchAndPopulate(url, selectElement, valueField, textField) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+            const response = await fetch(url, {
+                signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache'
+                }
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            if (!Array.isArray(data)) {
+                throw new Error('Invalid response format: expected array');
+            }
+
+            // Clear existing options
+            selectElement.innerHTML = '';
+
+            // Populate options
+            data.forEach(item => {
+                if (item[valueField] && item[textField]) {
+                    const option = new Option(
+                        escapeHtml(item[textField]), 
+                        item[valueField]
+                    );
+                    selectElement.appendChild(option);
+                }
+            });
+
+            // Trigger change to update Select2
+            $(selectElement).trigger('change');
+
+            return true;
+
+        } catch (error) {
+            console.error(`Failed to fetch data for ${selectElement.id}:`, error);
+            
+            // Show error option
+            selectElement.innerHTML = '<option value="" disabled>Lỗi tải dữ liệu</option>';
+            
+            showNotification(
+                `Không thể tải dữ liệu ${selectElement.id}. Vui lòng thử lại.`,
+                'error'
+            );
+            
+            return false;
+        }
+    }
+
+    /**
+     * Initialize Select2 components
+     */
+    function initializeSelect2() {
+        // Users select
+        $(elements.usersSelect).select2({
+            theme: CONFIG.SELECT2.THEME,
+            width: CONFIG.SELECT2.WIDTH,
+            placeholder: 'Chọn một hoặc nhiều user',
+            allowClear: true,
+            closeOnSelect: false,
+            language: {
+                noResults: () => 'Không tìm thấy user nào',
+                searching: () => 'Đang tìm kiếm...',
+                loadingMore: () => 'Đang tải thêm...'
+            }
+        });
+
+        // Devices select
+        $(elements.devicesSelect).select2({
+            theme: CONFIG.SELECT2.THEME,
+            width: CONFIG.SELECT2.WIDTH,
+            placeholder: 'Chọn một hoặc nhiều thiết bị',
+            allowClear: true,
+            closeOnSelect: false,
+            language: {
+                noResults: () => 'Không tìm thấy thiết bị nào',
+                searching: () => 'Đang tìm kiếm...',
+                loadingMore: () => 'Đang tải thêm...'
+            }
+        });
+
+        // Event listeners for validation
+        $(elements.usersSelect).on('change', validateUsers);
+        $(elements.devicesSelect).on('change', validateDevices);
+    }
+
+    /**
+     * Validate mission name
+     */
+    function validateMissionName() {
+        const value = elements.missionName.value.trim();
+        const { MIN_LENGTH, MAX_LENGTH, PATTERN } = CONFIG.VALIDATION.MISSION_NAME;
+        
+        let isValid = true;
+        let errorMessage = '';
+
+        if (!value) {
+            isValid = false;
+            errorMessage = 'Tên mission là bắt buộc';
+        } else if (value.length < MIN_LENGTH) {
+            isValid = false;
+            errorMessage = `Tên mission phải có ít nhất ${MIN_LENGTH} ký tự`;
+        } else if (value.length > MAX_LENGTH) {
+            isValid = false;
+            errorMessage = `Tên mission không được vượt quá ${MAX_LENGTH} ký tự`;
+        } else if (!PATTERN.test(value)) {
+            isValid = false;
+            errorMessage = 'Tên mission chứa ký tự không hợp lệ';
+        }
+
+        updateFieldValidation(elements.missionName, isValid, errorMessage, elements.missionNameError, elements.missionNameIndicator);
+        state.validation.missionName = isValid;
+        
+        return isValid;
+    }
+
+    /**
+     * Validate users selection
+     */
+    function validateUsers() {
+        const selectedUsers = $(elements.usersSelect).val() || [];
+        const isValid = selectedUsers.length > 0;
+        const errorMessage = isValid ? '' : 'Phải chọn ít nhất một user';
+
+        updateFieldValidation(elements.usersSelect, isValid, errorMessage, elements.usersSelectError);
+        state.validation.users = isValid;
+        
+        return isValid;
+    }
+
+    /**
+     * Validate devices selection
+     */
+    function validateDevices() {
+        const selectedDevices = $(elements.devicesSelect).val() || [];
+        const isValid = selectedDevices.length > 0;
+        const errorMessage = isValid ? '' : 'Phải chọn ít nhất một thiết bị';
+
+        updateFieldValidation(elements.devicesSelect, isValid, errorMessage, elements.devicesSelectError);
+        state.validation.devices = isValid;
+        
+        return isValid;
+    }
+
+    /**
+     * Update field validation UI
+     */
+    function updateFieldValidation(fieldElement, isValid, errorMessage, errorElement, indicatorElement = null) {
+        // Update field styling
+        fieldElement.classList.toggle('form-control-error', !isValid);
+        fieldElement.classList.toggle('form-control-success', isValid);
+
+        // Update error message
+        if (errorElement) {
+            if (isValid) {
+                errorElement.style.display = 'none';
+                errorElement.textContent = '';
+            } else {
+                errorElement.style.display = 'flex';
+                errorElement.innerHTML = `<i class="fa-solid fa-exclamation-triangle" aria-hidden="true"></i> ${escapeHtml(errorMessage)}`;
+            }
+        }
+
+        // Update validation indicator
+        if (indicatorElement) {
+            indicatorElement.className = 'validation-indicator';
+            if (isValid) {
+                indicatorElement.classList.add('valid');
+                indicatorElement.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i>';
+            } else if (fieldElement.value.trim()) {
+                indicatorElement.classList.add('invalid');
+                indicatorElement.innerHTML = '<i class="fa-solid fa-times" aria-hidden="true"></i>';
+            } else {
+                indicatorElement.innerHTML = '';
+            }
+        }
+
+        // Update submit button state
+        updateSubmitButton();
+    }
+
+    /**
+     * Update submit button state
+     */
+    function updateSubmitButton() {
+        const isFormValid = Object.values(state.validation).every(valid => valid);
+        elements.submitBtn.disabled = !isFormValid || state.isSubmitting;
+    }
+
+    /**
+     * Set form loading state
+     */
+    function setFormLoading(isLoading) {
+        state.isSubmitting = isLoading;
+        
+        elements.submitBtn.classList.toggle('loading', isLoading);
+        elements.submitBtn.disabled = isLoading;
+        
+        // Disable form inputs
+        const inputs = elements.form.querySelectorAll('input, select, button');
+        inputs.forEach(input => {
+            input.disabled = isLoading;
+        });
+
+        if (isLoading) {
+            elements.form.classList.add('form-loading');
+        } else {
+            elements.form.classList.remove('form-loading');
+        }
+    }
+
+    /**
+     * Handle form submission
+     */
+    async function handleSubmit(event) {
+        event.preventDefault();
+        
+        if (state.isSubmitting) return;
+
+        // Validate all fields
+        const isMissionNameValid = validateMissionName();
+        const isUsersValid = validateUsers();
+        const isDevicesValid = validateDevices();
+
+        if (!isMissionNameValid || !isUsersValid || !isDevicesValid) {
+            showNotification('Vui lòng kiểm tra và sửa các lỗi trong form', 'error');
+            return;
+        }
+
+        setFormLoading(true);
+
+        try {
+            const formData = {
+                mission_name: elements.missionName.value.trim(),
+                user_ids: ($(elements.usersSelect).val() || []).map(Number),
+                device_ids: ($(elements.devicesSelect).val() || []).map(Number)
+            };
+
+            // Validate data one more time
+            if (!formData.mission_name || formData.user_ids.length === 0 || formData.device_ids.length === 0) {
+                throw new Error('Dữ liệu form không hợp lệ');
+            }
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+            const response = await fetch(CONFIG.API_ENDPOINTS.MISSIONS, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(formData),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            // Success
+            showNotification(result.message || 'Mission đã được tạo thành công!', 'success');
+            
+            // Reset form
+            resetForm();
+            
+        } catch (error) {
+            console.error('Mission creation failed:', error);
+            
+            let errorMessage = 'Đã xảy ra lỗi khi tạo mission';
+            
+            if (error.name === 'AbortError') {
+                errorMessage = 'Yêu cầu bị timeout. Vui lòng thử lại.';
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            showNotification(`Lỗi: ${errorMessage}`, 'error');
+            
+        } finally {
+            setFormLoading(false);
+        }
+    }
+
+    /**
+     * Reset form to initial state
+     */
+    function resetForm() {
+        // Reset form fields
+        elements.form.reset();
+        
+        // Clear Select2 selections
+        $(elements.usersSelect).val(null).trigger('change');
+        $(elements.devicesSelect).val(null).trigger('change');
+        
+        // Reset validation state
+        state.validation = {
+            missionName: false,
+            users: false,
+            devices: false
+        };
+        
+        // Clear validation UI
+        const fields = [
+            { element: elements.missionName, error: elements.missionNameError, indicator: elements.missionNameIndicator },
+            { element: elements.usersSelect, error: elements.usersSelectError },
+            { element: elements.devicesSelect, error: elements.devicesSelectError }
+        ];
+        
+        fields.forEach(({ element, error, indicator }) => {
+            element.classList.remove('form-control-error', 'form-control-success');
+            if (error) {
+                error.style.display = 'none';
+                error.textContent = '';
+            }
+            if (indicator) {
+                indicator.className = 'validation-indicator';
+                indicator.innerHTML = '';
+            }
+        });
+        
+        updateSubmitButton();
+    }
+
+    /**
+     * Load initial data
+     */
+    async function loadInitialData() {
+        const loadingPromises = [
+            fetchAndPopulate(CONFIG.API_ENDPOINTS.USERS, elements.usersSelect, 'id', 'username'),
+            fetchAndPopulate(CONFIG.API_ENDPOINTS.DEVICES, elements.devicesSelect, 'id', 'tag_name')
+        ];
+
+        try {
+            const [usersLoaded, devicesLoaded] = await Promise.all(loadingPromises);
+            
+            state.usersLoaded = usersLoaded;
+            state.devicesLoaded = devicesLoaded;
+            
+            if (!usersLoaded || !devicesLoaded) {
+                showNotification('Một số dữ liệu không thể tải được. Vui lòng refresh trang.', 'error');
+            }
+            
+        } catch (error) {
+            console.error('Failed to load initial data:', error);
+            showNotification('Không thể tải dữ liệu ban đầu. Vui lòng refresh trang.', 'error');
+        }
+    }
+
+    /**
+     * Setup event listeners
+     */
+    function setupEventListeners() {
+        // Form submission
+        elements.form.addEventListener('submit', handleSubmit);
+        
+        // Mission name validation
+        elements.missionName.addEventListener('input', validateMissionName);
+        elements.missionName.addEventListener('blur', validateMissionName);
+        
+        // Prevent form submission on Enter in text fields
+        elements.missionName.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                validateMissionName();
+            }
+        });
+
+        // Focus management for better UX
+        elements.missionName.addEventListener('focus', () => {
+            elements.missionName.select();
+        });
+
+        // Handle page unload
+        window.addEventListener('beforeunload', (event) => {
+            if (state.isSubmitting) {
+                event.preventDefault();
+                event.returnValue = 'Mission đang được tạo. Bạn có chắc muốn rời khỏi trang?';
+                return event.returnValue;
+            }
+        });
+    }
+
+    /**
+     * Initialize application
+     */
+    async function initialize() {
+        if (state.isInitialized) return;
+        
+        try {
+            // Check if all required elements exist
+            const requiredElements = Object.entries(elements);
+            const missingElements = requiredElements.filter(([name, element]) => !element);
+            
+            if (missingElements.length > 0) {
+                console.error('Missing required elements:', missingElements.map(([name]) => name));
+                showNotification('Lỗi khởi tạo trang. Vui lòng refresh.', 'error');
+                return;
+            }
+
+            // Initialize Select2
+            initializeSelect2();
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Load initial data
+            await loadInitialData();
+            
+            state.isInitialized = true;
+            
+            // Focus on first input
+            elements.missionName.focus();
+            
+            console.log('Mission assignment page initialized successfully');
+            
+        } catch (error) {
+            console.error('Failed to initialize mission assignment page:', error);
+            showNotification('Lỗi khởi tạo trang. Vui lòng refresh và thử lại.', 'error');
+        }
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
+
+    // Expose public API for debugging (only in development)
+    if (window.location.hostname === 'localhost' || window.location.hostname.includes('dev')) {
+        window.MissionAssignment = {
+            state,
+            validateMissionName,
+            validateUsers,
+            validateDevices,
+            resetForm,
+            loadInitialData
+        };
+    }
+
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,22 @@
+# --- FILE HỆ THỐNG & PYTHON ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# --- DỮ LIỆU NGƯỜI DÙNG & CORE NẶNG ---
+# Thư mục chứa code người dùng (Nhạy cảm)
+QUAN_LY_USER/
+
+# Thư mục Core Arduino (Rất nặng, không nên đẩy lên)
+esp32_core/
+
+# --- LOG & DATABASE ---
+*.log
+*.sqlite3
+*.db
+
+# --- THƯ MỤC IDE ---
+.vscode/
+.idea/
