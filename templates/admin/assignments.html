@@ -1,0 +1,247 @@
+{% extends "layout.html" %}
+{% block title %}Quản lý Phân quyền{% endblock %}
+
+{% block extra_head %}
+<style>
+  .management-header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 2rem; border-radius: 20px; margin-bottom: 2rem; box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3); }
+  .assignments-table-container { background: #2a2a2e; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.2); }
+  .assignments-table { margin-bottom: 0; }
+  .assignments-table thead { background: linear-gradient(135deg, #3c3c42, #505058); }
+  .assignment-row { transition: all 0.3s ease; border-left: 4px solid transparent; }
+  .assignment-row:hover { background: rgba(102, 126, 234, 0.1) !important; border-left-color: #667eea; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="management-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="mb-2"><i class="fa-solid fa-user-tag"></i> Quản lý Phân quyền</h2>
+                <p class="mb-0 opacity-75">Cấp quyền sử dụng thiết bị (TAG) cho người dùng.</p>
+            </div>
+            <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addAssignmentModal">
+                <i class="fa-solid fa-plus"></i> Cấp quyền mới
+            </button>
+        </div>
+    </div>
+
+    {% include 'admin/_nav.html' %}
+
+    <div class="assignments-table-container">
+        <div class="table-responsive">
+            <table class="table assignments-table table-dark table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th><i class="fa-solid fa-user me-2"></i>Người dùng</th>
+                        <th><i class="fa-solid fa-tag me-2"></i>Tên TAG</th>
+                        <th><i class="fa-solid fa-calendar-check me-2"></i>Ngày cấp</th>
+                        <th><i class="fa-solid fa-cogs me-2"></i>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody id="assignments-table-body">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addAssignmentModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-white">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title"><i class="fa-solid fa-plus-circle"></i> Cấp quyền sử dụng thiết bị</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="addAssignmentForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Chọn người dùng</label>
+            <select id="userSelect" class="form-select form-control-dark" required></select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Chọn thiết bị (TAG)</label>
+            <select id="deviceSelect" class="form-select form-control-dark" required></select>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button type="submit" class="btn btn-primary">Cấp quyền</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tableBody = document.getElementById('assignments-table-body');
+    const addAssignmentForm = document.getElementById('addAssignmentForm');
+    const userSelect = document.getElementById('userSelect');
+    const deviceSelect = document.getElementById('deviceSelect');
+    const addAssignmentModal = new bootstrap.Modal(document.getElementById('addAssignmentModal'));
+
+    async function loadAssignments() {
+        const response = await fetch('/admin/api/assignments');
+        const assignments = await response.json();
+        tableBody.innerHTML = '';
+        if (assignments.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Chưa có quyền nào được cấp.</td></tr>';
+            return;
+        }
+        assignments.forEach(a => {
+            const assignedDate = new Date(a.assigned_at).toLocaleString('vi-VN');
+            const row = `
+                <tr class="assignment-row">
+                    <td>${a.username}</td>
+                    <td><strong>${a.tag_name}</strong></td>
+                    <td>${assignedDate}</td>
+                    <td><button class="btn btn-sm btn-outline-danger" onclick="revokeAssignment(${a.id})">Thu hồi</button></td>
+                </tr>`;
+            tableBody.innerHTML += row;
+        });
+    }
+
+    async function populateModalDropdowns() {
+        const [usersRes, devicesRes] = await Promise.all([
+            fetch('/admin/api/users'),
+            fetch('/admin/api/devices')
+        ]);
+        const users = await usersRes.json();
+        const devices = await devicesRes.json();
+
+        userSelect.innerHTML = '<option value="" disabled selected>-- Chọn user --</option>';
+        users.forEach(u => userSelect.innerHTML += `<option value="${u.id}">${u.username}</option>`);
+
+        deviceSelect.innerHTML = '<option value="" disabled selected>-- Chọn TAG --</option>';
+        devices.forEach(d => deviceSelect.innerHTML += `<option value="${d.id}">${d.tag_name} (${d.type})</option>`);
+    }
+
+    addAssignmentForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Hiển thị loading state
+        const submitButton = this.querySelector('button[type="submit"]');
+        const originalText = submitButton.textContent;
+        submitButton.disabled = true;
+        submitButton.textContent = 'Đang xử lý...';
+        
+        try {
+            const response = await fetch('/admin/api/assignments', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ 
+                    user_id: userSelect.value, 
+                    device_id: deviceSelect.value 
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Đóng modal
+                addAssignmentModal.hide();
+                
+                // Tải lại danh sách
+                loadAssignments();
+                
+                // Hiển thị thông báo thành công ngắn gọn
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Cấp quyền thành công',
+                    showConfirmButton: false,
+                    timer: 2000,
+                    toast: true,
+                    position: 'top-end',
+                    background: '#28a745',
+                    color: '#fff'
+                });
+                
+                // Reset form
+                this.reset();
+            } else {
+                // Hiển thị lỗi
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Không thể cấp quyền',
+                    text: result.message || result.error || 'Vui lòng thử lại sau',
+                    confirmButtonText: 'Đóng',
+                    background: '#dc3545',
+                    color: '#fff'
+                });
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Lỗi kết nối',
+                text: 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.',
+                confirmButtonText: 'Đóng',
+                background: '#dc3545',
+                color: '#fff'
+            });
+        } finally {
+            // Khôi phục button
+            submitButton.disabled = false;
+            submitButton.textContent = originalText;
+        }
+    });
+
+    window.revokeAssignment = async function(assignmentId) {
+        const result = await Swal.fire({
+            title: 'Xác nhận thu hồi quyền',
+            text: 'Bạn chắc chắn muốn thu hồi quyền này?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Thu hồi',
+            cancelButtonText: 'Hủy',
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d'
+        });
+        
+        if (result.isConfirmed) {
+            try {
+                const response = await fetch(`/admin/api/assignments/${assignmentId}`, { method: 'DELETE' });
+                const deleteResult = await response.json();
+                
+                if (deleteResult.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Thu hồi thành công',
+                        showConfirmButton: false,
+                        timer: 2000,
+                        toast: true,
+                        position: 'top-end',
+                        background: '#28a745',
+                        color: '#fff'
+                    });
+                    loadAssignments();
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Không thể thu hồi',
+                        text: deleteResult.message || deleteResult.error,
+                        confirmButtonText: 'Đóng',
+                        background: '#dc3545',
+                        color: '#fff'
+                    });
+                }
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Lỗi kết nối!',
+                    text: 'Không thể kết nối đến server.',
+                    confirmButtonText: 'Đóng'
+                });
+            }
+        }
+    }
+
+    document.getElementById('addAssignmentModal').addEventListener('show.bs.modal', populateModalDropdowns);
+    loadAssignments();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,14 @@
+[Unit]
+Description=Ultimate USB Watcher
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/toan/flask-kerberos-demo/ULTIMATE_USB_FIX
+ExecStart=/usr/bin/python3 /home/toan/flask-kerberos-demo/ULTIMATE_USB_FIX/NEW_watcher.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
