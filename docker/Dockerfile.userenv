@@ -48,7 +48,8 @@ RUN cd /root/.arduino15 && \
 RUN arduino-cli config set board_manager.additional_urls https://arduino.esp8266.com/stable/package_esp8266com_index.json,https://espressif.github.io/arduino-esp32/package_esp32_index.json
 
 # 8. Cài thư viện
-RUN arduino-cli lib install "ArduinoJson" "PubSubClient" "DHT sensor library" "Adafruit NeoPixel"
+# 8. Cài thư viện (Đã bổ sung LCD, Servo, WebSockets...)
+RUN arduino-cli lib install "LiquidCrystal I2C" "ArduinoJson" "PubSubClient" "DHT sensor library" "Adafruit Unified Sensor" "Adafruit NeoPixel" "ESP32Servo" "WebSockets"
 
 # 9. Copy scripts
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh

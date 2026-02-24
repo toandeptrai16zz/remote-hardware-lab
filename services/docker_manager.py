@@ -1,6 +1,6 @@
 """
 Docker Container Management Service
-UPDATED: Strict Device Mounting via Subprocess (No /dev:/dev)
+UPDATED: Strict Device Mounting via Subprocess (No /dev:/dev) + Fix Full Arduino Libs
 """
 import os
 import subprocess
@@ -149,7 +149,7 @@ def ensure_user_container(username):
         import shutil
         shutil.rmtree(setup_script_path)
     
-    # Script nội dung giữ nguyên như cũ của bạn
+    # Script nội dung (ĐÃ FIX PHẦN THƯ VIỆN & CORE CHO ESP32)
     script_content = f"""#!/bin/bash
 USER="{safe_username}"
 (
@@ -182,10 +182,17 @@ HE THONG THUC HANH IOT - EPU TECH
 [+] USER: $USER
 [+] TRANG THAI: SAN SANG (Connected)
 [+] PHAN CUNG HO TRO: ESP32 , ESP8266, ARDUINO
-[+] TAT CA CAC THU VIEN CO BAN CAN THIET
+[+] TAT CA CAC THU VIEN CO BAN CAN THIET (LCD, DHT, MQTT...)
 [+] HE THONG PHAT TRIEN BOI: EPU TECH TEAM 
 [+] HE THONG TRONG GIAI DOAN PHAT TRIEN
 EOF
+
+# --- ĐOẠN FIX : SHARE THƯ VIỆN & CORE TỪ ROOT SANG CHO USER ---
+mkdir -p /home/"$USER"/Arduino/libraries
+cp -rn /root/Arduino/libraries/* /home/"$USER"/Arduino/libraries/ 2>/dev/null || true
+ln -sfn /root/.arduino15 /home/"$USER"/.arduino15 2>/dev/null || true
+# ----------------------------------------------------------------------
+
 chown -R "$USER:$USER" /home/"$USER"
 
 mkdir -p /run/sshd
@@ -203,7 +210,7 @@ exec /usr/sbin/sshd -D
 
     logger.info(f"Starting container {cname} with devices: {required_ports}...")
     
-    # Xây dựng lệnh Docker Run
+    # Xây dựng lệnh Docker Run (ĐÃ XÓA DÒNG MOUNT VOLUME LÀM HỎNG CORE ESP32)
     docker_command = [
         "docker", "run", "-d", 
         "--name", cname, 
@@ -213,12 +220,11 @@ exec /usr/sbin/sshd -D
         "-e", f"USERNAME={safe_username}", 
         "-v", f"{host_user_dir}:/home/{safe_username}",
         "-v", f"{setup_script_path}:/startup.sh",
+        # THÊM LẠI CÁI DÒNG NÀY ĐỂ NÓ NHẬN LÕI ESP32 TỪ MÁY CHỦ:
         "-v", "/home/toan/flask-kerberos-demo/esp32_core:/root/.arduino15",
-        # QUAN TRỌNG: Đã BỎ dòng "-v /dev:/dev" ở đây!
         "--group-add", "dialout", 
         "--entrypoint", "/bin/bash"
     ]
-
     # THÊM CÁC THIẾT BỊ ĐƯỢC CẤP QUYỀN (Strict Mode)
     for port in required_ports:
         docker_command.extend(["--device", f"{port}:{port}:rwm"])
@@ -242,15 +248,12 @@ def setup_arduino_cli_for_user(cname, username):
     """Setup Arduino CLI with board URLs and cores"""
     logger.info(f"Setting up Arduino CLI for container '{cname}'...")
     try:
-        # (Giữ nguyên phần cài đặt CLI của bạn để tiết kiệm không gian, không thay đổi logic này)
-        # Nếu container vừa tạo lại, nó sẽ dùng lại volume .arduino15 nên rất nhanh
         pass 
     except Exception as e:
         logger.error(f"Failed to setup Arduino CLI: {e}")
 
 def check_platform_installed(cname, platform_id):
     """Check if Arduino platform is installed (with caching)"""
-    # (Giữ nguyên logic của bạn)
     cache_key = f"{cname}_{platform_id}"
     if cache_key in platform_cache:
         cached_time, cached_result = platform_cache[cache_key]
@@ -266,15 +269,11 @@ def ensure_user_container_and_setup(username):
     # Hàm này giờ đây sẽ tự động Xóa và Tạo lại container
     # nếu danh sách thiết bị trong DB khác với thực tế
     ssh_port = ensure_user_container(username) 
-
-    # Setup Arduino (Skip if already done)
-    # setup_arduino_cli_for_user(cname, safe_username)
     
     return ssh_port
 
 def setup_container_permissions(cname, username):
     """Setup serial device permissions in container"""
-    # Không cần thiết nữa vì --device đã handle quyền, nhưng giữ lại cho chắc
     try:
         cmd = ["docker", "exec", cname, "sh", "-c", "chmod 666 /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || true"]
         subprocess.run(cmd, check=False, timeout=5)
