@@ -11,6 +11,8 @@ from services import (
     ensure_user_container_and_setup, get_ssh_client,
     compile_sketch, get_serial_ports, log_action
 )
+from config.database import get_db_connection
+from services.ai_grader import grade_submission_with_ai
 
 user_bp = Blueprint('user', __name__, url_prefix='/user')
 
@@ -68,11 +70,12 @@ def list_files_api(username):
         for attr in dir_items:
             filename = attr.filename
             
-            # Filter hidden/system files
+            # Filter hidden/system/glitch files
             if filename.startswith('.'):
                 continue
                 
-            if filename in HIDDEN_SYSTEM_FILES:
+            # Hide specific config files and folders with colons (usually FQBN glitch folders)
+            if filename in HIDDEN_SYSTEM_FILES or ':' in filename:
                 continue
 
             files.append({
@@ -388,9 +391,9 @@ def compile_sketch_api(username):
     board_fqbn = data.get("board_fqbn")
     
     if not sketch_path or not board_fqbn:
-        return jsonify(success=False, output="Thiếu thông tin sketch_path hoặc board", error_analysis=None), 400
+        return jsonify(success=False, output="Thiếu thông tương tin sketch_path hoặc board", error_analysis=None), 400
 
-    result = compile_sketch(username, sketch_path, board_fqbn)
+    result = compile_sketch(username, board_fqbn, sketch_path)
     return jsonify(result)
 
 @user_bp.route('/<username>/upload', methods=['POST'])
@@ -428,6 +431,191 @@ def upload_to_board_api(username):
     )
     
     return jsonify(success=True, message="Yêu cầu nạp code đã được đưa vào hàng đợi.")
+
+# ==================== MISSIONS ====================
+
+@user_bp.route('/missions')
+@require_auth('user')
+def user_missions_page():
+    """User missions/exam page"""
+    return render_template('user_missions.html')
+
+
+@user_bp.route('/api/my-missions')
+@require_auth('user')
+def user_api_my_missions():
+    """API: Get missions assigned to current user"""
+    import json as json_lib
+    username = session['username']
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("SELECT id FROM users WHERE username=%s", (username,))
+    user = cur.fetchone()
+    if not user:
+        cur.close(); db.close()
+        return jsonify([])
+    user_id = user['id']
+    cur.execute("""
+        SELECT DISTINCT m.id, m.name, m.description, m.template_code,
+               m.start_time, m.end_time, m.duration_minutes, m.created_at,
+               sub.id as sub_id, sub.submitted_at, sub.score,
+               sub.ai_feedback, sub.ai_criteria
+        FROM missions m
+        JOIN mission_assignments ma ON m.id = ma.mission_id
+        LEFT JOIN submissions sub ON m.id = sub.mission_id AND sub.user_id = %s
+        WHERE ma.user_id = %s
+        ORDER BY m.start_time DESC
+    """, (user_id, user_id))
+    missions = cur.fetchall()
+    cur.close(); db.close()
+    result = []
+    for m in missions:
+        d = dict(m)
+        d['start_time'] = m['start_time'].isoformat() if m['start_time'] else None
+        d['end_time'] = m['end_time'].isoformat() if m['end_time'] else None
+        d['created_at'] = m['created_at'].isoformat() if m.get('created_at') else None
+        d['submitted'] = m['sub_id'] is not None
+        if m['sub_id']:
+            d['submission'] = {
+                'id': m['sub_id'],
+                'submitted_at': m['submitted_at'].isoformat() if m['submitted_at'] else None,
+                'score': float(m['score']) if m['score'] is not None else None,
+                'ai_feedback': m['ai_feedback'],
+                'ai_criteria': json_lib.loads(m['ai_criteria']) if isinstance(m.get('ai_criteria'), str) else m.get('ai_criteria'),
+            }
+        else:
+            d['submission'] = None
+        for k in ['sub_id', 'submitted_at', 'score', 'ai_feedback', 'ai_criteria']:
+            d.pop(k, None)
+        result.append(d)
+    return jsonify(result)
+
+
+@user_bp.route('/api/preview-files', methods=['GET'])
+@require_auth('user')
+def user_api_preview_files():
+    """API: List files that would be snapshotted on submission (preview only)."""
+    import stat as stat_mod
+    username = session['username']
+    safe_username = make_safe_name(username)
+    files_list = []
+    try:
+        client = get_ssh_client(username)
+        sftp = client.open_sftp()
+        home_dir = f"/home/{safe_username}"
+        def collect(path, depth=0):
+            if depth > 3: return
+            try:
+                for item in sftp.listdir_attr(path):
+                    if item.filename.startswith('.'): continue
+                    fp = f"{path}/{item.filename}"
+                    if stat_mod.S_ISDIR(item.st_mode):
+                        collect(fp, depth + 1)
+                    elif item.filename.endswith(('.ino', '.cpp', '.c', '.h', '.py')):
+                        files_list.append({
+                            'name': item.filename,
+                            'path': fp.replace(home_dir, ''),
+                            'size': item.st_size
+                        })
+            except: pass
+        collect(home_dir)
+        sftp.close(); client.close()
+    except Exception as e:
+        return jsonify(success=False, error=str(e)), 500
+    return jsonify(success=True, files=files_list)
+
+
+@user_bp.route('/api/missions/<int:mission_id>/submit', methods=['POST'])
+@require_auth('user')
+def user_api_submit_mission(mission_id):
+    """API: Submit mission - snapshot files and trigger AI grading"""
+    import json as json_lib
+    import threading
+    username = session['username']
+    safe_username = make_safe_name(username)
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("SELECT * FROM missions WHERE id=%s", (mission_id,))
+    mission = cur.fetchone()
+    if not mission:
+        cur.close(); db.close()
+        return jsonify(success=False, error="Không tìm thấy bài thi"), 404
+    cur.execute("SELECT id FROM users WHERE username=%s", (username,))
+    user = cur.fetchone()
+    if not user:
+        cur.close(); db.close()
+        return jsonify(success=False, error="Không tìm thấy người dùng"), 404
+    user_id = user['id']
+    cur.execute("SELECT id FROM mission_assignments WHERE mission_id=%s AND user_id=%s", (mission_id, user_id))
+    if not cur.fetchone():
+        cur.close(); db.close()
+        return jsonify(success=False, error="Bạn không được giao bài thi này"), 403
+    cur.execute("SELECT id FROM submissions WHERE mission_id=%s AND user_id=%s", (mission_id, user_id))
+    if cur.fetchone():
+        cur.close(); db.close()
+        return jsonify(success=False, error="Bạn đã nộp bài thi này rồi"), 409
+    # Snapshot files from container
+    files_snapshot = []
+    try:
+        import stat as stat_mod
+        client = get_ssh_client(username)
+        sftp = client.open_sftp()
+        home_dir = f"/home/{safe_username}"
+        def collect(path, depth=0):
+            if depth > 3: return
+            try:
+                for item in sftp.listdir_attr(path):
+                    if item.filename.startswith('.'): continue
+                    fp = f"{path}/{item.filename}"
+                    if stat_mod.S_ISDIR(item.st_mode):
+                        collect(fp, depth + 1)
+                    elif item.filename.endswith(('.ino', '.cpp', '.c', '.h', '.py')):
+                        try:
+                            with sftp.open(fp, 'r') as f:
+                                content = f.read(50000).decode('utf-8', errors='replace')
+                            files_snapshot.append({'name': item.filename, 'path': fp.replace(home_dir, ''), 'content': content, 'size': item.st_size})
+                        except: pass
+            except: pass
+        collect(home_dir)
+        sftp.close(); client.close()
+    except Exception as e:
+        files_snapshot = [{'name': 'error.txt', 'path': '/', 'content': f'Lỗi thu thập file: {e}', 'size': 0}]
+    is_auto = (request.get_json(silent=True) or {}).get('auto', False)
+    try:
+        cur.execute(
+            "INSERT INTO submissions (mission_id, user_id, files, is_auto_submit) VALUES (%s,%s,%s,%s)",
+            (mission_id, user_id, json_lib.dumps(files_snapshot), is_auto)
+        )
+        db.commit()
+        sub_id = cur.lastrowid
+        log_action(username, f"Submitted mission {mission_id} ({'auto' if is_auto else 'manual'})")
+        # Background AI grading
+        mission_snap = dict(mission)
+        def bg_grade():
+            try:
+                from services.ai_grader import grade_submission_with_ai
+                result = grade_submission_with_ai(
+                    mission_description=mission_snap['description'],
+                    mission_name=mission_snap['name'],
+                    files=files_snapshot
+                )
+                if result['success']:
+                    bg_db = get_db_connection()
+                    bg_cur = bg_db.cursor()
+                    bg_cur.execute(
+                        "UPDATE submissions SET score=%s, ai_feedback=%s, ai_criteria=%s WHERE id=%s",
+                        (result['score'], result['feedback'], json_lib.dumps(result['criteria']), sub_id)
+                    )
+                    bg_db.commit(); bg_cur.close(); bg_db.close()
+            except Exception as ex:
+                import logging; logging.getLogger(__name__).error(f"BG grade error: {ex}")
+        threading.Thread(target=bg_grade, daemon=True).start()
+        return jsonify(success=True, message="Nộp bài thành công! AI đang chấm điểm...", submission_id=sub_id)
+    except Exception as e:
+        return jsonify(success=False, error=str(e)), 500
+    finally:
+        cur.close(); db.close()
+
 
 # ==================== DEBUG/MAINTENANCE ====================
 

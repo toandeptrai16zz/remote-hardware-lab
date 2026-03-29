@@ -51,12 +51,16 @@
         <i class="fa-solid fa-cubes-stacked"></i>
         <span class="brand-gradient">EPU Tech</span>
       </a>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 align-items-center">
         {% if session.get('username') %}
+          <div class="text-white me-3 fw-semibold">
+              <i class="fa-solid fa-user-graduate text-info me-1"></i> {{ session.get('username') }}
+          </div>
           {% if session.get('role') == 'admin' %}
             <a class="btn btn-outline-primary" href="{{ url_for('admin.admin_manage') }}"><i class="fa-solid fa-shield-halved"></i> Admin</a>
           {% else %}
-            <a class="btn btn-outline-info" href="{{ url_for('user.user_workspace', username=session['username']) }}"><i class="fa-solid fa-terminal"></i> Dashboard</a>
+            <a class="btn btn-outline-warning" href="{{ url_for('user.user_missions_page') }}"><i class="fa-solid fa-bullseye"></i> Bài tập/Thi</a>
+            <a class="btn btn-outline-info" href="{{ url_for('user.user_workspace', username=session['username']) }}"><i class="fa-solid fa-terminal"></i> Code Space</a>
           {% endif %}
           <a class="btn btn-outline-danger" href="{{ url_for('auth.logout') }}"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</a>
         {% else %}

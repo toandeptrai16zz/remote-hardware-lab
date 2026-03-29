@@ -45,7 +45,10 @@ HIDDEN_SYSTEM_FILES = {
     ".cache",
     ".config",
     ".wget-hsts",
-    ".sudo_as_admin_successful"
+    ".sudo_as_admin_successful",
+    "Arduino",
+    ".arduino15",
+    "sketchbook"
 }
 
 # Device ID mapping for hardware identification

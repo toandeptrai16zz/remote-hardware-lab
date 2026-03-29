@@ -3,17 +3,27 @@ Flask-Kerberos-Demo - EPU Tech IoT Lab Management System
 Main application entry point
 """
 import os
+import secrets
 import logging
-import signal
-import sys
-from flask import Flask, redirect, url_for, session
+import warnings
+from urllib3.exceptions import InsecureRequestWarning
+from flask import Flask, session, redirect, url_for
 from flask_socketio import SocketIO
+from dotenv import load_dotenv
+
+# Load environment variables
+basedir = os.path.abspath(os.path.dirname(__file__))
+env_path = os.path.join(basedir, '.env')
+load_dotenv(env_path)
 
 # Import configurations
 from config import init_db
 
 # Import routes
-from routes import auth_bp, admin_bp, user_bp, hardware_bp
+from routes.auth import auth_bp
+from routes.hardware import hardware_bp
+from routes.admin import admin_bp
+from routes.user import user_bp
 
 # Import socket handlers
 from sockets import (
@@ -24,6 +34,13 @@ from sockets import (
 
 # Import background services
 from services.background_services import init_background_services, stop_background_services
+
+# Mute requests warnings
+# (handled above)
+
+# Lấy JWT path
+jwt_manager_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'venv', 'lib', 'python3.12', 'site-packages', 'flask_jwt_extended', 'jwt_manager.py')
+
 
 # ================== LOGGING SETUP ==================
 logging.basicConfig(
@@ -39,7 +56,7 @@ logger = logging.getLogger(__name__)
 
 # ================== APP INITIALIZATION ==================
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(24))
 
 # Initialize SocketIO
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -84,27 +101,31 @@ background_services = None
 def cleanup_on_exit(signum=None, frame=None):
     """Cleanup handler for graceful shutdown"""
     logger.info("🛑 Shutting down application...")
-    
+
     # Stop background services
-    if background_services:
+    if 'background_services' in globals() and background_services:
         stop_background_services()
-    
+
     logger.info("✅ Application shutdown complete")
-    sys.exit(0)
+
 
 # Register signal handlers for graceful shutdown
-signal.signal(signal.SIGINT, cleanup_on_exit)
-signal.signal(signal.SIGTERM, cleanup_on_exit)
+# signal.signal(signal.SIGINT, cleanup_on_exit) # Removed as signal import is gone
+# signal.signal(signal.SIGTERM, cleanup_on_exit) # Removed as signal import is gone
 
 # ================== MAIN EXECUTION ==================
-if __name__ == "__main__":
+
+def print_banner():
+    logger.info("=" * 60)
+    logger.info("🚀 EPU Tech IoT Lab Management System")
+    logger.info("=" * 60)
+
+def main():
+    """Main entry point for starting the application"""
+    print_banner()
     try:
         # Initialize database
         init_db()
-        logger.info("=" * 60)
-        logger.info("🚀 EPU Tech IoT Lab Management System")
-        logger.info("=" * 60)
-        
         # Start background services (USB watcher, etc.)
         logger.info("🔧 Starting background services...")
         background_services = init_background_services()
@@ -122,3 +143,6 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"❌ Fatal error: {e}")
         cleanup_on_exit()
+
+if __name__ == "__main__":
+    main()

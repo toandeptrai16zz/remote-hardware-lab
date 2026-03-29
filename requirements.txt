@@ -7,4 +7,9 @@ pyserial>=3.5
 requests>=2.31.0
 Werkzeug>=3.0.0
 esptool>=4.7.0
-eventlet>=0.35.0
+eventlet>=0.35.0python-dotenv>=1.0.0
+pandas>=2.1.0
+openpyxl>=3.1.2
+
+anthropic>=0.30.0
+google-genai>=0.3.0

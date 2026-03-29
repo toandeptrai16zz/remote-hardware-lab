@@ -4,8 +4,10 @@ Admin routes: dashboard, user management, device management
 import os
 import shutil
 import subprocess
+import io
+import pandas as pd
 from math import ceil
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from werkzeug.security import generate_password_hash
 import mysql.connector
 from utils import require_auth, make_safe_name
@@ -114,14 +116,23 @@ def add_user():
     
     db = get_db_connection()
     cur = db.cursor()
-    cur.execute(
-        "INSERT INTO users(username, password, email, role, status) VALUES(%s, %s, %s, %s, 'active')",
-        (username, generate_password_hash(password), email, role)
-    )
-    db.commit()
-    cur.close(), db.close()
+    try:
+        cur.execute(
+            "INSERT INTO users(username, password, email, role, status) VALUES(%s, %s, %s, %s, 'active')",
+            (username, generate_password_hash(password), email, role)
+        )
+        db.commit()
+        flash(f"Đã thêm user '{username}' thành công!", "success")
+    except mysql.connector.Error as err:
+        db.rollback()
+        if err.errno == 1062:
+            flash("Tên đăng nhập hoặc email đã tồn tại!", "error")
+        else:
+            flash(f"Lỗi hệ thống: {err}", "error")
+    finally:
+        cur.close()
+        db.close()
     
-    flash(f"Đã thêm user '{username}' thành công!", "success")
     return redirect(url_for("admin.admin_manage"))
 
 @admin_bp.route('/delete_user/<int:user_id>', methods=['POST'])
@@ -382,35 +393,185 @@ def admin_missions_page():
 @admin_bp.route("/api/missions", methods=['POST'])
 @require_auth('admin')
 def admin_api_create_mission():
-    """API to create mission (bulk assign devices to users)"""
+    """API to create mission / exam and assign to users"""
     data = request.get_json()
     mission_name = data.get('mission_name')
+    mission_type = data.get('type', 'assignment')
+    description = data.get('description', '')
+    duration_minutes = int(data.get('duration_minutes', 90))
+    start_time = data.get('start_time')
+    end_time = data.get('end_time')
     user_ids = data.get('user_ids')
-    device_ids = data.get('device_ids')
 
-    if not all([mission_name, user_ids, device_ids]):
-        return jsonify(success=False, error="Vui lòng điền tên mission và chọn ít nhất một user và một thiết bị."), 400
+    if not all([mission_name, user_ids, start_time, end_time]):
+        return jsonify(success=False, error="Vui lòng điền tên mission, chọn thời gian và ít nhất một user."), 400
 
-    if not isinstance(user_ids, list) or not isinstance(device_ids, list):
-        return jsonify(success=False, error="Dữ liệu không hợp lệ."), 400
+    if not isinstance(user_ids, list):
+        return jsonify(success=False, error="Dữ liệu danh sách user không hợp lệ."), 400
 
     db = get_db_connection()
     cur = db.cursor()
     
     success_count = 0
 
-    for user_id in user_ids:
-        for device_id in device_ids:
-            # Use INSERT IGNORE to skip existing assignments
-            cur.execute("INSERT IGNORE INTO device_assignments (user_id, device_id) VALUES (%s, %s)", 
-                       (user_id, device_id))
+    try:
+        cur.execute(
+            "INSERT INTO missions (name, description, type, duration_minutes, start_time, end_time) VALUES (%s, %s, %s, %s, %s, %s)",
+            (mission_name, description, mission_type, duration_minutes, start_time, end_time)
+        )
+        mission_id = cur.lastrowid
+        
+        for user_id in user_ids:
+            cur.execute("INSERT IGNORE INTO mission_assignments (mission_id, user_id) VALUES (%s, %s)", 
+                       (mission_id, user_id))
             if cur.rowcount > 0:
                 success_count += 1
 
-    db.commit()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        cur.close()
+        db.close()
+        return jsonify(success=False, error=str(e)), 500
+
     cur.close()
     db.close()
     
-    log_action(session['username'], f"Giao mission '{mission_name}': {success_count} quyền được cấp.")
-    message = f"Giao mission '{mission_name}' hoàn tất. Đã cấp {success_count} quyền mới."
+    try:
+        from flask import current_app
+        socket = current_app.extensions.get('socketio')
+        if socket:
+            socket.emit('new_mission', {'mission_name': mission_name})
+    except Exception:
+        pass
+    
+    log_action(session['username'], f"Tạo mission '{mission_name}' [ID: {mission_id}] và giao cho {success_count} user.")
+    message = f"Tạo mission '{mission_name}' hoàn tất. Đã cấp quyền cho {success_count} user."
     return jsonify(success=True, message=message)
+
+@admin_bp.route("/api/missions", methods=['GET'])
+@require_auth('admin')
+def admin_api_get_missions():
+    """API to get all missions with submission stats"""
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT m.*,
+               COUNT(DISTINCT ma.user_id) AS assigned_count,
+               COUNT(DISTINCT s.id)       AS submitted_count
+        FROM missions m
+        LEFT JOIN mission_assignments ma ON ma.mission_id = m.id
+        LEFT JOIN submissions s          ON s.mission_id  = m.id
+        GROUP BY m.id
+        ORDER BY m.created_at DESC
+    """)
+    missions = cur.fetchall()
+    cur.close()
+    db.close()
+
+    for m in missions:
+        m['created_at'] = m['created_at'].isoformat() if m['created_at'] else None
+        m['start_time'] = m['start_time'].isoformat() if m['start_time'] else None
+        m['end_time'] = m['end_time'].isoformat() if m['end_time'] else None
+
+    return jsonify(missions)
+
+
+@admin_bp.route("/api/missions/<int:mission_id>", methods=['DELETE'])
+@require_auth('admin')
+def admin_api_delete_mission(mission_id):
+    db = get_db_connection()
+    cur = db.cursor()
+    cur.execute("DELETE FROM mission_assignments WHERE mission_id = %s", (mission_id,))
+    cur.execute("DELETE FROM submissions WHERE mission_id = %s", (mission_id,))
+    cur.execute("DELETE FROM missions WHERE id = %s", (mission_id,))
+    db.commit()
+    cur.close()
+    db.close()
+    log_action(session['username'], f"Xóa mission ID: {mission_id}")
+    return jsonify(success=True, message="Đã xóa bài thi thành công.")
+
+@admin_bp.route("/api/missions/<int:mission_id>", methods=['PUT'])
+@require_auth('admin')
+def admin_api_update_mission(mission_id):
+    data = request.get_json()
+    db = get_db_connection()
+    cur = db.cursor()
+    try:
+        cur.execute("UPDATE missions SET name=%s, description=%s, type=%s, duration_minutes=%s, start_time=%s, end_time=%s WHERE id=%s",
+            (data.get('mission_name'), data.get('description'), data.get('type'), int(data.get('duration_minutes', 90)), data.get('start_time'), data.get('end_time'), mission_id)
+        )
+        if data.get('user_ids'):
+            cur.execute("DELETE FROM mission_assignments WHERE mission_id=%s", (mission_id,))
+            for uid in data.get('user_ids'):
+                cur.execute("INSERT IGNORE INTO mission_assignments (mission_id, user_id) VALUES (%s, %s)", (mission_id, uid))
+        db.commit()
+        success, message = True, "Cập nhật bài thi thành công"
+        log_action(session['username'], f"Cập nhật mission ID: {mission_id}")
+    except Exception as e:
+        db.rollback()
+        success, message = False, str(e)
+    finally:
+        cur.close()
+        db.close()
+    return jsonify(success=success, message=message)
+
+@admin_bp.route("/api/missions/<int:mission_id>/export", methods=['GET'])
+@require_auth('admin')
+def admin_api_export_mission(mission_id):
+    """API to export mission grades to Excel"""
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    
+    # Get mission details
+    cur.execute("SELECT name FROM missions WHERE id = %s", (mission_id,))
+    mission = cur.fetchone()
+    if not mission:
+        cur.close()
+        db.close()
+        return "Mission not found", 404
+        
+    # Get submission details
+    query = """
+        SELECT u.username, u.email, s.score, s.submitted_at, s.is_auto_submit
+        FROM mission_assignments ma
+        JOIN users u ON ma.user_id = u.id
+        LEFT JOIN submissions s ON ma.mission_id = s.mission_id AND ma.user_id = s.user_id
+        WHERE ma.mission_id = %s
+        ORDER BY u.username
+    """
+    cur.execute(query, (mission_id,))
+    submissions = cur.fetchall()
+    cur.close()
+    db.close()
+    
+    # Prepare DataFrame
+    data = []
+    for sub in submissions:
+        data.append({
+            'Tài khoản': sub['username'],
+            'Email': sub['email'],
+            'Điểm': sub['score'] if sub['score'] is not None else 'Chưa có điểm',
+            'Trạng thái': 'Đã nộp tự động' if sub['is_auto_submit'] else ('Đã nộp' if sub['submitted_at'] else 'Chưa nộp'),
+            'Thời gian nộp': sub['submitted_at'].strftime('%Y-%m-%d %H:%M:%S') if sub['submitted_at'] else ''
+        })
+        
+    df = pd.DataFrame(data)
+    
+    # Write to Excel in memory
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Grades')
+    output.seek(0)
+    
+    safe_mission_name = make_safe_name(mission['name'])
+    filename = f"Ket_qua_{safe_mission_name}.xlsx"
+    
+    log_action(session['username'], f"Xuất điểm mission '{mission['name']}' ra Excel")
+    
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )

@@ -1,0 +1,732 @@
+{% extends "layout.html" %}
+{% block title %}Bài Thi Của Tôi{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css" rel="stylesheet">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg-void: #0a0a0f;
+    --bg-surface: #13131a;
+    --bg-elevated: #1c1c26;
+    --accent: #7c6af7;
+    --accent-dim: rgba(124,106,247,0.12);
+    --accent-glow: rgba(124,106,247,0.35);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,0.12);
+    --cyan: #06b6d4;
+    --text-primary: #e8e8f0;
+    --text-secondary: #8888a8;
+    --text-muted: #55556a;
+    --border: rgba(255,255,255,0.07);
+    --border-accent: rgba(124,106,247,0.3);
+    --radius: 14px;
+    --radius-sm: 9px;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  body { font-family: var(--sans); background: var(--bg-void); color: var(--text-primary); }
+
+  /* ── EXAM BANNER (active state) ─────── */
+  .exam-banner {
+    position: fixed; top: 56px; left: 0; right: 0; z-index: 500;
+    background: linear-gradient(90deg, #1a0a2e, #0f1a2e);
+    border-bottom: 1px solid var(--border-accent);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.65rem 2rem; gap: 1rem;
+  }
+  .exam-banner.hidden { display: none; }
+  .exam-banner .banner-title {
+    font-weight: 700; font-size: 0.9rem; color: var(--text-primary);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .exam-banner .banner-title .live-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+    animation: pulse-anim 2s infinite;
+  }
+  @keyframes pulse-anim {
+    0%,100% { opacity:1; box-shadow: 0 0 0 0 var(--green); }
+    50% { opacity:0.7; box-shadow: 0 0 0 4px rgba(34,197,94,0); }
+  }
+
+  .countdown-display {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-family: var(--mono); font-size: 1.3rem; font-weight: 700;
+  }
+  .countdown-display.warning { color: var(--amber); }
+  .countdown-display.danger { color: var(--red); animation: flash 1s infinite; }
+  @keyframes flash { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+  .btn-submit-exam {
+    background: var(--green-dim); color: var(--green); border: 1px solid rgba(34,197,94,0.35);
+    border-radius: var(--radius-sm); padding: 0.5rem 1.1rem;
+    font-family: var(--sans); font-weight: 700; font-size: 0.875rem;
+    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.4rem;
+  }
+  .btn-submit-exam:hover { background: var(--green); color: white; }
+  .btn-submit-exam:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── PAGE ─────────────────────────────── */
+  .page-wrap {
+    max-width: 900px; margin: 0 auto;
+    padding: 2rem 1.5rem;
+    padding-top: calc(2rem + var(--banner-offset, 0px));
+  }
+  .page-wrap.has-banner { --banner-offset: 50px; }
+
+  /* ── MISSION CARD ─────────────────────── */
+  .mission-card {
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 1.5rem;
+    transition: border-color 0.2s;
+  }
+  .mission-card:hover { border-color: var(--border-accent); }
+  .mission-card.active-exam { border-color: var(--green); box-shadow: 0 0 0 1px rgba(34,197,94,0.15); }
+
+  .mission-card-header {
+    padding: 1.3rem 1.5rem; border-bottom: 1px solid var(--border);
+    background: var(--bg-elevated); display: flex; align-items: center; gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .mission-card-header .mission-icon {
+    width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+  }
+  .mission-card-header .mission-title-block { flex: 1; }
+  .mission-card-header .mission-title {
+    font-size: 1.1rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.25rem;
+  }
+  .mission-card-header .mission-subtitle {
+    font-size: 0.8rem; color: var(--text-secondary); display: flex; gap: 1rem; flex-wrap: wrap;
+  }
+  .mission-card-header .mission-subtitle span { display: flex; align-items: center; gap: 0.3rem; }
+
+  .mission-card-body { padding: 1.5rem; }
+
+  /* ── DESCRIPTION (rendered markdown) ─── */
+  .desc-content {
+    font-size: 0.9rem; line-height: 1.8; color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+  }
+  .desc-content h1,.desc-content h2,.desc-content h3 {
+    color: var(--text-primary); font-weight: 700; margin-top: 1.2rem; margin-bottom: 0.5rem;
+  }
+  .desc-content h1 { font-size: 1.2rem; }
+  .desc-content h2 { font-size: 1rem; }
+  .desc-content h3 { font-size: 0.9rem; }
+  .desc-content pre {
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 1rem; overflow-x: auto;
+    margin: 0.75rem 0;
+  }
+  .desc-content code {
+    font-family: var(--mono); font-size: 0.82rem; color: var(--cyan);
+    background: var(--bg-elevated); padding: 0.1em 0.4em; border-radius: 4px;
+  }
+  .desc-content pre code { background: none; padding: 0; color: var(--text-secondary); }
+  .desc-content ul, .desc-content ol { padding-left: 1.5rem; }
+  .desc-content li { margin-bottom: 0.35rem; }
+  .desc-content strong { color: var(--text-primary); }
+  .desc-content blockquote {
+    border-left: 3px solid var(--accent); padding-left: 1rem;
+    color: var(--text-muted); margin: 0.75rem 0; font-style: italic;
+  }
+
+  /* ── STATUS BADGES ─────────────────────── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 0.25rem 0.65rem; border-radius: 20px;
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .badge-active { background: var(--green-dim); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+  .badge-upcoming { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+  .badge-ended { background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid var(--border); }
+  .badge-submitted { background: rgba(6,182,212,0.12); color: var(--cyan); border: 1px solid rgba(6,182,212,0.3); }
+
+  /* ── COUNTDOWN ─────────────────────────── */
+  .time-blocks {
+    display: flex; gap: 0.5rem; align-items: center;
+    margin: 1rem 0; flex-wrap: wrap;
+  }
+  .time-block {
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: 10px; padding: 0.6rem 1rem; text-align: center; min-width: 70px;
+  }
+  .time-block .time-val {
+    font-family: var(--mono); font-size: 1.5rem; font-weight: 700;
+    color: var(--text-primary); line-height: 1;
+  }
+  .time-block .time-label {
+    font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.08em; margin-top: 0.2rem;
+  }
+  .time-sep { font-size: 1.2rem; color: var(--text-muted); }
+
+  /* ── ACTION BUTTONS ─────────────────────── */
+  .action-area { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.5rem; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.65rem 1.2rem; border-radius: var(--radius-sm);
+    font-family: var(--sans); font-size: 0.875rem; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; border: 1px solid transparent; text-decoration: none;
+  }
+  .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .btn-primary:hover { background: #6a58e0; box-shadow: 0 4px 16px var(--accent-glow); transform: translateY(-1px); }
+  .btn-ghost { background: transparent; color: var(--text-secondary); border-color: var(--border); }
+  .btn-ghost:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  .btn-green { background: var(--green-dim); color: var(--green); border-color: rgba(34,197,94,0.35); }
+  .btn-green:hover { background: var(--green); color: white; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+  /* ── RESULT CARD ─────────────────────────── */
+  .result-card {
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.5rem; margin-top: 1rem;
+  }
+  .score-display {
+    display: flex; align-items: baseline; gap: 0.35rem; justify-content: center;
+    margin-bottom: 1rem;
+  }
+  .score-display .score-val {
+    font-family: var(--mono); font-size: 3.5rem; font-weight: 700; line-height: 1;
+  }
+  .score-display .score-max { font-size: 1.2rem; color: var(--text-muted); }
+  .score-high { color: var(--green); }
+  .score-mid { color: var(--amber); }
+  .score-low { color: var(--red); }
+
+  .feedback-text {
+    font-size: 0.875rem; line-height: 1.75; color: var(--text-secondary);
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 1rem; margin-top: 0.75rem;
+  }
+
+  .criteria-list { display: flex; flex-direction: column; gap: 0.65rem; margin-top: 1rem; }
+  .criterion-row {
+    display: flex; align-items: center; gap: 0.75rem; font-size: 0.82rem;
+  }
+  .criterion-row .c-name { min-width: 150px; color: var(--text-secondary); }
+  .criterion-row .c-bar { flex:1; height:5px; background:var(--bg-void); border-radius:3px; overflow:hidden; }
+  .criterion-row .c-fill { height:100%; background:var(--accent); border-radius:3px; transition:width 0.8s ease; }
+  .criterion-row .c-score { font-family:var(--mono); font-size:0.78rem; font-weight:700; color:var(--accent); min-width:35px; text-align:right; }
+
+  /* ── EMPTY ─────────────────────────────── */
+  .empty-state {
+    text-align: center; padding: 4rem 1rem; color: var(--text-muted);
+  }
+  .empty-state i { font-size: 3rem; margin-bottom: 1rem; display:block; color: var(--text-muted); }
+  .empty-state h3 { font-size: 1rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+  .empty-state p { font-size: 0.85rem; line-height: 1.6; }
+
+  /* ── SECTION HEADINGS ────────────────────── */
+  .section-heading {
+    display: flex; align-items: center; gap: 0.6rem;
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--text-muted);
+    padding: 0.5rem 0; margin: 1.5rem 0 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-heading .dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  /* ── MODAL ─────────────────────────────── */
+  .modal-overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.8); backdrop-filter:blur(6px);
+    z-index:2000; align-items:center; justify-content:center; padding:1rem;
+  }
+  .modal-overlay.open { display:flex; }
+  .modal-box {
+    background:var(--bg-surface); border:1px solid var(--border);
+    border-radius:var(--radius); width:100%; max-width:480px;
+  }
+  .modal-header {
+    padding:1.2rem 1.4rem; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .modal-header h3 { font-size:1rem; font-weight:700; }
+  .modal-body { padding:1.4rem; }
+  .modal-footer { padding:1rem 1.4rem; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:0.75rem; }
+  .modal-close { background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:1.1rem;border-radius:6px;padding:0.2rem 0.4rem;transition:all 0.15s; }
+  .modal-close:hover { background:var(--bg-elevated);color:var(--text-primary); }
+
+  /* ── TIMEOUT SCREEN ─────────────────────── */
+  #timeoutScreen {
+    display:none; position:fixed; inset:0; z-index:9999;
+    background:rgba(5,5,10,0.97); backdrop-filter:blur(20px);
+    flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:2rem;
+  }
+  #timeoutScreen.show { display:flex; }
+  #timeoutScreen .timeout-icon {
+    font-size:4rem; margin-bottom:1.5rem;
+    animation: timeoutPulse 2s ease-in-out infinite;
+  }
+  @keyframes timeoutPulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.1);} }
+  #timeoutScreen h2 { font-size:2rem; font-weight:800; margin-bottom:0.75rem; }
+  #timeoutScreen p { color:var(--text-secondary); font-size:1rem; margin-bottom:2rem; max-width:400px; }
+
+  @media (max-width:640px) {
+    .exam-banner { padding: 0.5rem 1rem; gap: 0.5rem; }
+    .countdown-display { font-size: 1rem; }
+    .page-wrap { padding: 1rem; }
+    .time-block .time-val { font-size: 1.2rem; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── EXAM LIVE BANNER ── -->
+<div class="exam-banner hidden" id="examBanner">
+  <div class="banner-title">
+    <div class="live-dot"></div>
+    <span id="bannerMissionName">Đang thi</span>
+  </div>
+  <div class="countdown-display" id="bannerCountdown">00:00:00</div>
+  <button class="btn-submit-exam" id="bannerSubmitBtn" onclick="promptSubmit()">
+    <i class="fa-solid fa-paper-plane"></i> Nộp bài
+  </button>
+</div>
+
+<!-- ── MAIN ── -->
+<div class="page-wrap" id="pageWrap">
+  <div style="margin-bottom:2rem;">
+    <h1 style="font-size:1.5rem;font-weight:800;display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem;">
+      <i class="fa-solid fa-graduation-cap" style="color:var(--accent);"></i>
+      Bài Thi &amp; Bài Tập Của Tôi
+    </h1>
+    <p style="color:var(--text-secondary);font-size:0.875rem;">Xem lịch thi, đề bài và kết quả của bạn</p>
+  </div>
+
+  <div id="missionsContainer">
+    <div class="empty-state">
+      <i class="fa-solid fa-circle-notch fa-spin"></i>
+      <h3>Đang tải danh sách bài thi...</h3>
+    </div>
+  </div>
+</div>
+
+<!-- ── TIMEOUT SCREEN ── -->
+<div id="timeoutScreen">
+  <div class="timeout-icon">⏰</div>
+  <h2>Hết Giờ Làm Bài!</h2>
+  <p>Bài thi đã kết thúc. Bài làm của bạn đã được hệ thống tự động nộp. Cảm ơn bạn đã tham gia.</p>
+  <button class="btn btn-ghost" onclick="window.location.href='{{ url_for('auth.logout') }}'">
+    <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+  </button>
+</div>
+
+<div class="modal-overlay" id="submitModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-paper-plane" style="color:var(--green)"></i> Xác nhận nộp bài</h3>
+      <button class="modal-close" onclick="closeSubmitModal()"><i class="fa-solid fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-secondary);font-size:0.9rem;line-height:1.7;">
+        Nộp bài <strong id="submitMissionName" style="color:var(--text-primary)"></strong>? Sau khi nộp không thể chỉnh sửa thêm.
+      </p>
+
+      <!-- File preview list -->
+      <div id="submitFileList" style="margin:1rem 0;">
+        <p style="font-size:0.8rem;color:var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang đọc danh sách file...</p>
+      </div>
+
+      <div style="margin-top:0.75rem;padding:0.75rem;background:var(--amber-dim);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius-sm);">
+        <p style="font-size:0.82rem;color:var(--amber);display:flex;align-items:center;gap:0.4rem;">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          Thời gian còn lại: <strong id="submitTimeLeft" style="font-family:var(--mono)">--:--:--</strong>
+        </p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeSubmitModal()">Chưa, tiếp tục làm</button>
+      <button class="btn btn-green" id="confirmSubmitBtn" onclick="confirmSubmit()">
+        <i class="fa-solid fa-check"></i> Nộp bài ngay
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+'use strict';
+
+// ── STATE ──────────────────────────────────────────────────
+let activeMission = null;   // mission object hiện đang thi
+let timerInterval = null;   // countdown interval
+let currentUsername = "{{ session.get('username', '') }}";
+
+// ── UTILS ──────────────────────────────────────────────────
+function escH(s) { const d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
+
+function formatDuration(ms) {
+  if (ms <= 0) return '00:00:00';
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const pad = n => String(n).padStart(2,'0');
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+function toast(msg, type='success') {
+  const colors = {success:'bg-success',error:'bg-danger',info:'bg-primary',warning:'bg-warning text-dark'};
+  const id='t'+Date.now();
+  const el=document.createElement('div');
+  el.id=id; el.className=`toast show align-items-center text-white ${colors[type]||'bg-primary'} border-0`;
+  el.innerHTML=`<div class="d-flex"><div class="toast-body">${escH(msg)}</div>
+    <button class="btn-close btn-close-white me-2 m-auto" onclick="document.getElementById('${id}').remove()"></button></div>`;
+  let c=document.querySelector('.toast-container');
+  if(!c){c=document.createElement('div');c.className='toast-container position-fixed top-0 end-0 p-3 mt-5';c.style.zIndex='9998';document.body.appendChild(c);}
+  c.appendChild(el); setTimeout(()=>el.remove(),5000);
+}
+
+// ── LOAD MISSIONS ──────────────────────────────────────────
+function sectionHeader(label, color, count) {
+  return `<div class="section-heading">
+    <span class="dot" style="background:${color}"></span>
+    ${label} <span style="color:var(--text-muted);font-weight:400;">(${count})</span>
+  </div>`;
+}
+
+async function loadMyMissions() {
+  const container = document.getElementById('missionsContainer');
+  try {
+    const res = await fetch('/user/api/my-missions');
+    const missions = await res.json();
+    if (!missions.length) {
+      container.innerHTML = `<div class="empty-state">
+        <i class="fa-solid fa-calendar-xmark"></i>
+        <h3>Chưa có bài thi nào</h3>
+        <p>Giáo viên chưa giao bài thi hoặc bài tập nào cho bạn.<br>Hãy quay lại sau nhé!</p>
+      </div>`;
+      return;
+    }
+
+    // Group by status
+    const activeGroup    = missions.filter(m => getMissionStatus(m) === 'active');
+    const upcomingGroup  = missions.filter(m => getMissionStatus(m) === 'upcoming');
+    const submittedGroup = missions.filter(m => getMissionStatus(m) === 'submitted');
+    const endedGroup     = missions.filter(m => getMissionStatus(m) === 'ended');
+    const pastAll        = [...submittedGroup, ...endedGroup];
+
+    let html = '';
+    if (activeGroup.length) {
+      html += sectionHeader('🟢 Đang diễn ra', 'var(--green)', activeGroup.length);
+      html += activeGroup.map(m => renderMissionCard(m)).join('');
+    }
+    if (upcomingGroup.length) {
+      html += sectionHeader('⏰ Sắp tới', 'var(--amber)', upcomingGroup.length);
+      html += upcomingGroup.map(m => renderMissionCard(m)).join('');
+    }
+    if (pastAll.length) {
+      html += sectionHeader('✅ Đã kết thúc / Đã nộp', 'var(--text-muted)', pastAll.length);
+      html += pastAll.map(m => renderMissionCard(m)).join('');
+    }
+
+    container.innerHTML = html;
+    if (activeGroup.length) startExamMode(activeGroup[0]);
+  } catch(e) {
+    container.innerHTML = `<div class="empty-state">
+      <i class="fa-solid fa-exclamation-circle"></i>
+      <h3>Lỗi tải dữ liệu</h3>
+      <p>Không thể kết nối máy chủ. Vui lòng tải lại trang.</p>
+    </div>`;
+  }
+}
+
+
+function getMissionStatus(m) {
+  const now = Date.now();
+  const start = new Date(m.start_time).getTime();
+  const end = new Date(m.end_time).getTime();
+  if (m.submitted) return 'submitted';
+  if (now < start) return 'upcoming';
+  if (now >= start && now <= end) return 'active';
+  return 'ended';
+}
+
+function renderMissionCard(m) {
+  const status = getMissionStatus(m);
+  const start = new Date(m.start_time);
+  const end = new Date(m.end_time);
+  const fmt = d => d.toLocaleString('vi-VN',{dateStyle:'short',timeStyle:'short'});
+
+  const statusConfig = {
+    active:    { badge:'<span class="badge badge-active"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse-anim 2s infinite;"></span>Đang diễn ra</span>', iconBg:'var(--green-dim)', iconColor:'var(--green)', icon:'fa-play-circle' },
+    upcoming:  { badge:'<span class="badge badge-upcoming"><i class="fa-solid fa-clock"></i>Sắp diễn ra</span>',  iconBg:'var(--amber-dim)', iconColor:'var(--amber)', icon:'fa-clock' },
+    ended:     { badge:'<span class="badge badge-ended"><i class="fa-solid fa-flag-checkered"></i>Đã kết thúc</span>', iconBg:'rgba(255,255,255,0.04)', iconColor:'var(--text-muted)', icon:'fa-flag-checkered' },
+    submitted: { badge:'<span class="badge badge-submitted"><i class="fa-solid fa-check"></i>Đã nộp bài</span>', iconBg:'rgba(6,182,212,0.12)', iconColor:'var(--cyan)', icon:'fa-check-circle' }
+  };
+  const cfg = statusConfig[status];
+
+  // Countdown block (only for upcoming/active)
+  let countdownBlock = '';
+  if (status === 'active') {
+    const msLeft = end.getTime() - Date.now();
+    countdownBlock = `<div class="time-blocks" id="countdown_${m.id}">
+      <div class="time-block"><div class="time-val" id="cdH_${m.id}">00</div><div class="time-label">Giờ</div></div>
+      <div class="time-sep">:</div>
+      <div class="time-block"><div class="time-val" id="cdM_${m.id}">00</div><div class="time-label">Phút</div></div>
+      <div class="time-sep">:</div>
+      <div class="time-block"><div class="time-val" id="cdS_${m.id}">00</div><div class="time-label">Giây</div></div>
+    </div>`;
+  } else if (status === 'upcoming') {
+    countdownBlock = `<p style="font-size:0.85rem;color:var(--text-secondary);margin:0.75rem 0;">
+      <i class="fa-solid fa-calendar-check" style="color:var(--amber)"></i>
+      Bắt đầu lúc: <strong style="color:var(--text-primary)">${fmt(start)}</strong>
+      &nbsp;→&nbsp; Kết thúc: <strong style="color:var(--text-primary)">${fmt(end)}</strong>
+      &nbsp;•&nbsp; Thời lượng: <strong style="color:var(--accent)">${m.duration_minutes} phút</strong>
+    </p>`;
+  }
+
+  // Action button
+  let actionBtn = '';
+  if (status === 'active' && !m.submitted) {
+    actionBtn = `
+      <a href="/user/${currentUsername}/workspace" target="_blank" class="btn btn-primary">
+        <i class="fa-solid fa-code"></i> Vào làm bài
+      </a>
+      <button class="btn btn-green" onclick="promptSubmit(${m.id}, '${escH(m.name)}')">
+        <i class="fa-solid fa-paper-plane"></i> Nộp bài
+      </button>`;
+  } else if (status === 'upcoming') {
+    actionBtn = `<button class="btn btn-ghost" disabled>
+      <i class="fa-solid fa-lock"></i> Chưa đến giờ thi
+    </button>`;
+  } else if (status === 'ended' && !m.submitted) {
+    actionBtn = `<button class="btn btn-ghost" disabled>
+      <i class="fa-solid fa-ban"></i> Đã hết hạn
+    </button>`;
+  }
+
+  // Description (markdown → HTML)
+  const descHTML = m.description ? (typeof marked !== 'undefined' ? marked.parse(m.description) : escH(m.description)) : '<p style="color:var(--text-muted);font-style:italic;">Không có mô tả</p>';
+
+  // Result section
+  let resultSection = '';
+  if (m.submission) {
+    const score = m.submission.score;
+    const scoreClass = score !== null ? (score >= 8 ? 'score-high' : score >= 5 ? 'score-mid' : 'score-low') : '';
+    const criteriaHTML = (m.submission.ai_criteria || []).map(c =>
+      `<div class="criterion-row">
+        <span class="c-name">${escH(c.name)}</span>
+        <div class="c-bar"><div class="c-fill" style="width:${c.score*10}%"></div></div>
+        <span class="c-score">${c.score}/10</span>
+      </div>`
+    ).join('');
+    resultSection = `
+      <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:1.5rem;">
+        <h4 style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:1rem;">
+          <i class="fa-solid fa-chart-bar"></i> Kết quả
+        </h4>
+        <div class="result-card">
+          ${score !== null ? `
+            <div class="score-display">
+              <span class="score-val ${scoreClass}">${score.toFixed(1)}</span>
+              <span class="score-max">/ 10</span>
+            </div>
+            ${criteriaHTML ? `<div class="criteria-list">${criteriaHTML}</div>` : ''}
+            ${m.submission.ai_feedback ? `<div class="feedback-text">${escH(m.submission.ai_feedback)}</div>` : ''}
+          ` : `
+            <p style="text-align:center;color:var(--text-muted);padding:1rem 0;font-size:0.875rem;">
+              <i class="fa-solid fa-hourglass-half"></i> Giáo viên đang chấm điểm...
+            </p>
+          `}
+        </div>
+      </div>`;
+  }
+
+  return `
+  <div class="mission-card ${status === 'active' && !m.submitted ? 'active-exam' : ''}" id="mcard_${m.id}">
+    <div class="mission-card-header">
+      <div class="mission-icon" style="background:${cfg.iconBg};color:${cfg.iconColor};">
+        <i class="fa-solid ${cfg.icon}"></i>
+      </div>
+      <div class="mission-title-block">
+        <div class="mission-title">${escH(m.name)}</div>
+        <div class="mission-subtitle">
+          ${cfg.badge}
+          <span><i class="fa-solid fa-stopwatch"></i>${m.duration_minutes} phút</span>
+          <span><i class="fa-solid fa-calendar"></i>${fmt(start)} → ${fmt(end)}</span>
+        </div>
+      </div>
+    </div>
+    <div class="mission-card-body">
+      ${countdownBlock}
+      <div class="desc-content">${descHTML}</div>
+      ${resultSection}
+      ${actionBtn ? `<div class="action-area">${actionBtn}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+// ── EXAM MODE ──────────────────────────────────────────────
+function startExamMode(mission) {
+  activeMission = mission;
+  const banner = document.getElementById('examBanner');
+  banner.classList.remove('hidden');
+  document.getElementById('pageWrap').classList.add('has-banner');
+  document.getElementById('bannerMissionName').textContent = mission.name;
+
+  // Start timer
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => tickTimer(mission), 1000);
+  tickTimer(mission);
+}
+
+function tickTimer(mission) {
+  const endTime = new Date(mission.end_time).getTime();
+  const now = Date.now();
+  const remaining = endTime - now;
+
+  if (remaining <= 0) {
+    clearInterval(timerInterval);
+    handleTimeOut(mission);
+    return;
+  }
+
+  const display = formatDuration(remaining);
+  const bannerCd = document.getElementById('bannerCountdown');
+  bannerCd.textContent = display;
+
+  // Color warning
+  bannerCd.classList.remove('warning','danger');
+  if (remaining < 5 * 60 * 1000) bannerCd.classList.add('danger');
+  else if (remaining < 15 * 60 * 1000) bannerCd.classList.add('warning');
+
+  // Update card countdown
+  if (mission) {
+    const h = Math.floor(remaining / 3600000);
+    const m = Math.floor((remaining % 3600000) / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    const pad = n => String(n).padStart(2,'0');
+    const hEl = document.getElementById(`cdH_${mission.id}`);
+    const mEl = document.getElementById(`cdM_${mission.id}`);
+    const sEl = document.getElementById(`cdS_${mission.id}`);
+    if (hEl) hEl.textContent = pad(h);
+    if (mEl) mEl.textContent = pad(m);
+    if (sEl) sEl.textContent = pad(s);
+  }
+
+  // Update submit modal time left
+  const stl = document.getElementById('submitTimeLeft');
+  if (stl) stl.textContent = display;
+}
+
+async function handleTimeOut(mission) {
+  clearInterval(timerInterval);
+  // Auto submit
+  try {
+    await fetch(`/user/api/missions/${mission.id}/submit`, { method: 'POST' });
+  } catch(e) {}
+  // Show timeout screen
+  document.getElementById('timeoutScreen').classList.add('show');
+  // Block workspace after 5s
+  setTimeout(() => { window.location.href = '{{ url_for("auth.logout") }}'; }, 30000);
+}
+
+// ── SUBMIT ──────────────────────────────────────────────────
+let submitMissionId = null;
+let submitMissionName = '';
+
+async function promptSubmit(missionId, missionName) {
+  submitMissionId = missionId || (activeMission ? activeMission.id : null);
+  submitMissionName = missionName || (activeMission ? activeMission.name : '');
+  document.getElementById('submitMissionName').textContent = submitMissionName;
+  if (activeMission) {
+    const rem = new Date(activeMission.end_time).getTime() - Date.now();
+    document.getElementById('submitTimeLeft').textContent = formatDuration(rem);
+  }
+  // Load file preview
+  const fileListEl = document.getElementById('submitFileList');
+  fileListEl.innerHTML = '<p style="font-size:0.8rem;color:var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang đọc danh sách file...</p>';
+  document.getElementById('submitModal').classList.add('open');
+
+  try {
+    const res = await fetch('/user/api/preview-files');
+    const data = await res.json();
+    if (data.success && data.files.length > 0) {
+      fileListEl.innerHTML = `
+        <p style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;"><i class="fa-solid fa-file-code"></i> File sẽ được nộp (${data.files.length} file)</p>
+        <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.5rem;max-height:150px;overflow-y:auto;">
+          ${data.files.map(f => `<div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem .5rem;font-size:.82rem;font-family:var(--mono);"><span style="color:var(--cyan);">${escH(f.path)}</span><span style="color:var(--text-muted);font-size:.75rem;">${(f.size/1024).toFixed(1)}KB</span></div>`).join('')}
+        </div>`;
+    } else if (data.success) {
+      fileListEl.innerHTML = '<p style="font-size:0.82rem;color:var(--amber);"><i class="fa-solid fa-triangle-exclamation"></i> Không tìm thấy file code nào (.ino/.cpp/.c/.h/.py). Hãy kiểm tra lại workspace!</p>';
+    } else {
+      fileListEl.innerHTML = '<p style="font-size:0.82rem;color:var(--text-muted);"><i class="fa-solid fa-plug-circle-exclamation"></i> Không thể đọc danh sách file (server chưa kết nối).</p>';
+    }
+  } catch(e) {
+    fileListEl.innerHTML = '<p style="font-size:0.82rem;color:var(--text-muted);"><i class="fa-solid fa-plug-circle-exclamation"></i> Không thể đọc danh sách file.</p>';
+  }
+}
+
+function closeSubmitModal() {
+  document.getElementById('submitModal').classList.remove('open');
+}
+
+async function confirmSubmit() {
+  if (!submitMissionId) return;
+  const btn = document.getElementById('confirmSubmitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang nộp...';
+  try {
+    const res = await fetch(`/user/api/missions/${submitMissionId}/submit`, { method: 'POST' });
+    const data = await res.json();
+    closeSubmitModal();
+    if (data.success) {
+      toast('✅ Nộp bài thành công! AI đang chấm điểm, kết quả sẽ hiện trong vài giây...', 'success');
+      clearInterval(timerInterval);
+      document.getElementById('examBanner').classList.add('hidden');
+      document.getElementById('pageWrap').classList.remove('has-banner');
+      activeMission = null;
+      await loadMyMissions();
+      // Poll for score every 8s up to 10 times
+      let pollCount = 0;
+      const mId = submitMissionId;
+      submitMissionId = null;
+      const pollInterval = setInterval(async () => {
+        pollCount++;
+        const missions = await fetch('/user/api/my-missions').then(r=>r.json()).catch(()=>[]);
+        const m = missions.find(x => x.id === mId);
+        if ((m && m.submission && m.submission.score !== null) || pollCount >= 10) {
+          clearInterval(pollInterval);
+          await loadMyMissions();
+          if (m && m.submission && m.submission.score !== null) {
+            toast(`🎓 AI đã chấm xong! Điểm của bạn: ${m.submission.score.toFixed(1)}/10`, 'info');
+          }
+        }
+      }, 8000);
+    } else {
+      toast(data.error || 'Lỗi nộp bài', 'error');
+    }
+  } catch(e) {
+    toast('Lỗi kết nối. Vui lòng thử lại.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> Nộp bài ngay';
+  }
+}
+
+// Modal click outside close
+document.getElementById('submitModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSubmitModal();
+});
+
+// ── INIT ──────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', loadMyMissions);
+</script>
+{% endblock %}

@@ -92,6 +92,54 @@ def init_db():
         )
     """)
     
+    # --------- EXAM & MISSION TABLES ---------
+    
+    # Create missions table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS missions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            description TEXT,
+            type ENUM('exam', 'test', 'assignment') NOT NULL DEFAULT 'assignment',
+            duration_minutes INT DEFAULT 90,
+            template_code TEXT NULL,
+            start_time DATETIME NULL,
+            end_time DATETIME NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
+    # Create mission assignments table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS mission_assignments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            mission_id INT NOT NULL,
+            user_id INT NOT NULL,
+            assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (mission_id) REFERENCES missions(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE KEY (mission_id, user_id)
+        )
+    """)
+    
+    # Create submissions table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS submissions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            mission_id INT NOT NULL,
+            user_id INT NOT NULL,
+            files JSON,
+            is_auto_submit BOOLEAN DEFAULT FALSE,
+            score DECIMAL(4, 2) NULL,
+            ai_feedback TEXT NULL,
+            ai_criteria JSON NULL,
+            submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (mission_id) REFERENCES missions(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE KEY (mission_id, user_id)
+        )
+    """)
+    
     # Create default admin user if not exists
     cur.execute("SELECT id FROM users WHERE username='admin'")
     if not cur.fetchone():

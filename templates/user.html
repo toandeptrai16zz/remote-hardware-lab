@@ -557,6 +557,8 @@
                     <button class="btn btn-sm btn-success" onclick="compileCode(event)"><i class="fa-solid fa-cogs"></i><span>Biên dịch</span></button>
                     <button class="btn btn-sm btn-upload" onclick="uploadToBoard(event)"><i class="fa-solid fa-microchip"></i><span>Nạp code</span></button>
                     <button class="btn btn-sm btn-ide" onclick="saveCurrentFile()"><i class="fa-solid fa-save"></i><span>Save</span></button>
+                    <!-- Dynamic Submit Button for Active Missions -->
+                    <button id="btnSubmitMission" class="btn btn-sm btn-warning" style="display:none;font-weight:bold;color:#000;" onclick="submitActiveMission()"><i class="fa-solid fa-paper-plane"></i><span id="txtSubmitMission">Nộp Bài Ngay</span></button>
                 </div>
             </div>
             <div class="editor-container" id="editorContainer"><div id="editor"></div></div>
@@ -794,7 +796,16 @@ document.addEventListener('DOMContentLoaded', () => {
     loadIDEState();
     connectTerminalSocket();
     connectUploadSocket();
+    setupRealTimeNotifications();
 });
+
+function setupRealTimeNotifications() {
+    const mainSocket = io.connect(location.protocol + '//' + document.domain + ':' + location.port + '/');
+    mainSocket.on('new_mission', function(data) {
+        showNotification(`📢 BÀI TẬP MỚI: ${data.mission_name}. Hãy truy cập tab Bài tập/Thi để bắt đầu làm bài!`, 'info');
+        if (typeof checkIDEActiveMission === 'function') checkIDEActiveMission();
+    });
+}
 
         // =================================================================
         // FILE CREATION MODAL
