@@ -8,6 +8,8 @@ import logging
 import warnings
 from urllib3.exceptions import InsecureRequestWarning
 from flask import Flask, session, redirect, url_for
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from prometheus_client import make_wsgi_app
 from flask_socketio import SocketIO
 from dotenv import load_dotenv
 
@@ -57,6 +59,11 @@ logger = logging.getLogger(__name__)
 # ================== APP INITIALIZATION ==================
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(24))
+
+# Cọc endpoint /metrics phục vụ cho hệ thống giám sát Monitoring Kubernetes
+app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
+    '/metrics': make_wsgi_app()
+})
 
 # Initialize SocketIO
 socketio = SocketIO(app, cors_allowed_origins="*")

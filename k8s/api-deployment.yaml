@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-api
+  labels:
+    app: flask-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flask-api
+  template:
+    metadata:
+      labels:
+        app: flask-api
+    spec:
+      containers:
+      - name: api
+        image: eput/flask-iot-lab:latest # Sẽ thay bằng image build trên local node
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5000
+        env:
+        - name: FLASK_APP
+          value: "app.py"
+        - name: MYSQL_HOST
+          value: "mysql-db"
+        - name: MYSQL_USER
+          value: "root"
+        - name: MYSQL_PASSWORD
+          value: "root123"
+        - name: MYSQL_DB
+          value: "iot_lab"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-api-svc
+spec:
+  type: NodePort
+  selector:
+    app: flask-api
+  ports:
+  - port: 5000
+    targetPort: 5000
+    nodePort: 30005
