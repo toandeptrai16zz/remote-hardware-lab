@@ -548,14 +548,7 @@
                     <button class="btn btn-sm btn-dark" onclick="toggleTerminal()" title="Bật/Tắt Terminal" style="border-color: #444;"><i class="fa-solid fa-terminal"></i></button>
                     <button class="btn btn-sm btn-dark" onclick="toggleSerialMonitor()" title="Bật/Tắt Serial Monitor" style="border-color: #444;"><i class="fa-solid fa-plug"></i></button>
                     <span class="border-end" style="height: 20px;"></span>
-                    <select id="boardSelector" class="form-select form-select-sm d-inline-block w-auto" style="background-color: #30363d; color: white; border-color: #444;">
-                        <option value="arduino:avr:uno">Arduino Uno</option>
-                        <option value="arduino:avr:nano">Arduino Nano (ATmega328P)</option>
-                        <option value="esp8266:esp8266:nodemcuv2">ESP8266 (NodeMCU 1.0)</option>
-                        <option value="esp32:esp32:esp32doit-devkit-v1">ESP32 Dev Module</option>
-                    </select>
-                    <button class="btn btn-sm btn-success" onclick="compileCode(event)"><i class="fa-solid fa-cogs"></i><span>Biên dịch</span></button>
-                    <button class="btn btn-sm btn-upload" onclick="uploadToBoard(event)"><i class="fa-solid fa-microchip"></i><span>Nạp code</span></button>
+                    <button class="btn btn-sm btn-success" onclick="compileCode(event)"><i class="fa-solid fa-microchip"></i><span>Chạy Testbench (Ảo hóa)</span></button>
                     <button class="btn btn-sm btn-ide" onclick="saveCurrentFile()"><i class="fa-solid fa-save"></i><span>Save</span></button>
                     <!-- Dynamic Submit Button for Active Missions -->
                     <button id="btnSubmitMission" class="btn btn-sm btn-warning" style="display:none;font-weight:bold;color:#000;" onclick="submitActiveMission()"><i class="fa-solid fa-paper-plane"></i><span id="txtSubmitMission">Nộp Bài Ngay</span></button>

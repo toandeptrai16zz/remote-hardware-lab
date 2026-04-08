@@ -49,38 +49,39 @@ def grade_submission_with_ai(mission_description: str, mission_name: str, files:
     if not files_text.strip():
         files_text = "(Các file đều trống hoặc không đọc được)"
 
-    prompt = f"""Bạn là giáo viên chấm bài Lập trình nhúng (Embedded Systems, Arduino, ESP32, ESP8266).
+    prompt = f"""Bạn là một Chuyên gia Kỹ sư Điện tử Viễn Thông (ĐTVT) và Cố vấn Thiết kế Hệ thống Nhúng (Embedded/IoT Architect) cực kỳ khắt khe. 
+Bạn được giao phó chấm dứt điểm kỳ thi lập trình phần cứng của sinh viên.
 
-## TÊN BÀI THI
+## TÊN BÀI THI VIỄN THÔNG
 {mission_name}
 
-## NỘI DUNG ĐỀ BÀI
-{mission_description or '(Không có mô tả đề bài)'}
+## NỘI DUNG YÊU CẦU ĐỀ BÀI
+{mission_description or '(Không có mô tả bài thi)'}
 
-## BÀI LÀM CỦA SINH VIÊN
+## SOURCE CODE SINH VIÊN BÀI LÀM
 {files_text}
 
-## HƯỚNG DẪN CHẤM ĐIỂM
-Chấm theo 5 tiêu chí, mỗi tiêu chí từ 0 đến 10 điểm:
+## BẢNG TIÊU CHÍ CHẤM ĐIỂM (RUBRIC ĐTVT):
+Bạn cần đánh giá cực rắn theo 5 tiêu chí phân cứng (0 đến 10 điểm/mục). Tuyệt đối trừ sạch điểm nếu lạm dụng hàm delay hoặc làm sai logic nhúng:
 
-1. **Đúng yêu cầu đề bài**: Code thực hiện đúng chức năng được yêu cầu trong đề không? Đầu ra/hành vi có đúng không?
-2. **Chất lượng code**: Rõ ràng, có comment phù hợp, đặt tên biến/hàm có ý nghĩa, cấu trúc gọn gàng?
-3. **Logic và thuật toán**: Cách giải quyết vấn đề có đúng logic không? Có hiệu quả không?
-4. **Xử lý lỗi / robustness**: Có kiểm tra lỗi, trường hợp ngoại lệ, delay hợp lý không?
-5. **Sử dụng thư viện / API**: Dùng đúng hàm, đúng API của platform (Arduino, ESP-IDF, v.v.) không?
+1. **Thuật toán & Giao thức truyền thông**: Code có thao tác xử lý bit (bit-wise), framing bản tin (JSON/Header/CRC), hoặc giao tiếp TCP/UDP/MQTT đúng chuẩn viễn thông không?
+2. **Kiến trúc Hệ điều hành nhúng (RTOS & Real-time)**: Nhấn mạnh vào đa nhiệm! Code có bắt buộc dùng Task/Thread thay vì vòng lặp tĩnh không? Có lạm dụng `delay()` gây đứt tiến trình thay vì dùng `vTaskDelay`, `Mutex`, `Semaphore`, `Message Queue` (FreeRTOS/RTOS) không?
+3. **Quản lý Ngắt (Interrupt ISR) & Context Switch**: Hàm ngắt (ISR) có cực ngắn gọn để không lock Hệ điều hành không? Có dùng đúng hàm Yield của RTOS (`portYIELD_FROM_ISR`) không? Khai báo cờ (flag) có dùng hâu tố `volatile` an toàn phần cứng không?
+4. **Tối ưu Tài nguyên (RAM/Power)**: Việc cấp phát mảng/con trỏ `malloc` có gây rủi ro tràn RAM vi điều khiển không? Có cơ chế chờ cực thấp (Deep Sleep, Low Power) cho các node mạng (Lora/IoT) để tiết pin không?
+5. **Độ ổn định & Chống nhiễu**: Việc cấu hình I/O (Pullup/Pulldown), bộ lọc nhiễu nảy nút (Debounce) cứng/mềm có sai sót không? Convention code C/C++ có gọn gàng không?
 
 Điểm tổng = trung bình cộng 5 tiêu chí, làm tròn 1 chữ số thập phân.
 
-Trả về DUY NHẤT một JSON object theo định dạng dưới đây, không có bất kỳ text nào khác:
+TRẢ VỀ DUY NHẤT MỘT KHỐI JSON (KHÔNG CHỨA BẤT KỲ KÝ TỰ VĂN BẢN NÀO):
 {{
   "score": <float, 0.0-10.0>,
-  "feedback": "<nhận xét tổng quan bằng tiếng Việt, 3-5 câu, nêu điểm mạnh và điểm cần cải thiện>",
+  "feedback": "<nhận xét cực kỳ chuyên sâu về phần cứng/viễn thông, vạch trần thói quen dùng delay, ram allocation ngu ngốc nếu có. Lời lẽ giảng viên gắt gao. Tiếng Việt>",
   "criteria": [
-    {{"name": "Đúng yêu cầu đề bài", "score": <0-10>}},
-    {{"name": "Chất lượng code", "score": <0-10>}},
-    {{"name": "Logic và thuật toán", "score": <0-10>}},
-    {{"name": "Xử lý lỗi", "score": <0-10>}},
-    {{"name": "Sử dụng thư viện", "score": <0-10>}}
+    {{"name": "Giao thức & Tín hiệu số", "score": <0-10>}},
+    {{"name": "Kiến trúc Real-time", "score": <0-10>}},
+    {{"name": "Xử lý Ngắt (ISR)", "score": <0-10>}},
+    {{"name": "Tối ưu RAM & Power", "score": <0-10>}},
+    {{"name": "Độ ổn định hệ thống", "score": <0-10>}}
   ]
 }}"""
 
