@@ -895,11 +895,13 @@ function toggleMissionsListModal() {
         }
     };
 
-    // Reload table after init
+    // Reload table after init + auto-refresh mỗi 15 giây
     const originalInit = initialize;
     initialize = async function() {
         await originalInit();
         loadMissionsTable();
+        // TỰ ĐỘNG LÀM MỚI bảng để cập nhật khi sinh viên nộp bài -> bài thi kết thúc sớm
+        setInterval(loadMissionsTable, 15000);
     };
 
 
