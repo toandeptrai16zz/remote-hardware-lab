@@ -1,0 +1,29 @@
+body {
+      font-family: 'Inter', sans-serif;
+      background-color: #111 !important;
+    }
+    .navbar {
+        background: rgba(17, 17, 17, 0.8);
+        backdrop-filter: blur(10px);
+    }
+    .brand-gradient {
+      background: linear-gradient(90deg, #5e72e4, #9254de);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 700;
+    }
+    .toast-container {
+      z-index: 9999;
+    }
+    /* Đảm bảo content block có thể chiếm toàn bộ chiều cao còn lại */
+    html, body {
+        height: 100%;
+    }
+    body {
+        display: flex;
+        flex-direction: column;
+    }
+    .content-wrapper {
+        flex: 1;
+        overflow: auto; /* Thêm scroll nếu nội dung dài */
+    }

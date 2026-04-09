@@ -1,0 +1,518 @@
+body { overflow: hidden !important; user-select: none; }
+        .content-wrapper { height: calc(100vh - 58px); padding: 0; overflow: hidden; display: flex; }
+        .ide-container { display: flex; width: 100%; height: 100%; background-color: #0d1117; color: #e6edf3; font-family: 'Inter', sans-serif; }
+        .file-panel { width: 280px; min-width: 200px; max-width: 40%; background: #161b22; display: flex; flex-direction: column; flex-shrink: 0; border-right: 1px solid #30363d; }
+        .panel-header { padding: 12px 16px; font-weight: 600; color: #f0f6fc; display: flex; align-items: center; gap: 10px; font-size: 13px; text-transform: uppercase; border-bottom: 1px solid #30363d; flex-shrink: 0; }
+        .panel-actions { margin-left: auto; display: flex; gap: 4px; }
+        .panel-content { flex-grow: 1; overflow-y: auto; padding: 8px; }
+        .resizer { width: 5px; background: #30363d; cursor: col-resize; flex-shrink: 0; transition: background 0.2s ease; }
+        .resizer:hover { background: #58a6ff; }
+        .main-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .editor-header { display: flex; align-items: center; padding: 0 8px; background: #161b22; border-bottom: 1px solid #30363d; flex-shrink: 0; }
+        .editor-tabs { display: flex; flex-grow: 1; }
+        .editor-tab { background: transparent; border: none; color: #8b949e; padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; border-bottom: 2px solid transparent; transition: all 0.2s ease; }
+        .editor-tab:hover { background: #21262d; color: #e6edf3; }
+        .editor-tab.active { color: #e6edf3; border-bottom-color: #58a6ff; }
+        .editor-tab .close-icon { font-size: 12px; padding: 4px; border-radius: 4px; }
+        .editor-tab .close-icon:hover { background: #444; }
+        .editor-actions { padding-right: 8px; display: flex; align-items: center; gap: 8px; }
+        .editor-container { flex-grow: 1; overflow: hidden; position: relative; }
+        #editor { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+        #terminal-container { 
+            height: 240px; 
+            flex-shrink: 0; 
+            display: flex; 
+            flex-direction: column; 
+            background: #0d1117; 
+            min-height: 40px;
+            max-height: calc(100vh - 200px);
+        }
+        #terminal { 
+            width: 100%; 
+            flex-grow: 1; 
+            position: relative; 
+            overflow: hidden;
+        }
+        
+        /* Terminal Improvements - VS Code Style */
+        .xterm { 
+            padding: 8px; 
+            height: 100%; 
+            box-sizing: border-box; 
+            font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+            background: #0d1117 !important;
+            overflow: hidden;
+        }
+        .xterm .xterm-viewport { 
+            overflow-y: auto !important;
+            scrollbar-width: thin;
+            scrollbar-color: #30363d #161b22;
+            background: #0d1117 !important;
+        }
+        .xterm .xterm-viewport::-webkit-scrollbar { 
+            width: 8px; 
+        }
+        .xterm .xterm-viewport::-webkit-scrollbar-track { 
+            background: #161b22; 
+            border-radius: 4px;
+        }
+        .xterm .xterm-viewport::-webkit-scrollbar-thumb { 
+            background: #30363d; 
+            border-radius: 4px; 
+            border: 1px solid #161b22; 
+        }
+        .xterm .xterm-viewport::-webkit-scrollbar-thumb:hover { 
+            background: #484f58; 
+        }
+        .xterm .xterm-screen { 
+            user-select: text !important; 
+            background: #0d1117 !important;
+        }
+        .xterm-selection { 
+            background-color: rgba(88, 166, 255, 0.3) !important; 
+        }
+        .xterm .xterm-rows { 
+            line-height: 1.3 !important; 
+        }
+        .xterm .xterm-cursor-layer { 
+            background: #d4d4d4 !important; 
+        }
+        .xterm .xterm-cursor-blink { 
+            animation: xterm-cursor-blink 1s infinite; 
+        }
+        @keyframes xterm-cursor-blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        .file-tree, .file-tree ul { list-style: none; padding: 0; margin: 0; }
+        .file-tree ul { padding-left: 18px; }
+        .tree-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .tree-item:hover { background: #21262d; }
+        .tree-item.is-selected { background: #005cc5; }
+        .tree-chevron { width: 16px; text-align: center; transition: transform 0.2s ease; }
+        .tree-item.is-folder.is-open > .tree-chevron { transform: rotate(90deg); }
+        .tree-icon { width: 18px; }
+        .tree-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-tree ul { display: none; }
+        .file-tree li.is-open > ul { display: block; }
+        .context-menu { position: fixed; background: #21262d; border: 1px solid #444; border-radius: 6px; box-shadow: 0 8px 16px rgba(0,0,0,0.3); z-index: 1000; min-width: 180px; padding: 4px; display: none; }
+        .context-menu-item { padding: 8px 12px; color: #e6edf3; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 13px; border-radius: 4px; background: none; border: none; width: 100%; text-align: left; }
+        .context-menu-item:hover { background: #58a6ff; }
+        .context-menu-item.danger:hover { background: #da3633; }
+        .context-menu-separator { height: 1px; background: #444; margin: 4px 0; }
+        .context-menu-icon { width: 14px; text-align: center; }
+        .btn-ide { background: #238636; color: white; border: 1px solid #339d4b; }
+        .btn-ide:hover { background: #2da44e; }
+        .btn-upload { background: #fd7e14; color: white; border: 1px solid #fd7e14; }
+        .btn-upload:hover { background: #e76f05; }
+        .file-btn { background: none; border: none; color: #8b949e; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+        .file-btn:hover { background: #30363d; color: #e6edf3; }
+        .fa-spin { animation: fa-spin 1s infinite linear; }
+        @keyframes fa-spin { to { transform: rotate(360deg); } }
+        .resizer-horizontal { height: 5px; background: #30363d; cursor: row-resize; flex-shrink: 0; transition: background 0.2s ease; }
+        .resizer-horizontal:hover { background: #58a6ff; }
+        .main-panel.terminal-hidden #terminal-container,
+        .main-panel.terminal-hidden .resizer-horizontal { display: none; }
+        .main-panel.serial-hidden #serial-monitor-container,
+        .main-panel.serial-hidden #serialResizerHorizontal { display: none; }
+        
+        /* Custom File Creation Dialog */
+        .file-creation-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        
+        .file-creation-content {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 24px;
+            min-width: 400px;
+            max-width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        .file-creation-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .file-creation-title {
+            color: #f0f6fc;
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .file-creation-subtitle {
+            color: #8b949e;
+            font-size: 14px;
+            margin: 0;
+        }
+        
+        .file-creation-form {
+            margin-bottom: 20px;
+        }
+        
+        .file-creation-input-group {
+            margin-bottom: 16px;
+        }
+        
+        .file-creation-label {
+            display: block;
+            color: #e6edf3;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        
+        .file-creation-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            color: #e6edf3;
+            font-size: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+        }
+        
+        .file-creation-input:focus {
+            outline: none;
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+        }
+        
+        .file-creation-input::placeholder {
+            color: #6e7681;
+        }
+        
+        .file-creation-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .file-creation-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            min-width: 80px;
+        }
+        
+        .file-creation-btn.primary {
+            background: #238636;
+            color: white;
+            border-color: #339d4b;
+        }
+        
+        .file-creation-btn.primary:hover {
+            background: #2da44e;
+            border-color: #2da44e;
+            transform: translateY(-1px);
+        }
+        
+        .file-creation-btn.secondary {
+            background: #21262d;
+            color: #e6edf3;
+            border-color: #30363d;
+        }
+        
+        .file-creation-btn.secondary:hover {
+            background: #30363d;
+            border-color: #484f58;
+        }
+        
+        .file-creation-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        /* Custom Unsaved Changes Dialog */
+        .unsaved-changes-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10001;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        
+        .unsaved-changes-content {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 24px;
+            min-width: 400px;
+            max-width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        .unsaved-changes-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .unsaved-changes-title {
+            color: #f0f6fc;
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .unsaved-changes-message {
+            color: #8b949e;
+            font-size: 14px;
+            margin: 0;
+        }
+        
+        .unsaved-changes-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .unsaved-changes-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            min-width: 80px;
+        }
+        
+        .unsaved-changes-btn.primary {
+            background: #da3633;
+            color: white;
+            border-color: #f85149;
+        }
+        
+        .unsaved-changes-btn.primary:hover {
+            background: #f85149;
+            border-color: #f85149;
+            transform: translateY(-1px);
+        }
+        
+        .unsaved-changes-btn.secondary {
+            background: #21262d;
+            color: #e6edf3;
+            border-color: #30363d;
+        }
+        
+        .unsaved-changes-btn.secondary:hover {
+            background: #30363d;
+            border-color: #484f58;
+        }
+        
+        /* Floating Serial Monitor Window */
+        .floating-window {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            width: 500px;
+            height: 400px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            resize: both;
+            overflow: auto;
+            min-width: 350px;
+            min-height: 250px;
+        }
+        
+        .floating-window-header {
+            background: #21262d;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: move;
+            user-select: none;
+            border-bottom: 1px solid #30363d;
+            border-radius: 7px 7px 0 0;
+        }
+        
+        .window-title {
+            color: #e6edf3;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .window-controls {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .window-control-btn {
+            background: none;
+            border: none;
+            color: #8b949e;
+            padding: 4px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .window-control-btn:hover {
+            background: #30363d;
+            color: #e6edf3;
+        }
+        
+        .floating-window-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .serial-controls {
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            flex-shrink: 0;
+        }
+        
+        .serial-controls select {
+            background-color: #30363d;
+            color: white;
+            border-color: #444;
+            font-size: 12px;
+        }
+        
+        .serial-controls .btn {
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+        
+        .status-text {
+            font-size: 11px;
+            color: #8b949e;
+            margin-left: auto;
+        }
+        
+        .serial-output-area {
+            flex: 1;
+            background: #0d1117;
+            color: #d4d4d4;
+            font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+            font-size: 13px;
+            padding: 10px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            user-select: text;
+            line-height: 1.4;
+            /* Custom scrollbar for serial output */
+            scrollbar-width: thin;
+            scrollbar-color: #30363d #0d1117;
+        }
+        
+        .serial-output-area::-webkit-scrollbar { width: 12px; }
+        .serial-output-area::-webkit-scrollbar-track { background: #0d1117; }
+        .serial-output-area::-webkit-scrollbar-thumb { 
+            background: #30363d; 
+            border-radius: 6px; 
+            border: 2px solid #0d1117; 
+        }
+        .serial-output-area::-webkit-scrollbar-thumb:hover { background: #484f58; }
+        
+        /* Port selection modal styles */
+        .port-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: none; align-items: center; justify-content: center; }
+        .port-modal-content { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; min-width: 400px; max-width: 90%; }
+        .port-modal-header { margin-bottom: 20px; }
+        .port-modal-title { color: #f0f6fc; font-size: 18px; font-weight: 600; margin: 0; }
+        .port-list { max-height: 300px; overflow-y: auto; margin-bottom: 20px; }
+        .port-item { padding: 12px; border: 1px solid #30363d; border-radius: 6px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s ease; }
+        .port-item:hover { background: #21262d; border-color: #58a6ff; }
+        .port-item.selected { background: #005cc5; border-color: #58a6ff; }
+        .port-name { font-weight: 500; color: #e6edf3; }
+        .port-desc { font-size: 12px; color: #8b949e; margin-top: 4px; }
+        .port-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+        .port-modal-btn { padding: 8px 16px; border-radius: 4px; border: 1px solid; cursor: pointer; font-size: 14px; }
+        .port-modal-btn.primary { background: #238636; color: white; border-color: #339d4b; }
+        .port-modal-btn.primary:hover { background: #2da44e; }
+        .port-modal-btn.secondary { background: #21262d; color: #e6edf3; border-color: #30363d; }
+        .port-modal-btn.secondary:hover { background: #30363d; }
+        .terminal-header { background: #161b22; padding: 4px 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #30363d; flex-shrink: 0; }
+        .terminal-title { font-size: 13px; font-weight: 500; color: #8b949e; text-transform: uppercase; }
+        .terminal-actions { margin-left: auto; display: flex; gap: 4px; }
+        .terminal-btn { background: none; border: none; color: #8b949e; padding: 2px 5px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: all 0.2s ease; }
+        .terminal-btn:hover { background: #30363d; color: #e6edf3; }
+        .terminal-btn:active { background: #21262d; }
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .toast { margin-bottom: 10px; max-width: 350px; }
+        /* Serial Monitor styles */
+        #serial-monitor-container {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            border-top: 2px solid #555;
+            display: flex;
+            flex-direction: column;
+            height: 300px;
+        }
+        #serial-output {
+            flex-grow: 1;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+        }
+        #serial-controls {
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
