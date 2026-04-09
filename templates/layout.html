@@ -19,6 +19,10 @@
         document.write('<style>#mainNav { display:none!important; } body, .content-wrapper { padding:0!important; margin:0!important; height:100vh; overflow:auto; }</style>');
     }
   </script>
+  <style>
+    /* Fix SweetAlert2 z-index to appear above 9999 modals */
+    .swal2-container { z-index: 10000 !important; }
+  </style>
 </head>
 <body>
   <nav id="mainNav" class="navbar navbar-expand-lg sticky-top border-bottom border-secondary border-opacity-25">
