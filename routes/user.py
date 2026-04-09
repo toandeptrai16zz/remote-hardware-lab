@@ -445,7 +445,7 @@ def user_missions_page():
 @require_auth('user')
 def user_api_my_missions():
     """API: Get missions assigned to current user"""
-    import json as json_lib
+    import json
     username = session['username']
     db = get_db_connection()
     cur = db.cursor(dictionary=True)
@@ -481,7 +481,7 @@ def user_api_my_missions():
                 'submitted_at': m['submitted_at'].isoformat() if m['submitted_at'] else None,
                 'score': float(m['score']) if m['score'] is not None else None,
                 'ai_feedback': m['ai_feedback'],
-                'ai_criteria': json_lib.loads(m['ai_criteria']) if isinstance(m.get('ai_criteria'), str) else m.get('ai_criteria'),
+                'ai_criteria': json.loads(m['ai_criteria']) if isinstance(m.get('ai_criteria'), str) else m.get('ai_criteria'),
             }
         else:
             d['submission'] = None
@@ -529,7 +529,7 @@ def user_api_preview_files():
 @require_auth('user')
 def user_api_submit_mission(mission_id):
     """API: Submit mission - snapshot files and trigger AI grading"""
-    import json as json_lib
+    import json
     import threading
     username = session['username']
     safe_username = make_safe_name(username)
@@ -584,7 +584,7 @@ def user_api_submit_mission(mission_id):
     try:
         cur.execute(
             "INSERT INTO submissions (mission_id, user_id, files, is_auto_submit) VALUES (%s,%s,%s,%s)",
-            (mission_id, user_id, json_lib.dumps(files_snapshot), is_auto)
+            (mission_id, user_id, json.dumps(files_snapshot), is_auto)
         )
         db.commit()
         sub_id = cur.lastrowid
@@ -608,7 +608,6 @@ def user_api_submit_mission(mission_id):
         def bg_grade():
             import traceback
             import sys
-            import json
             try:
                 from services.ai_grader import grade_submission_with_ai
                 result = grade_submission_with_ai(
