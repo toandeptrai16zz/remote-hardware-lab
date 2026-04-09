@@ -169,6 +169,15 @@ EOF
 mkdir -p /home/"$USER"/Arduino/libraries
 cp -rn /root/Arduino/libraries/* /home/"$USER"/Arduino/libraries/ 2>/dev/null || true
 ln -sfn /root/.arduino15 /home/"$USER"/.arduino15 2>/dev/null || true
+
+# TỰ ĐỘNG CÀI ĐẶT CORE ARDUINO VÀ ESP32 NẾU CHƯA CÓ
+if command -v arduino-cli &> /dev/null; then
+    if ! arduino-cli core list | grep -q "arduino:avr"; then
+        echo "Installing arduino:avr core..."
+        arduino-cli core update-index &>/dev/null
+        arduino-cli core install arduino:avr &>/dev/null
+    fi
+fi
 # ----------------------------------------------------------------------
 
 chown -R "$USER:$USER" /home/"$USER"
