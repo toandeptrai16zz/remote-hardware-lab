@@ -2,6 +2,7 @@
 User workspace routes: file management, editor, Arduino operations
 """
 import os
+import json
 import stat
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.utils import secure_filename
@@ -445,7 +446,6 @@ def user_missions_page():
 @require_auth('user')
 def user_api_my_missions():
     """API: Get missions assigned to current user"""
-    import json
     username = session['username']
     db = get_db_connection()
     cur = db.cursor(dictionary=True)
@@ -529,7 +529,6 @@ def user_api_preview_files():
 @require_auth('user')
 def user_api_submit_mission(mission_id):
     """API: Submit mission - snapshot files and trigger AI grading"""
-    import json
     import threading
     username = session['username']
     safe_username = make_safe_name(username)
@@ -661,7 +660,6 @@ def debug_devices_api(username):
     """API to debug device detection"""
     import glob
     import subprocess
-    import json
     
     if session['username'] != username:
         return jsonify(error="Unauthorized"), 403
