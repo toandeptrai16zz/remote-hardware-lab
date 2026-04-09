@@ -22,31 +22,9 @@ class BackgroundServices:
         self.threads = {}
         
     def start_usb_watcher(self):
-        """Start USB watcher service in background thread"""
-        try:
-            from watcher import USBWatcher
-            
-            watcher = USBWatcher()
-            self.services['usb_watcher'] = watcher
-            
-            # Start in daemon thread so it stops when main app stops
-            thread = threading.Thread(
-                target=watcher.watch,
-                name="USBWatcher",
-                daemon=True
-            )
-            thread.start()
-            self.threads['usb_watcher'] = thread
-            
-            logger.info(" USB Watcher service started")
-            return True
-            
-        except ImportError as e:
-            logger.error(f" Cannot import watcher module: {e}")
-            return False
-        except Exception as e:
-            logger.error(f" Failed to start USB Watcher: {e}")
-            return False
+        """Start USB watcher service in background thread (DISABLED FOR VIRTUAL TESTBENCH PIVOT)"""
+        logger.warning("🚫 USB Watcher disabled intelligently (Moved to Virtual AI Assessment Architecture)")
+        return True
     
     def stop_all(self):
         """Stop all background services gracefully"""

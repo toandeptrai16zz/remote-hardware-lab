@@ -19,31 +19,9 @@ platform_cache = {}
 
 def get_assigned_ports(username):
     """
-    Lấy danh sách các cổng USB được cấp quyền cho user từ Database.
-    Chỉ trả về các cổng ĐANG TỒN TẠI trên Host.
+    (Deprecated) Lấy port USB -> Cắt bỏ hoàn toàn do kiến trúc ảo hóa
     """
-    assigned = set()
-    try:
-        db = get_db_connection()
-        if db:
-            cur = db.cursor(dictionary=True)
-            # Lấy ID user
-            cur.execute("SELECT id FROM users WHERE username=%s", (username,))
-            user = cur.fetchone()
-            if user:
-                # Lấy các cổng được assign
-                cur.execute("SELECT port FROM hardware_devices WHERE in_use_by=%s", (user['id'],))
-                rows = cur.fetchall()
-                for row in rows:
-                    port = row['port']
-                    # Chỉ lấy nếu cổng thực sự đang cắm trên máy chủ
-                    if glob.glob(port):
-                        assigned.add(port)
-            cur.close()
-            db.close()
-    except Exception as e:
-        logger.error(f"DB Error getting ports for {username}: {e}")
-    return list(assigned)
+    return []
 
 def docker_status(cname):
     """Check Docker container status"""
@@ -225,9 +203,8 @@ exec /usr/sbin/sshd -D
         "--group-add", "dialout", 
         "--entrypoint", "/bin/bash"
     ]
-    # THÊM CÁC THIẾT BỊ ĐƯỢC CẤP QUYỀN (Strict Mode)
-    for port in required_ports:
-        docker_command.extend(["--device", f"{port}:{port}:rwm"])
+    # [ARCHITECT PIVOT]: Removed --device mappings to enforce isolated Testbench mode
+    pass
 
     docker_command.append(image)
     docker_command.append("/startup.sh")

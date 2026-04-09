@@ -1,7 +1,7 @@
 # Mục 1: Báo cáo Phân tích Yêu cầu và Thiết kế Kiến trúc
 
 ## 1. Tính cấp thiết của đề tài
-Các học phần thực hành lập trình nhúng đối mặt với khó khăn khi sinh viên phải cài đặt các Toolchain phức tạp, thiếu tính đồng nhất. Dự án ban đầu định hướng mô hình nạp code thẳng từ Web xuống mạch phần cứng.
+Các học phần thực hành lập trình nhúng đối mặt với khó khăn khi sinh viên phải cài đặt các Toolchain phức tạp, thiếu tính đồng nhất. Mặc dù bắt đầu với mô hình nạp code thẳng xuống mạch phần cứng, đồ án đã tiến hóa thành nền tảng Nền tảng Đánh giá Kỹ năng Nhúng Ảo hóa Cloud-Native bằng AI.
 
 ## 2. Biện luận lựa chọn Kiến trúc (Lý do chuyển đổi mô hình)
 Trong giai đoạn phát triển, nhóm nhận thấy một "Lỗ hổng thắt cổ chai" (Bottleneck) mang tính hệ thống nếu ép buộc giao tiếp phần cứng vật lý qua luồng đám mây phân tán:

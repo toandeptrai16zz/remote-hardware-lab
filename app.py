@@ -133,9 +133,9 @@ def main():
     try:
         # Initialize database
         init_db()
-        # Start background services (USB watcher, etc.)
-        logger.info("🔧 Starting background services...")
-        background_services = init_background_services()
+        # Removed USB watcher for Virtual Assessment architecture
+        logger.info("🔧 Background services tracking USB disabled for Virtual AI assessment.")
+        background_services = None
         
         logger.info("✅ Application initialization complete")
         logger.info("🌐 Server running on http://[::]:5000")

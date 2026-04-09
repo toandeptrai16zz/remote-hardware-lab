@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% block title %}Quản lý Thiết bị{% endblock %}
+{% block title %}Quản lý Node Ảo hóa{% endblock %}
 
 {% block extra_head %}
 <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
@@ -671,8 +671,8 @@
 <div class="device-container">
   <header class="device-header">
     <h2>
-      <i class="fa-solid fa-microchip header-icon" aria-hidden="true"></i>
-      Quản lý Thiết bị
+      <i class="fa-solid fa-server header-icon" aria-hidden="true"></i> <!-- Đổi icon server cloud -->
+      Quản lý Hệ thống Virtual Testbench (Cloud)
     </h2>
   </header>
 
@@ -685,7 +685,7 @@
         <div class="card-content">
           <h4 class="card-title" id="add-device-title">
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
-            Thêm Thiết bị Mới
+            Khai báo Node Testbench Mới
           </h4>
 
           <form id="addDeviceForm" novalidate>
@@ -719,14 +719,14 @@
 
             <div class="form-group">
               <label for="port" class="form-label">
-                <i class="fa-solid fa-plug" aria-hidden="true"></i>
-                Cổng (Port)
+                <i class="fa-solid fa-link" aria-hidden="true"></i>
+                Docker Socket / Fake Port
                 <span class="required-indicator" aria-label="Required">*</span>
               </label>
               <input type="text" class="form-control form-control-dark focus-trap" id="port" name="port" required
-                placeholder="e.g., /dev/ttyUSB0" aria-describedby="portHelp" maxlength="50" autocomplete="off">
+                placeholder="e.g., /sandbox/node-1" aria-describedby="portHelp" maxlength="50" autocomplete="off">
               <div id="portHelp" class="form-text text-muted">
-                Cổng kết nối của thiết bị
+                Endpoint ảo hóa cho Testbench (Thay thế cho USB vật lý cũ)
               </div>
               <div id="portError" class="error-message" style="display: none;" role="alert"></div>
             </div>
@@ -735,8 +735,8 @@
               <button type="submit" class="btn-primary-custom w-100" id="addDeviceBtn">
                 <span class="spinner" aria-hidden="true"></span>
                 <span class="btn-text">
-                  <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                  Thêm Thiết bị
+                  <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i>
+                  Khởi tạo Node
                 </span>
               </button>
             </div>
@@ -750,8 +750,8 @@
       <section class="card card-soft" aria-labelledby="devices-list-title">
         <div class="card-content">
           <h4 class="card-title" id="devices-list-title">
-            <i class="fa-solid fa-list" aria-hidden="true"></i>
-            Danh sách Thiết bị
+            <i class="fa-solid fa-network-wired" aria-hidden="true"></i>
+            Mạng lưới Node Testbench Ảo hóa
             <span id="deviceCount" class="badge badge-success ms-2" aria-live="polite">0</span>
           </h4>
 

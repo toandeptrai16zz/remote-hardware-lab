@@ -546,7 +546,7 @@
                 <div class="editor-tabs" id="editorTabs"></div>
                 <div class="editor-actions">
                     <button class="btn btn-sm btn-dark" onclick="toggleTerminal()" title="Bật/Tắt Terminal" style="border-color: #444;"><i class="fa-solid fa-terminal"></i></button>
-                    <button class="btn btn-sm btn-dark" onclick="toggleSerialMonitor()" title="Bật/Tắt Serial Monitor" style="border-color: #444;"><i class="fa-solid fa-plug"></i></button>
+                    <button class="btn btn-sm btn-warning" onclick="toggleMissionsModal()" title="Xem Nhiệm Vụ & Bài Thi" style="background:#f59e0b; color:#000; font-weight:bold; border:none; margin-left: 8px;"><i class="fa-solid fa-layer-group"></i> <span style="margin-left: 4px;">Missions</span></button>
                     <span class="border-end" style="height: 20px;"></span>
                     <button class="btn btn-sm btn-success" onclick="compileCode(event)"><i class="fa-solid fa-microchip"></i><span>Chạy Testbench (Ảo hóa)</span></button>
                     <button class="btn btn-sm btn-ide" onclick="saveCurrentFile()"><i class="fa-solid fa-save"></i><span>Save</span></button>
@@ -2261,5 +2261,40 @@ function setupRealTimeNotifications() {
             div.textContent = text;
             return div.innerHTML;
         }
+        function toggleMissionsModal() {
+            const wrapper = document.getElementById('missions-modal-wrapper');
+            const iframe = document.getElementById('missions-iframe');
+            const loader = document.getElementById('missions-iframe-loader');
+            
+            if (wrapper.style.display === 'none' || wrapper.style.display === '') {
+                wrapper.style.display = 'flex';
+                if (!iframe.src || iframe.src.includes('blank')) {
+                    iframe.src = "{{ url_for('user.user_missions_page') }}?embed=1";
+                    iframe.onload = function() {
+                        if(loader) loader.style.display = 'none';
+                        iframe.style.display = 'block';
+                    };
+                }
+            } else {
+                wrapper.style.display = 'none';
+            }
+        }
     </script>
+
+    <!-- Missions Modal Container -->
+    <div id="missions-modal-wrapper" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(4px); z-index:9999; flex-direction:column; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-surface, #13131a); width:95vw; max-width:1300px; height:90vh; border-radius:12px; border:1px solid #333; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 10px 40px rgba(0,0,0,0.6);">
+            <div style="padding:12px 20px; background:linear-gradient(90deg, #1a0a2e, #0f1a2e); border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; font-size:1.1rem; color:#e8e8f0; font-weight:600;"><i class="fa-solid fa-graduation-cap" style="color:#7c6af7; margin-right:8px;"></i> Các Bài Tập & Bài Thi</h3>
+                <button onclick="toggleMissionsModal()" style="background:none; border:none; color:#8888a8; font-size:1.4rem; cursor:pointer; line-height:1; transition:color 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#8888a8'"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="flex:1; position:relative; background:#0a0a0f;">
+                <iframe id="missions-iframe" src="about:blank" style="width:100%; height:100%; border:none; display:none;" allow="fullscreen"></iframe>
+                <div id="missions-iframe-loader" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#8888a8; gap:10px;">
+                    <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>
+                    <span>Đang tải danh sách bài tập...</span>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %} 

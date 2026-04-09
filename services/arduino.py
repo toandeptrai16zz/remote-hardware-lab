@@ -16,7 +16,7 @@ from config import get_db_connection
 from services.logger import log_action
 
 logger = logging.getLogger(__name__)
-device_locks = defaultdict(threading.Lock)
+# [ARCHITECT PIVOT]: device_locks bị vô hiệu hóa vì dễ gây lỗi Distributed Data Race trên Kubernetes
 
 # ==============================================================================
 # 1. HÀM HỖ TRỢ PHÂN TÍCH LỖI (GIỮ NGUYÊN)
@@ -93,6 +93,7 @@ def prepare_sketch_folder(container_name, safe_username, sketch_filename):
 # 4. QUY TRÌNH NẠP MỚI (AUTO-COMPILE + STREAMING)
 # ==============================================================================
 def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio=None):
+    """[VIRTUAL PIVOT] Hàm rút gọn chỉ biên dịch mô phỏng (Testbench), bỏ nạp phần cứng."""
     if socketio is None:
         try: from __main__ import socketio
         except ImportError: return
@@ -101,37 +102,23 @@ def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio
     cname = f"{safe_username}-dev"
     sketch_filename = os.path.basename(sketch_path)
 
-    socketio.emit('upload_status', {'status': 'start', 'message': f'Bắt đầu xử lý cho {board_fqbn}...'}, namespace='/upload_status', room=sid)
-    try: subprocess.run(["docker", "exec", "-u", "root", cname, "chmod", "666", port], timeout=2)
-    except: pass
+    socketio.emit('upload_status', {'status': 'start', 'message': f'Bắt đầu Testbench Ảo hóa cho {board_fqbn}...'}, namespace='/upload_status', room=sid)
 
     container_sketch_path = prepare_sketch_folder(cname, safe_username, sketch_filename)
 
-    with device_locks[port]:
-        # B2: Biên dịch (Streaming)
-        socketio.emit('upload_status', {'status': 'compiling', 'message': '--- 1. ĐANG BIÊN DỊCH CODE MỚI ---'}, namespace='/upload_status', room=sid)
-        compile_cmd = ["docker", "exec", cname, "arduino-cli", "compile", "--fqbn", board_fqbn, container_sketch_path]
-        
-        code, log = run_and_stream(compile_cmd, socketio, sid)
-        
-        if code != 0:
-            socketio.emit('upload_status', {'status': 'error', 'message': '❌ Lỗi biên dịch!', 'details': log, 'suggestions': ["Kiểm tra cú pháp code."]}, namespace='/upload_status', room=sid)
-            log_action(username, "Upload aborted: Compile failed", success=False)
-            return
+    socketio.emit('upload_status', {'status': 'compiling', 'message': '--- ĐANG BIÊN DỊCH CODE MÔ PHỎNG ---'}, namespace='/upload_status', room=sid)
+    compile_cmd = ["docker", "exec", cname, "arduino-cli", "compile", "--fqbn", board_fqbn, container_sketch_path]
+    
+    code, log = run_and_stream(compile_cmd, socketio, sid)
+    
+    if code != 0:
+        socketio.emit('upload_status', {'status': 'error', 'message': '❌ Lỗi biên dịch Biên mẫu!', 'details': log, 'suggestions': ["Vui lòng kiểm tra cú pháp mã nguồn C/C++."]}, namespace='/upload_status', room=sid)
+        log_action(username, "Virtual Compile failed", success=False)
+        return
 
-        # B3: Nạp (Streaming)
-        socketio.emit('upload_status', {'status': 'uploading', 'message': '--- 2. ĐANG NẠP CODE XUỐNG MẠCH ---'}, namespace='/upload_status', room=sid)
-        upload_cmd = ["docker", "exec", cname, "arduino-cli", "upload", "-p", port, "--fqbn", board_fqbn, container_sketch_path]
-        
-        code, log = run_and_stream(upload_cmd, socketio, sid)
-        
-        if code == 0:
-            log_action(username, "Upload success")
-            socketio.emit('upload_status', {'status': 'success', 'message': '✅ NẠP THÀNH CÔNG!'}, namespace='/upload_status', room=sid)
-        else:
-            log_action(username, "Upload failed", success=False)
-            suggestions = get_upload_error_suggestions(log)
-            socketio.emit('upload_status', {'status': 'error', 'message': '❌ Nạp thất bại!', 'details': log, 'suggestions': suggestions}, namespace='/upload_status', room=sid)
+    # Mocking completion phase directly to sidestep physical USB limits
+    log_action(username, "Virtual Compile success")
+    socketio.emit('upload_status', {'status': 'success', 'message': '✅ MÔ PHỎNG THÀNH CÔNG! SẴN SÀNG ĐỂ AI CHẤM ĐIỂM.'}, namespace='/upload_status', room=sid)
 
 # ==============================================================================
 # 5. CÁC HÀM SCAN & HELPERS KHÁC

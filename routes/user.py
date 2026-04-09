@@ -599,16 +599,31 @@ def user_api_submit_mission(mission_id):
                     mission_name=mission_snap['name'],
                     files=files_snapshot
                 )
+                bg_db = get_db_connection()
+                bg_cur = bg_db.cursor()
                 if result['success']:
-                    bg_db = get_db_connection()
-                    bg_cur = bg_db.cursor()
                     bg_cur.execute(
                         "UPDATE submissions SET score=%s, ai_feedback=%s, ai_criteria=%s WHERE id=%s",
                         (result['score'], result['feedback'], json_lib.dumps(result['criteria']), sub_id)
                     )
-                    bg_db.commit(); bg_cur.close(); bg_db.close()
+                else:
+                    bg_cur.execute(
+                        "UPDATE submissions SET score=%s, ai_feedback=%s, ai_criteria=%s WHERE id=%s",
+                        (0.0, f"LỖI CHẤM ĐIỂM AI: {result.get('error', 'Không xác định')}", "[]", sub_id)
+                    )
+                bg_db.commit(); bg_cur.close(); bg_db.close()
             except Exception as ex:
                 import logging; logging.getLogger(__name__).error(f"BG grade error: {ex}")
+                try:
+                    bg_db = get_db_connection()
+                    bg_cur = bg_db.cursor()
+                    bg_cur.execute(
+                        "UPDATE submissions SET score=%s, ai_feedback=%s, ai_criteria=%s WHERE id=%s",
+                        (0.0, f"LỖI HỆ THỐNG: {ex}", "[]", sub_id)
+                    )
+                    bg_db.commit(); bg_cur.close(); bg_db.close()
+                except:
+                    pass
         threading.Thread(target=bg_grade, daemon=True).start()
         return jsonify(success=True, message="Nộp bài thành công! AI đang chấm điểm...", submission_id=sub_id)
     except Exception as e:
