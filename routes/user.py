@@ -608,6 +608,7 @@ def user_api_submit_mission(mission_id):
         def bg_grade():
             import traceback
             import sys
+            import json
             try:
                 from services.ai_grader import grade_submission_with_ai
                 result = grade_submission_with_ai(
@@ -623,7 +624,7 @@ def user_api_submit_mission(mission_id):
                 if result['success']:
                     bg_cur.execute(
                         "UPDATE submissions SET score=%s, ai_feedback=%s, ai_criteria=%s WHERE id=%s",
-                        (result['score'], result['feedback'], json_lib.dumps(result['criteria']), sub_id)
+                        (result['score'], result['feedback'], json.dumps(result['criteria']), sub_id)
                     )
                 else:
                     bg_cur.execute(
