@@ -160,7 +160,10 @@ async function loadMyMissions() {
     }
 
     container.innerHTML = html;
-    if (activeGroup.length) startExamMode(activeGroup[0]);
+    // CHỈ kích hoạt chế độ thi (countdown + auto-submit) khi user CHỦ ĐỘNG mở trang
+    // KHÔNG kích hoạt nếu đang chạy từ iframe ngầm (embed mode) để tránh auto-submit ẩn
+    const isEmbedded = window.location.search.includes('embed=1');
+    if (activeGroup.length && !isEmbedded) startExamMode(activeGroup[0]);
   } catch(e) {
     container.innerHTML = `<div class="empty-state">
       <i class="fa-solid fa-exclamation-circle"></i>
