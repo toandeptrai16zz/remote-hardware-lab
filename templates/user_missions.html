@@ -351,14 +351,61 @@ function tickTimer(mission) {
 
 async function handleTimeOut(mission) {
   clearInterval(timerInterval);
+  // Hiển thị giao diện khóa ngay lập tức
+  document.getElementById('timeoutScreen').classList.add('show');
+  document.getElementById('timeoutScreen').innerHTML = `
+    <i class="fa-solid fa-robot timeout-icon text-info" style="color: #0ea5e9;"></i>
+    <h2 style="color: #0ea5e9;">Hết Giờ! Hệ thống đang tự động nộp bài...</h2>
+    <p>Vui lòng chờ AI hoàn tất việc đánh giá Code của bạn (khoảng 30 giây).</p>
+    <div class="mt-3"><i class="fa-solid fa-circle-notch fa-spin fa-2x" style="color:#555"></i></div>
+  `;
+  
   // Auto submit
   try {
-    await fetch(`/user/api/missions/${mission.id}/submit`, { method: 'POST' });
-  } catch(e) {}
-  // Show timeout screen
-  document.getElementById('timeoutScreen').classList.add('show');
-  // Block workspace after 5s
-  setTimeout(() => { window.location.href = '{{ url_for("auth.logout") }}'; }, 30000);
+    const res = await fetch(`/user/api/missions/${mission.id}/submit`, { method: 'POST' });
+    const data = await res.json();
+    
+    if (data.success || data.error.includes("already submitted")) {
+      // Bắt đầu chờ điểm của AI Grader
+      let pollCount = 0;
+      const pollInterval = setInterval(async () => {
+        pollCount++;
+        const missionsResult = await fetch('/user/api/my-missions').then(r=>r.json()).catch(()=>[]);
+        const m = missionsResult.find(x => x.id === mission.id);
+        
+        if ((m && m.submission && m.submission.score !== null) || pollCount >= 10) {
+          clearInterval(pollInterval);
+          if (m && m.submission && m.submission.score !== null) {
+            document.getElementById('timeoutScreen').innerHTML = `
+                <i class="fa-solid fa-graduation-cap timeout-icon" style="color: #22c55e;"></i>
+                <h2 style="color: #22c55e;">Hoàn Tất! Điểm: ${m.submission.score.toFixed(1)}/10</h2>
+                <p>Nộp bài thành công. Chúc mừng bạn đã hoàn thành bài thi!</p>
+                <div style="margin-top: 30px;">
+                    <button class="btn btn-primary" style="padding: 10px 20px; font-weight: bold; font-size: 1rem;" onclick="window.location.reload()">Đóng và Xem chi tiết</button>
+                </div>
+            `;
+          } else {
+             document.getElementById('timeoutScreen').innerHTML = `
+                <i class="fa-solid fa-triangle-exclamation timeout-icon" style="color: #f59e0b;"></i>
+                <h2 style="color: #f59e0b;">Đã gửi File thành công</h2>
+                <p>Hệ thống AI xử lý chậm. Vui lòng quay lại sau để xem điểm.</p>
+                <div style="margin-top: 30px;">
+                    <button class="btn btn-primary" onclick="window.location.reload()">Trở về màn hình chờ</button>
+                </div>
+            `;
+          }
+        }
+      }, 5000);
+    }
+  } catch(e) {
+      document.getElementById('timeoutScreen').innerHTML = `
+        <i class="fa-solid fa-bug timeout-icon" style="color: #ef4444;"></i>
+        <h2 style="color: #ef4444;">Lỗi kết nối khi Submit</h2>
+        <div style="margin-top: 30px;">
+            <button class="btn btn-primary" onclick="window.location.reload()">Tải lại trang</button>
+        </div>
+    `;
+  }
 }
 
 // ── SUBMIT ──────────────────────────────────────────────────

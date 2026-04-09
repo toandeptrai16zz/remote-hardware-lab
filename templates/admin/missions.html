@@ -139,32 +139,56 @@
             </div>
         </div>
 
-        <div class="col-lg-12 mt-5">
-            <h3 class="mb-4 text-white"><i class="fa-solid fa-list-ol text-primary"></i> Danh sách bài thi đã tạo</h3>
-            <div class="card card-soft">
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover mb-0" id="missionsTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Tên bài thi</th>
-                                <th>Loại</th>
-                                <th>Bắt đầu</th>
-                                <th>Kết thúc</th>
-                                <th>Thời gian</th>
-                                <th class="text-end">Hành động</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Dữ liệu render bằng JS -->
-                            <tr><td colspan="7" class="text-center text-muted py-4"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+        <div class="col-lg-12 mt-4 text-center">
+            <button type="button" class="btn btn-primary btn-lg" onclick="toggleMissionsListModal()" style="border-radius: 8px; font-weight: bold; padding: 12px 24px;">
+                <i class="fa-solid fa-list-ol me-2"></i> Xem Danh sách Bài thi đã tạo
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Danh Sách Bài Thi Của Admin -->
+<div id="adminMissionsListModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(4px); z-index:9999; flex-direction:column; align-items:center; justify-content:center;">
+    <div style="background:var(--bg-surface, #13131a); width:95vw; max-width:1300px; height:85vh; border-radius:12px; border:1px solid #333; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 10px 40px rgba(0,0,0,0.6);">
+        <div style="padding:12px 20px; background:linear-gradient(90deg, #1a0a2e, #0f1a2e); border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-size:1.1rem; color:#e8e8f0; font-weight:600;"><i class="fa-solid fa-list-ol" style="color:#7c6af7; margin-right:8px;"></i> Danh sách bài thi đã tạo</h3>
+            <button type="button" onclick="toggleMissionsListModal()" style="background:none; border:none; color:#8888a8; font-size:1.4rem; cursor:pointer; line-height:1; transition:color 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#8888a8'"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div style="flex:1; position:relative; background:#0a0a0f; padding: 20px; overflow-y: auto;">
+            <div class="table-responsive">
+                <table class="table table-dark table-hover mb-0" id="missionsTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Tên bài thi</th>
+                            <th>Loại</th>
+                            <th>Bắt đầu</th>
+                            <th>Kết thúc</th>
+                            <th>Thời gian</th>
+                            <th class="text-end">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Dữ liệu render bằng JS -->
+                        <tr><td colspan="7" class="text-center text-muted py-4"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function toggleMissionsListModal() {
+    const modal = document.getElementById('adminMissionsListModal');
+    if (modal.style.display === 'none') {
+        modal.style.display = 'flex';
+    } else {
+        modal.style.display = 'none';
+        // Cleanup modal state if needed
+    }
+}
+</script>
 {% endblock %}
 
 {% block scripts %}
