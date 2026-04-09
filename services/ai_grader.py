@@ -49,39 +49,45 @@ def grade_submission_with_ai(mission_description: str, mission_name: str, files:
     if not files_text.strip():
         files_text = "(Các file đều trống hoặc không đọc được)"
 
-    prompt = f"""Bạn là một Chuyên gia Kỹ sư Điện tử Viễn Thông (ĐTVT) và Cố vấn Thiết kế Hệ thống Nhúng (Embedded/IoT Architect) cực kỳ khắt khe. 
-Bạn được giao phó chấm dứt điểm kỳ thi lập trình phần cứng của sinh viên.
+    prompt = f"""Bạn là giảng viên Điện tử Viễn thông chấm bài lập trình nhúng/IoT cho sinh viên.
+Hãy chấm điểm CÔNG BẰNG và KHUYẾN KHÍCH - sinh viên đang học, chưa phải chuyên gia.
 
-## TÊN BÀI THI VIỄN THÔNG
+## TÊN BÀI THI
 {mission_name}
 
-## NỘI DUNG YÊU CẦU ĐỀ BÀI
-{mission_description or '(Không có mô tả bài thi)'}
+## ĐỀ BÀI YÊU CẦU
+{mission_description or '(Không có mô tả)'}
 
-## SOURCE CODE SINH VIÊN BÀI LÀM
+## CODE BÀI LÀM CỦA SINH VIÊN
 {files_text}
 
-## BẢNG TIÊU CHÍ CHẤM ĐIỂM (RUBRIC ĐTVT):
-Bạn cần đánh giá cực rắn theo 5 tiêu chí phân cứng (0 đến 10 điểm/mục). Tuyệt đối trừ sạch điểm nếu lạm dụng hàm delay hoặc làm sai logic nhúng:
+## NGUYÊN TẮC CHẤM ĐIỂM:
+- Sinh viên viết được code CHẠY ĐƯỢC và ĐÚNG HƯỚNG → tối thiểu 4-5 điểm
+- Code đáp ứng phần lớn yêu cầu đề bài → 6-7 điểm
+- Code tốt, sáng tạo, xử lý tốt → 8-9 điểm
+- Hoàn hảo → 10 điểm
+- KHÔNG trừ nặng vì dùng delay() hay thiếu RTOS/ISR nếu đề bài không yêu cầu
+- Đánh giá dựa trên MỨC ĐỘ phù hợp trình độ sinh viên, KHÔNG đòi hỏi chuẩn công nghiệp
 
-1. **Thuật toán & Giao thức truyền thông**: Code có thao tác xử lý bit (bit-wise), framing bản tin (JSON/Header/CRC), hoặc giao tiếp TCP/UDP/MQTT đúng chuẩn viễn thông không?
-2. **Kiến trúc Hệ điều hành nhúng (RTOS & Real-time)**: Nhấn mạnh vào đa nhiệm! Code có bắt buộc dùng Task/Thread thay vì vòng lặp tĩnh không? Có lạm dụng `delay()` gây đứt tiến trình thay vì dùng `vTaskDelay`, `Mutex`, `Semaphore`, `Message Queue` (FreeRTOS/RTOS) không?
-3. **Quản lý Ngắt (Interrupt ISR) & Context Switch**: Hàm ngắt (ISR) có cực ngắn gọn để không lock Hệ điều hành không? Có dùng đúng hàm Yield của RTOS (`portYIELD_FROM_ISR`) không? Khai báo cờ (flag) có dùng hâu tố `volatile` an toàn phần cứng không?
-4. **Tối ưu Tài nguyên (RAM/Power)**: Việc cấp phát mảng/con trỏ `malloc` có gây rủi ro tràn RAM vi điều khiển không? Có cơ chế chờ cực thấp (Deep Sleep, Low Power) cho các node mạng (Lora/IoT) để tiết pin không?
-5. **Độ ổn định & Chống nhiễu**: Việc cấu hình I/O (Pullup/Pulldown), bộ lọc nhiễu nảy nút (Debounce) cứng/mềm có sai sót không? Convention code C/C++ có gọn gàng không?
+## 5 TIÊU CHÍ CHẤM (0-10 điểm mỗi mục):
+1. **Đúng yêu cầu đề bài**: Code có thực hiện đúng những gì đề bài yêu cầu không? Đây là tiêu chí quan trọng nhất.
+2. **Chất lượng code**: Code có dễ đọc, có comment, đặt tên biến hợp lý không?
+3. **Logic và thuật toán**: Cách giải quyết bài toán có hợp lý không? Luồng chương trình có mạch lạc không?
+4. **Xử lý lỗi và ngoại lệ**: Có kiểm tra điều kiện biên, xử lý lỗi cơ bản không?
+5. **Sử dụng thư viện phù hợp**: Có dùng đúng thư viện cho phần cứng/giao thức yêu cầu không?
 
 Điểm tổng = trung bình cộng 5 tiêu chí, làm tròn 1 chữ số thập phân.
 
-TRẢ VỀ DUY NHẤT MỘT KHỐI JSON (KHÔNG CHỨA BẤT KỲ KÝ TỰ VĂN BẢN NÀO):
+TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
 {{
-  "score": <float, 0.0-10.0>,
-  "feedback": "<nhận xét cực kỳ chuyên sâu về phần cứng/viễn thông, vạch trần thói quen dùng delay, ram allocation ngu ngốc nếu có. Lời lẽ giảng viên gắt gao. Tiếng Việt>",
+  "score": <float 0.0-10.0>,
+  "feedback": "<nhận xét ngắn gọn 2-3 câu bằng tiếng Việt, nêu điểm mạnh trước rồi mới góp ý cải thiện. Giọng điệu thân thiện, khuyến khích>",
   "criteria": [
-    {{"name": "Giao thức & Tín hiệu số", "score": <0-10>}},
-    {{"name": "Kiến trúc Real-time", "score": <0-10>}},
-    {{"name": "Xử lý Ngắt (ISR)", "score": <0-10>}},
-    {{"name": "Tối ưu RAM & Power", "score": <0-10>}},
-    {{"name": "Độ ổn định hệ thống", "score": <0-10>}}
+    {{"name": "Đúng yêu cầu đề bài", "score": <0-10>}},
+    {{"name": "Chất lượng code", "score": <0-10>}},
+    {{"name": "Logic và thuật toán", "score": <0-10>}},
+    {{"name": "Xử lý lỗi", "score": <0-10>}},
+    {{"name": "Sử dụng thư viện", "score": <0-10>}}
   ]
 }}"""
 
