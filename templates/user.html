@@ -1420,7 +1420,8 @@ function setupRealTimeNotifications() {
             }
 
             const boardSelector = document.getElementById('boardSelector');
-            const boardFqbn = boardSelector.value;
+            // Mặc định biên dịch Ảo hóa theo kiến trúc bo mạch Arduino Uno nếu đã xóa giao diện tùy chọn board
+            const boardFqbn = boardSelector ? boardSelector.value : 'arduino:avr:uno';
             const sketchPath = currentFile;
             
             terminal.write(`\r\n\x1b[1;33m[COMPILE]\x1b[0m Đang biên dịch '${sketchPath}' cho ${boardFqbn}...\r\n`);
@@ -1592,7 +1593,7 @@ function setupRealTimeNotifications() {
                 await saveCurrentFile(); // Đợi lưu xong rồi mới tiếp tục
             }
             const boardSelector = document.getElementById('boardSelector');
-            const boardFqbn = boardSelector.value;
+            const boardFqbn = boardSelector ? boardSelector.value : 'arduino:avr:uno';
             const sketchPath = currentFile;
             const portAddress = selectedPort.port.address;
             closePortModal();
