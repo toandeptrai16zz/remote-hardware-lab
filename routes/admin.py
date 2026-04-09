@@ -214,6 +214,18 @@ def change_user_status(action, username):
     redirect_to = request.form.get('next') or url_for("admin.admin_manage")
     return redirect(redirect_to)
 
+@admin_bp.route("/api/users")
+@require_auth('admin')
+def admin_api_get_users():
+    """API to get active users for mission assignment"""
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("SELECT id, username FROM users WHERE role = 'user' AND status = 'active' ORDER BY username")
+    users = cur.fetchall()
+    cur.close()
+    db.close()
+    return jsonify(users)
+
 # ==================== MISSIONS ====================
 
 @admin_bp.route("/missions")
