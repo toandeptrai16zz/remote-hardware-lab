@@ -1880,9 +1880,12 @@ function setupRealTimeNotifications() {
                 showNotification('Không có bài thi nào đang diễn ra!', 'warning');
                 return;
             }
+            const missionId = _ideActiveMission.id;
+            const missionName = _ideActiveMission.name;
+
             const result = await Swal.fire({
                 title: 'Nộp bài thi?',
-                text: `Bạn muốn nộp bài "${_ideActiveMission.name}"? Sau khi nộp, không thể chỉnh sửa nữa.`,
+                text: `Bạn muốn nộp bài "${missionName}"? Sau khi nộp, không thể chỉnh sửa nữa.`,
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#7c6af7',
@@ -1892,14 +1895,55 @@ function setupRealTimeNotifications() {
             if (!result.isConfirmed) return;
 
             try {
-                const res = await fetch(`/user/api/missions/${_ideActiveMission.id}/submit`, { method: 'POST' });
+                const res = await fetch(`/user/api/missions/${missionId}/submit`, { method: 'POST' });
                 const data = await res.json();
-                if (data.success) {
-                    await Swal.fire({ icon: 'success', title: 'Nộp bài thành công!', text: 'Hệ thống AI đang chấm điểm...', timer: 3000, showConfirmButton: false });
-                    syncMissionsToIDE();
-                    // Reload iframe missions
-                    const iframe = document.getElementById('missions-iframe');
-                    if (iframe && iframe.src) iframe.src = iframe.src;
+                if (data.success || (data.error && data.error.includes('already submitted'))) {
+                    // Hiện popup loading chờ AI chấm điểm
+                    Swal.fire({
+                        title: '🤖 AI đang chấm điểm...',
+                        html: `<p style="color:#aaa;">Hệ thống AI đang phân tích code của bạn.<br>Vui lòng chờ trong giây lát (khoảng 15-30 giây).</p>
+                               <div style="margin-top:16px"><i class="fa-solid fa-circle-notch fa-spin fa-2x" style="color:#7c6af7"></i></div>`,
+                        allowOutsideClick: false,
+                        showConfirmButton: false
+                    });
+
+                    // Poll chờ kết quả AI
+                    let pollCount = 0;
+                    const pollInterval = setInterval(async () => {
+                        pollCount++;
+                        try {
+                            const mRes = await fetch('/user/api/my-missions');
+                            const missions = await mRes.json();
+                            const m = missions.find(x => x.id === missionId);
+
+                            if ((m && m.submission && m.submission.score !== null) || pollCount >= 12) {
+                                clearInterval(pollInterval);
+                                if (m && m.submission && m.submission.score !== null) {
+                                    const score = m.submission.score;
+                                    const feedback = m.submission.feedback || '';
+                                    const scoreColor = score >= 7 ? '#22c55e' : score >= 5 ? '#f59e0b' : '#ef4444';
+                                    Swal.fire({
+                                        title: `<span style="font-size:3rem;font-weight:900;color:${scoreColor}">${score.toFixed(1)}</span><span style="color:#888;font-size:1.2rem"> / 10</span>`,
+                                        html: `<h3 style="margin:8px 0;color:#e0e0e0;">${escapeHtml(missionName)}</h3>
+                                               <div style="text-align:left;max-height:200px;overflow-y:auto;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid #333;margin-top:12px;font-size:0.85rem;color:#bbb;line-height:1.6;">${escapeHtml(feedback).replace(/\n/g,'<br>')}</div>`,
+                                        icon: score >= 5 ? 'success' : 'warning',
+                                        confirmButtonColor: '#7c6af7',
+                                        confirmButtonText: 'Đóng'
+                                    });
+                                } else {
+                                    Swal.fire({
+                                        icon: 'info',
+                                        title: 'Đã gửi bài thành công!',
+                                        text: 'AI xử lý chậm hơn dự kiến. Bấm Missions để xem điểm sau.',
+                                        confirmButtonColor: '#7c6af7'
+                                    });
+                                }
+                                syncMissionsToIDE();
+                                const iframe = document.getElementById('missions-iframe');
+                                if (iframe && iframe.src) iframe.src = iframe.src;
+                            }
+                        } catch(e) { /* tiếp tục poll */ }
+                    }, 4000);
                 } else {
                     Swal.fire({ icon: 'error', title: 'Lỗi', text: data.error || 'Không thể nộp bài' });
                 }
