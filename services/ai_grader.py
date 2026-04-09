@@ -87,9 +87,10 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON (KHÔNG CHỨA BẤT KỲ KÝ TỰ VĂN 
 
     gemini_key = os.getenv('GEMINI_API_KEY')
     anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+    groq_key = os.getenv('GROQ_API_KEY')
     
-    if not gemini_key and not anthropic_key:
-        logger.error("Cả GEMINI_API_KEY và ANTHROPIC_API_KEY đều không được thiết lập")
+    if not gemini_key and not anthropic_key and not groq_key:
+        logger.error("Cả GEMINI, ANTHROPIC và GROQ API KEY đều không được thiết lập")
         return {'success': False, 'error': 'Chưa cấu hình API key chấm điểm AI. Liên hệ quản trị viên.'}
 
     try:
@@ -135,6 +136,47 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON (KHÔNG CHỨA BẤT KỲ KÝ TỰ VĂN 
                 last_error = "Thiếu thư viện anthropic"
             except Exception as e:
                 logger.error(f"Lỗi Anthropic: {e}")
+                last_error = str(e)
+
+        # Nếu cả 2 thất bại, chuyển sang model siêu tốc LLaMA 3 (thông qua API Groq miễn phí)
+        if not success_api and groq_key:
+            try:
+                import urllib.request
+                import urllib.error
+                import json
+                
+                headers = {
+                    "Authorization": f"Bearer {groq_key}",
+                    "Content-Type": "application/json"
+                }
+                data = {
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [
+                        {"role": "system", "content": "Chỉ trả về JSON thuần túy, tuyệt đối không có văn bản giải thích. Không bọc trong ```json."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.2
+                }
+                
+                req = urllib.request.Request(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers=headers,
+                    data=json.dumps(data).encode('utf-8')
+                )
+                try:
+                    with urllib.request.urlopen(req, timeout=30) as response:
+                        if response.status == 200:
+                            resp_json = json.loads(response.read().decode('utf-8'))
+                            raw = resp_json['choices'][0]['message']['content'].strip()
+                            success_api = True
+                        else:
+                            last_error = f"Groq Error: {response.status}"
+                            logger.error(last_error)
+                except urllib.error.HTTPError as e:
+                    last_error = f"Groq HTTP Error {e.code}: {e.read().decode('utf-8', errors='ignore')}"
+                    logger.error(last_error)
+            except Exception as e:
+                logger.error(f"Lỗi Groq API: {e}")
                 last_error = str(e)
 
         if not success_api:
