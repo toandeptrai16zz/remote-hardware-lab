@@ -1459,7 +1459,33 @@ function setupRealTimeNotifications() {
                     if (data.error_analysis) {
                         writeErrorAnalysisToTerminal(data.error_analysis);
                     } else {
-                        terminal.write(`\x1b[90m${data.output}\x1b[0m\r\n`);
+                        // Lọc chỉ giữ lại dòng lỗi/cảnh báo có ý nghĩa
+                        const rawOutput = data.output || '';
+                        const filteredLines = rawOutput.split('\n').filter(line => {
+                            const l = line.trim();
+                            if (!l) return false;
+                            // Chỉ giữ dòng error/warning/note từ file .ino hoặc thông báo lỗi chung
+                            if (l.includes(': error:') || l.includes(': warning:') || l.includes(': note:')) return true;
+                            if (l.startsWith('Error during build')) return true;
+                            if (l.startsWith('exit status')) return true;
+                            return false;
+                        });
+                        if (filteredLines.length > 0) {
+                            terminal.write(`\r\n\x1b[90m--- Chi tiết lỗi ---\x1b[0m\r\n`);
+                            filteredLines.forEach(line => {
+                                if (line.includes(': error:')) {
+                                    terminal.write(`  \x1b[1;31m❌ ${line}\x1b[0m\r\n`);
+                                } else if (line.includes(': warning:')) {
+                                    terminal.write(`  \x1b[1;33m⚠ ${line}\x1b[0m\r\n`);
+                                } else if (line.includes(': note:')) {
+                                    terminal.write(`  \x1b[36m💡 ${line}\x1b[0m\r\n`);
+                                } else {
+                                    terminal.write(`  \x1b[90m${line}\x1b[0m\r\n`);
+                                }
+                            });
+                        } else {
+                            terminal.write(`\x1b[90m${rawOutput.substring(0, 500)}\x1b[0m\r\n`);
+                        }
                     }
                     const errorCount = data.error_analysis ? data.error_analysis.error_count : 0;
                     const warningCount = data.error_analysis ? data.error_analysis.warning_count : 0;

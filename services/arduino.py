@@ -204,7 +204,7 @@ def compile_sketch(username, board_fqbn, sketch_path):
     sketch_filename = os.path.basename(sketch_path)
     container_sketch_path = prepare_sketch_folder(cname, safe_username, sketch_filename)
     
-    cmd = ["docker", "exec", cname, "arduino-cli", "compile", "--fqbn", board_fqbn, container_sketch_path, "--verbose"]
+    cmd = ["docker", "exec", cname, "arduino-cli", "compile", "--fqbn", board_fqbn, container_sketch_path]
     
     try:
         logger.info(f"Compiling for {username} on {board_fqbn}")
