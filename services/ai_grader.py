@@ -149,7 +149,6 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
             try:
                 import urllib.request
                 import urllib.error
-                import json
                 
                 headers = {
                     "Authorization": f"Bearer {groq_key}",
