@@ -568,6 +568,10 @@ function toggleMissionsListModal() {
             
             // Reset form
             resetForm();
+            // Tải lại bảng để xem bài mới giao
+            if (typeof loadMissionsTable === 'function') {
+                loadMissionsTable();
+            }
             
         } catch (error) {
             console.error('Mission creation failed:', error);
@@ -866,7 +870,19 @@ function toggleMissionsListModal() {
     };
 
     window.deleteMission = async function(id) {
-        if(!confirm('Bạn có chắc chắn muốn xóa bài thi này? Mọi dữ liệu nộp bài của sinh viên cũng sẽ bị xóa vĩnh viễn!')) return;
+        const result = await Swal.fire({
+            title: 'Cảnh báo!',
+            text: 'Bạn có chắc chắn muốn xóa bài thi này? Mọi dữ liệu nộp bài của sinh viên cũng sẽ bị xóa vĩnh viễn!',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Xóa ngay',
+            cancelButtonText: 'Hủy bỏ',
+            background: '#13131a',
+            color: '#e8e8f0'
+        });
+        if (!result.isConfirmed) return;
         try {
             const res = await fetch(`/admin/api/missions/${id}`, {method: 'DELETE'});
             const data = await res.json();

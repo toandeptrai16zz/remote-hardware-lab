@@ -589,6 +589,20 @@ def user_api_submit_mission(mission_id):
         db.commit()
         sub_id = cur.lastrowid
         log_action(username, f"Submitted mission {mission_id} ({'auto' if is_auto else 'manual'})")
+        
+        # KIỂM TRA ĐIỀU KIỆN KẾT THÚC BÀI THI SỚM
+        cur.execute("SELECT user_id FROM mission_assignments WHERE mission_id = %s", (mission_id,))
+        assigned_users = [row['user_id'] for row in cur.fetchall()]
+        if assigned_users:
+            format_strings = ','.join(['%s'] * len(assigned_users))
+            # Lấy số lượng user_id đã có status submit trong table submissions cho mission này
+            cur.execute(f"SELECT COUNT(DISTINCT user_id) as submitted_count FROM submissions WHERE mission_id = %s AND user_id IN ({format_strings})", (mission_id, *assigned_users))
+            result = cur.fetchone()
+            submitted_count = result['submitted_count'] if result else 0
+            if submitted_count >= len(assigned_users):
+                # 100% học viên đã nộp bài -> Kết thúc bài thi ngay lập tức
+                cur.execute("UPDATE missions SET end_time = CURRENT_TIMESTAMP WHERE id = %s", (mission_id,))
+                db.commit()
         # Background AI grading
         mission_snap = dict(mission)
         def bg_grade():

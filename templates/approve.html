@@ -25,7 +25,18 @@
           <td class="text-center">
             <form method="POST" action="{{ url_for('admin.change_user_status', action='approve', username=user.username) }}" style="display: inline;">
               <input type="hidden" name="next" value="{{ url_for('admin.admin_approve_page') }}">
-              <button type="submit" class="btn btn-success btn-sm btn-animate" onclick="return confirm('Bạn có chắc chắn muốn duyệt và tạo môi trường cho user này?')">
+              <button type="button" class="btn btn-success btn-sm btn-animate" onclick="Swal.fire({
+                title: 'Xác nhận duyệt',
+                text: 'Bạn có chắc chắn muốn duyệt và tạo môi trường cho user này?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Duyệt',
+                cancelButtonText: 'Hủy',
+                background: '#13131a',
+                color: '#e8e8f0'
+              }).then((result) => { if (result.isConfirmed) this.closest('form').submit(); })">
                 <i class="fa-solid fa-check"></i> Duyệt
               </button>
             </form>
