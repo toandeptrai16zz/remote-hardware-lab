@@ -29,7 +29,8 @@
                     <button class="btn btn-sm btn-dark" onclick="toggleTerminal()" title="Bật/Tắt Terminal" style="border-color: #444;"><i class="fa-solid fa-terminal"></i></button>
                     <button class="btn btn-sm btn-warning" onclick="toggleMissionsModal()" title="Xem Nhiệm Vụ & Bài Thi" style="background:#f59e0b; color:#000; font-weight:bold; border:none; margin-left: 8px;"><i class="fa-solid fa-layer-group"></i> <span style="margin-left: 4px;">Missions</span></button>
                     <span class="border-end" style="height: 20px;"></span>
-                    <button class="btn btn-sm btn-ide" onclick="saveCurrentFile()"><i class="fa-solid fa-save"></i><span>Save</span></button>
+                    <button class="btn btn-sm btn-success" onclick="compileCode(event)"><i class="fa-solid fa-hammer"></i><span style="margin-left: 4px;">Biên dịch (Compile)</span></button>
+                    <button class="btn btn-sm btn-ide" onclick="saveCurrentFile()"><i class="fa-solid fa-save"></i><span style="margin-left: 4px;">Save</span></button>
                     <!-- Dynamic Submit Button for Active Missions -->
                     <button id="btnSubmitMission" class="btn btn-sm btn-warning" style="display:none;font-weight:bold;color:#000;" onclick="submitActiveMission()"><i class="fa-solid fa-paper-plane"></i><span id="txtSubmitMission">Nộp Bài Ngay</span></button>
                 </div>
