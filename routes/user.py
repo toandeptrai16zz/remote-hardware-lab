@@ -592,6 +592,8 @@ def user_api_submit_mission(mission_id):
         # Background AI grading
         mission_snap = dict(mission)
         def bg_grade():
+            import traceback
+            import sys
             try:
                 from services.ai_grader import grade_submission_with_ai
                 result = grade_submission_with_ai(
@@ -600,6 +602,9 @@ def user_api_submit_mission(mission_id):
                     files=files_snapshot
                 )
                 bg_db = get_db_connection()
+                if not bg_db:
+                    with open("/tmp/ai_err.log", "a") as f: f.write("Lỗi: Không thể lấy get_db_connection trong bg_grade\n")
+                    return
                 bg_cur = bg_db.cursor()
                 if result['success']:
                     bg_cur.execute(
@@ -613,19 +618,21 @@ def user_api_submit_mission(mission_id):
                     )
                 bg_db.commit(); bg_cur.close(); bg_db.close()
             except Exception as ex:
-                import logging; logging.getLogger(__name__).error(f"BG grade error: {ex}")
+                err_trace = traceback.format_exc()
+                with open("/tmp/ai_err.log", "a") as f: f.write(f"CRASH:\n{err_trace}\n")
                 try:
                     bg_db = get_db_connection()
-                    bg_cur = bg_db.cursor()
-                    bg_cur.execute(
-                        "UPDATE submissions SET score=%s, ai_feedback=%s, ai_criteria=%s WHERE id=%s",
-                        (0.0, f"LỖI HỆ THỐNG: {ex}", "[]", sub_id)
-                    )
-                    bg_db.commit(); bg_cur.close(); bg_db.close()
-                except:
-                    pass
+                    if bg_db:
+                        bg_cur = bg_db.cursor()
+                        bg_cur.execute(
+                            "UPDATE submissions SET score=%s, ai_feedback=%s, ai_criteria=%s WHERE id=%s",
+                            (0.0, f"LỖI HỆ THỐNG: {ex}", "[]", sub_id)
+                        )
+                        bg_db.commit(); bg_cur.close(); bg_db.close()
+                except Exception as inner_ex:
+                    with open("/tmp/ai_err.log", "a") as f: f.write(f"INNER CRASH:\n{traceback.format_exc()}\n")
         threading.Thread(target=bg_grade, daemon=True).start()
-        return jsonify(success=True, message="Nộp bài thành công! AI đang chấm điểm...", submission_id=sub_id)
+        return jsonify(success=True, message="Nộp bài thành công! Đang chấm điểm...", submission_id=sub_id)
     except Exception as e:
         return jsonify(success=False, error=str(e)), 500
     finally:
