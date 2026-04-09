@@ -177,6 +177,16 @@ if command -v arduino-cli &> /dev/null; then
         arduino-cli core update-index &>/dev/null
         arduino-cli core install arduino:avr &>/dev/null
     fi
+    if ! arduino-cli core list | grep -q "esp32:esp32"; then
+        echo "Installing esp32:esp32 core..."
+        arduino-cli config init &>/dev/null || true
+        arduino-cli config add board_manager.additional_urls https://dl.espressif.com/dl/package_esp32_index.json &>/dev/null || true
+        arduino-cli core update-index &>/dev/null
+        arduino-cli core install esp32:esp32 &>/dev/null
+    fi
+    
+    # CÀI CÁC THƯ VIỆN NHÚNG THEO CONFIG CHUNG
+    arduino-cli lib install "Adafruit NeoPixel" "DHT sensor library" "Adafruit Unified Sensor" "PubSubClient" "ArduinoJson" &>/dev/null || true
 fi
 # ----------------------------------------------------------------------
 
