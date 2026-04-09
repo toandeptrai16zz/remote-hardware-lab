@@ -139,11 +139,13 @@
             </div>
         </div>
 
-        <div class="col-lg-12 mt-4 text-center">
-            <button type="button" class="btn btn-primary btn-lg" onclick="toggleMissionsListModal()" style="border-radius: 8px; font-weight: bold; padding: 12px 24px;">
-                <i class="fa-solid fa-list-ol me-2"></i> Xem Danh sách Bài thi đã tạo
-            </button>
-        </div>
+<!-- Floating Button for Missions List -->
+<button type="button" class="btn btn-primary shadow-lg" onclick="toggleMissionsListModal()" 
+    style="position: fixed; bottom: 30px; right: 30px; border-radius: 50px; font-weight: bold; padding: 12px 24px; z-index: 9900; box-shadow: 0 8px 20px rgba(13, 110, 253, 0.4); transition: transform 0.2s;"
+    onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='translateY(0)'">
+    <i class="fa-solid fa-list-ol me-2"></i> Xem Danh sách Bài thi
+</button>
+
     </div>
 </div>
 
