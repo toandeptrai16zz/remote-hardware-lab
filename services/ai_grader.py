@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 logger = logging.getLogger(__name__)
 
 
@@ -147,7 +147,8 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON (KHÔNG CHỨA BẤT KỲ KÝ TỰ VĂN 
                 
                 headers = {
                     "Authorization": f"Bearer {groq_key}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 }
                 data = {
                     "model": "llama-3.3-70b-versatile",
