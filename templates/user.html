@@ -11,12 +11,11 @@
 {% block content %}
     <div class="ide-container">
         <div class="file-panel" id="filePanel">
-            <div class="panel-header"><i class="fas fa-folder-tree"></i><span>Explorer</span>
+            <div class="panel-header"><i class="fas fa-folder-tree"></i><span>EXPLORER</span>
                 <div class="panel-actions">
-                    <button class="file-btn" onclick="handleUploadClick()" title="Upload Files"><i class="fa-solid fa-upload"></i></button>
-                    <button class="file-btn" onclick="createNewItem('file')" title="New File"><i class="fa-solid fa-file-plus"></i></button>
-                    <button class="file-btn" onclick="createNewItem('folder')" title="New Folder"><i class="fa-solid fa-folder-plus"></i></button>
-                    <button class="file-btn" onclick="refreshRootFiles()" title="Refresh"><i class="fa-solid fa-rotate" id="refreshIcon"></i></button>
+                    <button class="file-btn" onclick="createNewItem('file')" title="Tạo File mới"><i class="fa-solid fa-file-circle-plus"></i></button>
+                    <button class="file-btn" onclick="createNewItem('folder')" title="Tạo Thư mục"><i class="fa-solid fa-folder-plus"></i></button>
+                    <button class="file-btn" onclick="refreshRootFiles()" title="Làm mới"><i class="fa-solid fa-rotate" id="refreshIcon"></i></button>
                 </div>
             </div>
             <div class="panel-content"><ul class="file-tree" id="file-tree-root"></ul></div>
@@ -27,12 +26,18 @@
                 <div class="editor-tabs" id="editorTabs"></div>
                 <div class="editor-actions">
                     <button class="btn btn-sm btn-dark" onclick="toggleTerminal()" title="Bật/Tắt Terminal" style="border-color: #444;"><i class="fa-solid fa-terminal"></i></button>
-                    <button class="btn btn-sm btn-warning" onclick="toggleMissionsModal()" title="Xem Nhiệm Vụ & Bài Thi" style="background:#f59e0b; color:#000; font-weight:bold; border:none; margin-left: 8px;"><i class="fa-solid fa-layer-group"></i> <span style="margin-left: 4px;">Missions</span></button>
+                    <button id="btnMissions" class="btn btn-sm" onclick="toggleMissionsModal()" title="Xem Bài Thi" style="background:#f59e0b; color:#000; font-weight:bold; border:none; margin-left: 8px; position:relative;"><i class="fa-solid fa-layer-group"></i> <span style="margin-left:4px;">Missions</span><span id="missionsBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;font-size:0.65rem;min-width:16px;height:16px;border-radius:50%;display:none;align-items:center;justify-content:center;font-weight:700;"></span></button>
+                    <!-- Countdown mini khi có bài thi đang diễn ra -->
+                    <span id="miniExamBar" style="display:none;align-items:center;gap:6px;margin-left:8px;padding:3px 10px;background:linear-gradient(135deg,#1a0a2e,#0f1a2e);border:1px solid #7c6af7;border-radius:6px;font-size:0.78rem;color:#e0e0ff;">
+                        <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse-anim 2s infinite;"></span>
+                        <span id="miniExamName" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+                        <span id="miniExamCountdown" style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#7c6af7;">00:00:00</span>
+                    </span>
                     <span class="border-end" style="height: 20px;"></span>
                     <button class="btn btn-sm btn-success" onclick="compileCode(event)"><i class="fa-solid fa-hammer"></i><span style="margin-left: 4px;">Biên dịch (Compile)</span></button>
                     <button class="btn btn-sm btn-ide" onclick="saveCurrentFile()"><i class="fa-solid fa-save"></i><span style="margin-left: 4px;">Save</span></button>
-                    <!-- Dynamic Submit Button for Active Missions -->
-                    <button id="btnSubmitMission" class="btn btn-sm btn-warning" style="display:none;font-weight:bold;color:#000;" onclick="submitActiveMission()"><i class="fa-solid fa-paper-plane"></i><span id="txtSubmitMission">Nộp Bài Ngay</span></button>
+                    <!-- Nút Nộp bài - chỉ hiện khi có bài đang diễn ra -->
+                    <button id="btnSubmitMission" class="btn btn-sm" style="display:none;font-weight:bold;background:linear-gradient(135deg,#7c6af7,#a855f7);color:#fff;border:none;" onclick="submitActiveMission()"><i class="fa-solid fa-paper-plane"></i><span style="margin-left:4px;" id="txtSubmitMission">Nộp Bài</span></button>
                 </div>
             </div>
             <div class="editor-container" id="editorContainer"><div id="editor"></div></div>
@@ -1796,6 +1801,116 @@ function setupRealTimeNotifications() {
                 wrapper.style.display = 'none';
             }
         }
+
+        // ── MISSIONS SYNC: Badge + Countdown + Submit từ IDE ──
+        let _ideMissionTimer = null;
+        let _ideActiveMission = null;
+
+        async function syncMissionsToIDE() {
+            try {
+                const res = await fetch('/user/api/my-missions');
+                const missions = await res.json();
+                const now = Date.now();
+                const active = missions.filter(m => {
+                    const s = new Date(m.start_time).getTime();
+                    const e = new Date(m.end_time).getTime();
+                    return !m.submitted && now >= s && now <= e;
+                });
+                const total = missions.filter(m => {
+                    const s = new Date(m.start_time).getTime();
+                    const e = new Date(m.end_time).getTime();
+                    return !m.submitted && now <= e;
+                });
+
+                // Badge trên nút Missions
+                const badge = document.getElementById('missionsBadge');
+                if (badge) {
+                    if (total.length > 0) {
+                        badge.textContent = total.length;
+                        badge.style.display = 'flex';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+
+                // Countdown mini + nút submit
+                const bar = document.getElementById('miniExamBar');
+                const btnSubmit = document.getElementById('btnSubmitMission');
+                if (active.length > 0) {
+                    _ideActiveMission = active[0];
+                    document.getElementById('miniExamName').textContent = active[0].name;
+                    bar.style.display = 'inline-flex';
+                    btnSubmit.style.display = '';
+                    if (!_ideMissionTimer) {
+                        _ideMissionTimer = setInterval(tickIDECountdown, 1000);
+                        tickIDECountdown();
+                    }
+                } else {
+                    _ideActiveMission = null;
+                    if (bar) bar.style.display = 'none';
+                    if (btnSubmit) btnSubmit.style.display = 'none';
+                    if (_ideMissionTimer) { clearInterval(_ideMissionTimer); _ideMissionTimer = null; }
+                }
+            } catch(e) { /* im lặng */ }
+        }
+
+        function tickIDECountdown() {
+            if (!_ideActiveMission) return;
+            const end = new Date(_ideActiveMission.end_time).getTime();
+            const remaining = end - Date.now();
+            const el = document.getElementById('miniExamCountdown');
+            if (remaining <= 0) {
+                if (el) el.textContent = '00:00:00';
+                clearInterval(_ideMissionTimer);
+                _ideMissionTimer = null;
+                return;
+            }
+            const h = Math.floor(remaining / 3600000);
+            const m = Math.floor((remaining % 3600000) / 60000);
+            const s = Math.floor((remaining % 60000) / 1000);
+            const pad = n => String(n).padStart(2, '0');
+            if (el) {
+                el.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+                el.style.color = remaining < 300000 ? '#ef4444' : remaining < 900000 ? '#f59e0b' : '#7c6af7';
+            }
+        }
+
+        async function submitActiveMission() {
+            if (!_ideActiveMission) {
+                showNotification('Không có bài thi nào đang diễn ra!', 'warning');
+                return;
+            }
+            const result = await Swal.fire({
+                title: 'Nộp bài thi?',
+                text: `Bạn muốn nộp bài "${_ideActiveMission.name}"? Sau khi nộp, không thể chỉnh sửa nữa.`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#7c6af7',
+                cancelButtonText: 'Chưa, tiếp tục làm',
+                confirmButtonText: 'Nộp bài ngay!'
+            });
+            if (!result.isConfirmed) return;
+
+            try {
+                const res = await fetch(`/user/api/missions/${_ideActiveMission.id}/submit`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    await Swal.fire({ icon: 'success', title: 'Nộp bài thành công!', text: 'Hệ thống AI đang chấm điểm...', timer: 3000, showConfirmButton: false });
+                    syncMissionsToIDE();
+                    // Reload iframe missions
+                    const iframe = document.getElementById('missions-iframe');
+                    if (iframe && iframe.src) iframe.src = iframe.src;
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Lỗi', text: data.error || 'Không thể nộp bài' });
+                }
+            } catch(e) {
+                Swal.fire({ icon: 'error', title: 'Lỗi kết nối', text: 'Không thể liên hệ server' });
+            }
+        }
+
+        // Khởi chạy sync khi IDE load xong
+        syncMissionsToIDE();
+        setInterval(syncMissionsToIDE, 15000);
     </script>
 
     <!-- Missions Modal Container -->
