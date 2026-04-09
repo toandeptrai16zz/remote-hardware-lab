@@ -8,6 +8,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/user_ide.css') }}">
 {% endblock %}
 
+<style>
+.swal-no-scroll, .swal2-popup { overflow: hidden !important; }
+.swal2-container { z-index: 99999 !important; }
+</style>
 {% block content %}
     <div class="ide-container">
         <div class="file-panel" id="filePanel">
@@ -1905,7 +1909,9 @@ function setupRealTimeNotifications() {
                         allowOutsideClick: false,
                         showConfirmButton: false,
                         background: '#1a1a2e',
-                        color: '#e0e0e0'
+                        color: '#e0e0e0',
+                        backdrop: `rgba(10,10,30,0.6) blur(4px)`,
+                        customClass: { popup: 'swal-no-scroll' }
                     });
 
                     // Poll chờ kết quả AI
@@ -1921,17 +1927,19 @@ function setupRealTimeNotifications() {
                                 clearInterval(pollInterval);
                                 if (m && m.submission && m.submission.score !== null) {
                                     const score = m.submission.score;
-                                    const feedback = m.submission.feedback || '';
+                                    const feedback = m.submission.ai_feedback || m.submission.feedback || 'Không có nhận xét.';
                                     const scoreColor = score >= 7 ? '#22c55e' : score >= 5 ? '#f59e0b' : '#ef4444';
                                     Swal.fire({
                                         title: `<span style="font-size:3rem;font-weight:900;color:${scoreColor}">${score.toFixed(1)}</span><span style="color:#888;font-size:1.2rem"> / 10</span>`,
-                                        html: `<h3 style="margin:8px 0;color:#e0e0e0;">${escapeHtml(missionName)}</h3>
-                                               <div style="text-align:left;max-height:200px;overflow-y:auto;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid #333;margin-top:12px;font-size:0.85rem;color:#bbb;line-height:1.6;">${escapeHtml(feedback).replace(/\n/g,'<br>')}</div>`,
+                                        html: `<h3 style="margin:8px 0;color:#ccc;">${escapeHtml(missionName)}</h3>
+                                               <div style="text-align:left;padding:14px 18px;background:rgba(255,255,255,0.03);border-radius:12px;border:1px solid rgba(124,106,247,0.3);box-shadow:inset 0 0 10px rgba(124,106,247,0.1);margin-top:15px;font-size:0.85rem;color:#ccc;line-height:1.7;max-height:180px;overflow-y:auto;">💬 <b>AI Nhận xét:</b><br><span style="color:#aaa;">${escapeHtml(feedback).replace(/\n/g,'<br>')}</span></div>`,
                                         icon: score >= 5 ? 'success' : 'warning',
                                         confirmButtonColor: '#7c6af7',
                                         confirmButtonText: 'Đóng',
                                         background: '#1a1a2e',
-                                        color: '#e0e0e0'
+                                        color: '#e0e0e0',
+                                        backdrop: `rgba(10,10,30,0.6) blur(4px)`,
+                                        customClass: { popup: 'swal-no-scroll' }
                                     });
                                 } else {
                                     Swal.fire({
@@ -1940,7 +1948,9 @@ function setupRealTimeNotifications() {
                                         text: 'AI xử lý chậm hơn dự kiến. Bấm Missions để xem điểm sau.',
                                         confirmButtonColor: '#7c6af7',
                                         background: '#1a1a2e',
-                                        color: '#e0e0e0'
+                                        color: '#e0e0e0',
+                                        backdrop: `rgba(10,10,30,0.6) blur(4px)`,
+                                        customClass: { popup: 'swal-no-scroll' }
                                     });
                                 }
                                 syncMissionsToIDE();

@@ -880,7 +880,8 @@ function toggleMissionsListModal() {
             confirmButtonText: 'Xóa ngay',
             cancelButtonText: 'Hủy bỏ',
             background: '#13131a',
-            color: '#e8e8f0'
+            color: '#e8e8f0',
+            backdrop: `rgba(10,10,30,0.6) blur(4px)`
         });
         if (!result.isConfirmed) return;
         try {
