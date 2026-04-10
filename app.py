@@ -23,7 +23,6 @@ from config import init_db
 
 # Import routes
 from routes.auth import auth_bp
-from routes.hardware import hardware_bp
 from routes.admin import admin_bp
 from routes.user import user_bp
 
@@ -72,7 +71,6 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(user_bp)
-app.register_blueprint(hardware_bp)
 
 # ================== REGISTER SOCKET.IO HANDLERS ==================
 register_terminal_handlers(socketio)
