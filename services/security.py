@@ -64,7 +64,7 @@ def validate_captcha(user_input, token):
         captcha, timestamp = decoded.split(':', 1)
         if time.time() - float(timestamp) > 300: 
             return False
-        return user_input.upper() == captcha.upper()
+        return user_input == captcha
     except: 
         return False
 
