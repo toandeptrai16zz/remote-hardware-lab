@@ -162,7 +162,7 @@ def resend_otp_api():
             if send_otp_email(reg_data['email'], new_otp, reg_data['username']):
                 return jsonify({'success': True, 'message': 'Đã gửi lại mã OTP vào email đăng ký.'})
             else:
-                return jsonify({'success': False, 'message': 'Lỗi hệ thống gửi email.'}), 500
+                return jsonify({'success': False, 'message': 'Lỗi gửi mail: Vui lòng kiểm tra lại cấu hình SMTP/App Password trong file .env.'}), 500
         except Exception as e:
             return jsonify({'success': False, 'message': 'Lỗi không xác định.'}), 500
 
@@ -195,7 +195,7 @@ def resend_otp_api():
                     log_action(username, "Resend Login OTP")
                     return jsonify({'success': True, 'message': 'Đã gửi lại mã OTP đăng nhập.'})
                 else:
-                    return jsonify({'success': False, 'message': 'Lỗi gửi email.'}), 500
+                    return jsonify({'success': False, 'message': 'Lỗi gửi mail: Vui lòng kiểm tra lại cấu hình SMTP/App Password trong file .env.'}), 500
             else:
                 return jsonify({'success': False, 'message': 'Không tìm thấy email liên kết.'}), 400
         except Exception as e:
