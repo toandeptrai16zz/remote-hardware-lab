@@ -14,12 +14,18 @@ SECURITY_CONFIG = {
     'RATE_LIMIT_PER_MINUTE': 60,
 }
 
+import os
+from dotenv import load_dotenv
+
+# Load .env file
+load_dotenv()
+
 EMAIL_CONFIG = {
-    'SMTP_SERVER': 'smtp.gmail.com', 
-    'SMTP_PORT': 587,
-    'SMTP_USERNAME': 'haquangchuong28@gmail.com',
-    'SMTP_PASSWORD': 'ctuo nyxx clvg xxtc',
-    'FROM_EMAIL': 'EPU TECH'
+    'SMTP_SERVER': os.getenv('SMTP_SERVER', 'smtp.gmail.com'), 
+    'SMTP_PORT': int(os.getenv('SMTP_PORT', 587)),
+    'SMTP_USERNAME': os.getenv('SMTP_USERNAME'),
+    'SMTP_PASSWORD': os.getenv('SMTP_PASSWORD'),
+    'FROM_EMAIL': os.getenv('FROM_EMAIL', 'EPU TECH')
 }
 
 # List of default Arduino libraries to pre-install for all users.
