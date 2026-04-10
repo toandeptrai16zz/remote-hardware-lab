@@ -1,6 +1,13 @@
 """
 Configuration settings for the Flask application
 """
+import os
+from dotenv import load_dotenv
+
+# Load .env file using absolute path relative to project root
+basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+env_path = os.path.join(basedir, '.env')
+load_dotenv(env_path)
 
 # ================== CONFIGURATIONS ==================
 SECURITY_CONFIG = {
@@ -13,12 +20,6 @@ SECURITY_CONFIG = {
     'USERNAME_MIN_LENGTH': 3, 
     'RATE_LIMIT_PER_MINUTE': 60,
 }
-
-import os
-from dotenv import load_dotenv
-
-# Load .env file
-load_dotenv()
 
 EMAIL_CONFIG = {
     'SMTP_SERVER': os.getenv('SMTP_SERVER', 'smtp.gmail.com'), 
