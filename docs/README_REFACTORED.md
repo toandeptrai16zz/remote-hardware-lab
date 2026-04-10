@@ -155,6 +155,12 @@ werkzeug.routing.BuildError: Could not build url for endpoint 'login_page'
 - Python Package Structure: https://docs.python.org/3/tutorial/modules.html
 
 ---
-**Phiên bản**: 2.0 (Refactored)  
-**Ngày cập nhật**: 30/01/2026  
-**Tác giả**: EPU Tech Team
+### 5. **Chấm điểm thông minh & Virtual Lab**
+- **AI-Native Evaluation**: Thay thế việc nạp phần cứng vật lý (hạn chế về quy mô) bằng hệ thống **Virtual Testbench** sử dụng AI.
+- **Đa mô hình (Multi-LLM)**: Tích hợp linh hoạt Gemini, Claude và đặc biệt là **GROQ (LLaMA 3.3 70B)** để đạt tốc độ chấm bài cực nhanh.
+- **Data Collection**: Tự động thu thập dữ liệu bài làm để huấn luyện mô hình AI chuyên biệt trong tương lai.
+
+---
+**Phiên bản**: 2.5 (AI-Native Transition)  
+**Ngày cập nhật**: 11/04/2026  
+**Tác giả**: Hà Quang Chương & EPU Tech Team

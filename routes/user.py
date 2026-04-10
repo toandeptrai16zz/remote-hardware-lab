@@ -2,6 +2,8 @@
 User workspace routes: file management, editor, Arduino operations
 """
 import os
+import re
+import unicodedata
 import json
 import stat
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
@@ -356,18 +358,18 @@ def save_file_api(username):
         client = get_ssh_client(username)
         sftp = client.open_sftp()
         
-        filepath = os.path.join(home_dir, path, filename)
+        filepath = os.path.normpath(os.path.join(home_dir, path, filename))
         
         with sftp.open(filepath, 'w') as f: 
             f.write(content)
             
         sftp.close()
         client.close()
-        log_action(username, f"Save file: {filename}")
+        log_action(username, f"Save file: {filepath}")
         return jsonify(success=True)
     except Exception as e: 
         from flask import current_app
-        current_app.logger.error(f"Save Error: {e}")
+        current_app.logger.error(f"Save Error for {username}: {e} (Path: {path}, File: {filename})")
         return jsonify(success=False, error=str(e)), 500
 
 # ==================== ARDUINO OPERATIONS ====================
@@ -528,9 +530,34 @@ def initialize_assigned_missions(username):
             mission_slug = slugify_vn(m['name'])
             if not mission_slug: mission_slug = f"mission_{m['id']}"
             
-            mission_dir = os.path.join(home_dir, mission_slug)
+            # Đề phòng tên cũ bị lỗi (ví dụ đề 18 thành e_18)
+            # Ta sẽ kiểm tra và đổi tên nếu cần
+            def broken_slugify(text):
+                import unicodedata
+                text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
+                text = re.sub(r'[^\w\s-]', '', text).strip().lower()
+                text = re.sub(r'[-\s]+', '_', text)
+                return text
+            old_slug = broken_slugify(m['name'])
             
-            # 1. Tạo thư mục
+            mission_dir = os.path.join(home_dir, mission_slug)
+            old_dir = os.path.join(home_dir, old_slug) if old_slug and old_slug != mission_slug else None
+            
+            # Kiểm tra di cư thư mục cũ sang mới
+            if old_dir:
+                try:
+                    sftp.stat(old_dir)
+                    # Nếu tồn tại thư mục cũ, hãy đổi tên nó sang tên mới chuẩn nếu tên mới chưa có
+                    try:
+                        sftp.stat(mission_dir)
+                    except FileNotFoundError:
+                        sftp.rename(old_dir, mission_dir)
+                        from flask import current_app
+                        current_app.logger.info(f"Migrated folder {old_slug} -> {mission_slug} for {username}")
+                except FileNotFoundError:
+                    pass
+
+            # 1. Tạo thư mục mới (nếu chưa có sau khi migrate)
             try:
                 sftp.mkdir(mission_dir)
             except IOError: pass

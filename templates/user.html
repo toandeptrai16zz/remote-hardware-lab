@@ -1410,7 +1410,9 @@ function setupRealTimeNotifications() {
                 updateTabAppearance(currentFile); 
                 DOM.saveButton.textContent = 'Save'; 
                 showNotification(`Saved ${fileData.shortName}`, 'success'); 
-            } catch (error) { } 
+            } catch (error) {
+                showNotification(`Lỗi lưu bài: ${error.message}`, 'error');
+            } 
         }
 
         async function compileCode(event) {

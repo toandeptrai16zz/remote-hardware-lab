@@ -1,6 +1,6 @@
 """
 AI Grader Service
-Dùng Claude (Anthropic API) để chấm điểm bài nộp lập trình nhúng
+Hỗ trợ đa mô hình: Gemini 1.5, Claude 3.5 và GROQ (LLaMA 3) để chấm điểm bài nộp lập trình nhúng.
 """
 import os
 import json
