@@ -91,10 +91,14 @@ def login_api():
                     'expires_at': time.time() + SECURITY_CONFIG['OTP_EXPIRY'], 
                     'ip': ip_address
                 }
-                send_otp_email(user['email'], otp, username)
-                log_action(username, "Login: OTP sent")
-                cur.close(), db.close()
-                return jsonify({'success': True, 'requireOTP': True})
+                if send_otp_email(user['email'], otp, username):
+                    log_action(username, "Login: OTP sent")
+                    cur.close(), db.close()
+                    return jsonify({'success': True, 'requireOTP': True})
+                else:
+                    log_action(username, "Login: OTP send failed (SMTP Error)", False)
+                    cur.close(), db.close()
+                    return jsonify({'success': False, 'message': 'Lỗi gửi mail OTP: Vui lòng kiểm tra lại cấu hình SMTP/App Password trong file .env.'}), 500
             else:
                 # Direct login without OTP
                 session["username"] = user["username"]
