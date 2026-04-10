@@ -14,6 +14,7 @@ from services import (
 )
 from config.database import get_db_connection
 from services.ai_grader import grade_submission_with_ai
+from utils.helpers import slugify_vn
 
 user_bp = Blueprint('user', __name__, url_prefix='/user')
 
@@ -32,6 +33,8 @@ def user_workspace(username):
     
     try:        
         ensure_user_container_and_setup(username)
+        # Tự động tạo folder bài tập cho tất cả mission đang diễn ra
+        initialize_assigned_missions(username)
     except Exception as e:
         from flask import current_app
         current_app.logger.error(f"Container check failed for {username}: {e}")
@@ -491,6 +494,61 @@ def user_api_my_missions():
     return jsonify(result)
 
 
+def initialize_assigned_missions(username):
+    """
+    Helper to auto-initialize all active missions assigned to user.
+    Creates folders and .ino files.
+    """
+    from utils import make_safe_name
+    safe_username = make_safe_name(username)
+    
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    # Lấy danh sách missions active mà user được giao
+    cur.execute("""
+        SELECT m.* FROM missions m
+        JOIN mission_assignments ma ON m.id = ma.mission_id
+        JOIN users u ON u.id = ma.user_id
+        WHERE u.username = %s 
+        AND m.start_time <= CURRENT_TIMESTAMP 
+        AND m.end_time >= CURRENT_TIMESTAMP
+    """, (username,))
+    missions = cur.fetchall()
+    cur.close(); db.close()
+    
+    if not missions:
+        return
+        
+    try:
+        client = get_ssh_client(username)
+        sftp = client.open_sftp()
+        home_dir = f"/home/{safe_username}"
+        
+        for m in missions:
+            mission_slug = slugify_vn(m['name'])
+            if not mission_slug: mission_slug = f"mission_{m['id']}"
+            
+            mission_dir = os.path.join(home_dir, mission_slug)
+            
+            # 1. Tạo thư mục
+            try:
+                sftp.mkdir(mission_dir)
+            except IOError: pass
+                
+            # 2. Tạo file .ino (nếu chưa có)
+            ino_path = os.path.join(mission_dir, f"{mission_slug}.ino")
+            try:
+                sftp.stat(ino_path)
+            except FileNotFoundError:
+                template = m.get('template_code') or "// Bắt đầu code bài làm của bạn tại đây\nvoid setup() {\n  Serial.begin(115200);\n}\n\nvoid loop() {\n  \n}\n"
+                with sftp.open(ino_path, 'w') as f:
+                    f.write(template)
+        
+        sftp.close(); client.close()
+    except Exception as e:
+        from flask import current_app
+        current_app.logger.error(f"Auto-init missions error for {username}: {e}")
+
 @user_bp.route('/api/preview-files', methods=['GET'])
 @require_auth('user')
 def user_api_preview_files():
@@ -532,9 +590,7 @@ def user_api_preview_files():
 @user_bp.route('/api/missions/<int:mission_id>/start', methods=['POST'])
 @require_auth('user')
 def user_api_missions_start(mission_id):
-    """API to initialize mission: create folder and file .ino with mission name"""
-    import re
-    
+    """API to initialize specific mission (fallback or manual trigger)"""
     username = session['username']
     safe_username = make_safe_name(username)
     
@@ -547,16 +603,7 @@ def user_api_missions_start(mission_id):
     if not mission:
         return jsonify(success=False, error="Không tìm thấy bài thi"), 404
         
-    # Chuẩn hóa tên bài thi thành tên folder/file hợp lệ (không dấu, gạch dưới)
-    # Ví dụ: "Đề 5: Lập trình" -> "De_5_Lap_trinh"
-    def slugify(text):
-        import unicodedata
-        text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
-        text = re.sub(r'[^\w\s-]', '', text).strip().lower()
-        text = re.sub(r'[-\s]+', '_', text)
-        return text
-        
-    mission_slug = slugify(mission['name'])
+    mission_slug = slugify_vn(mission['name'])
     if not mission_slug: mission_slug = f"mission_{mission_id}"
     
     try:
@@ -565,17 +612,13 @@ def user_api_missions_start(mission_id):
         home_dir = f"/home/{safe_username}"
         mission_dir = os.path.join(home_dir, mission_slug)
         
-        # 1. Tạo thư mục
         try:
             sftp.mkdir(mission_dir)
-        except IOError: # Đã tồn tại thì thôi
-            pass
+        except IOError: pass
             
-        # 2. Tạo file .ino (nếu chưa có)
         ino_path = os.path.join(mission_dir, f"{mission_slug}.ino")
         try:
             sftp.stat(ino_path)
-            # File đã tồn tại, không ghi đè tránh mất bài sinh viên
         except FileNotFoundError:
             template = mission.get('template_code') or "// Bắt đầu code bài làm của bạn tại đây\nvoid setup() {\n  Serial.begin(115200);\n}\n\nvoid loop() {\n  \n}\n"
             with sftp.open(ino_path, 'w') as f:
