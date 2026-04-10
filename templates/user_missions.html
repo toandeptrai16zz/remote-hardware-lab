@@ -222,9 +222,9 @@ function renderMissionCard(m) {
   let actionBtn = '';
   if (status === 'active' && !m.submitted) {
     actionBtn = `
-      <a href="/user/${currentUsername}/workspace" target="_blank" class="btn btn-primary">
+      <button onclick="startMission(${m.id})" class="btn btn-primary">
         <i class="fa-solid fa-code"></i> Vào làm bài
-      </a>
+      </button>
       <button class="btn btn-green" onclick="promptSubmit(${m.id}, '${escH(m.name)}')">
         <i class="fa-solid fa-paper-plane"></i> Nộp bài
       </button>`;
@@ -408,6 +408,25 @@ async function handleTimeOut(mission) {
             <button class="btn btn-primary" onclick="window.location.reload()">Tải lại trang</button>
         </div>
     `;
+  }
+}
+
+// ── START MISSION ──────────────────────────────────────────
+async function startMission(missionId) {
+  try {
+    toast('🚀 Đang khởi tạo môi trường bài thi...', 'info');
+    const res = await fetch(`/user/api/missions/${missionId}/start`, { method: 'POST' });
+    const data = await res.json();
+    
+    if (data.success) {
+      // Mở workspace trong tab mới
+      window.open(`/user/${currentUsername}/workspace`, '_blank');
+      toast('✅ Khởi tạo thành công! Chúc bạn làm bài tốt.', 'success');
+    } else {
+      toast(data.error || 'Lỗi khởi tạo bài thi', 'error');
+    }
+  } catch (e) {
+    toast('Lỗi kết nối máy chủ khi bắt đầu bài thi.', 'error');
   }
 }
 

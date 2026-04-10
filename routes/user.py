@@ -504,14 +504,18 @@ def user_api_preview_files():
         sftp = client.open_sftp()
         home_dir = f"/home/{safe_username}"
         def collect(path, depth=0):
-            if depth > 3: return
+            if depth > 4: return
             try:
+                EXCLUDED_DIRS = {'libraries', 'node_modules', 'venv', '__pycache__', '.git', '.arduino15', 'Arduino'}
                 for item in sftp.listdir_attr(path):
                     if item.filename.startswith('.'): continue
+                    if item.filename in EXCLUDED_DIRS: continue
+                    
                     fp = f"{path}/{item.filename}"
                     if stat_mod.S_ISDIR(item.st_mode):
                         collect(fp, depth + 1)
                     elif item.filename.endswith(('.ino', '.cpp', '.c', '.h', '.py')):
+                        if 'libraries/' in fp or 'node_modules/' in fp: continue
                         files_list.append({
                             'name': item.filename,
                             'path': fp.replace(home_dir, ''),
@@ -523,6 +527,64 @@ def user_api_preview_files():
     except Exception as e:
         return jsonify(success=False, error=str(e)), 500
     return jsonify(success=True, files=files_list)
+
+
+@user_bp.route('/api/missions/<int:mission_id>/start', methods=['POST'])
+@require_auth('user')
+def user_api_missions_start(mission_id):
+    """API to initialize mission: create folder and file .ino with mission name"""
+    import re
+    
+    username = session['username']
+    safe_username = make_safe_name(username)
+    
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("SELECT * FROM missions WHERE id=%s", (mission_id,))
+    mission = cur.fetchone()
+    cur.close(); db.close()
+    
+    if not mission:
+        return jsonify(success=False, error="Không tìm thấy bài thi"), 404
+        
+    # Chuẩn hóa tên bài thi thành tên folder/file hợp lệ (không dấu, gạch dưới)
+    # Ví dụ: "Đề 5: Lập trình" -> "De_5_Lap_trinh"
+    def slugify(text):
+        import unicodedata
+        text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
+        text = re.sub(r'[^\w\s-]', '', text).strip().lower()
+        text = re.sub(r'[-\s]+', '_', text)
+        return text
+        
+    mission_slug = slugify(mission['name'])
+    if not mission_slug: mission_slug = f"mission_{mission_id}"
+    
+    try:
+        client = get_ssh_client(username)
+        sftp = client.open_sftp()
+        home_dir = f"/home/{safe_username}"
+        mission_dir = os.path.join(home_dir, mission_slug)
+        
+        # 1. Tạo thư mục
+        try:
+            sftp.mkdir(mission_dir)
+        except IOError: # Đã tồn tại thì thôi
+            pass
+            
+        # 2. Tạo file .ino (nếu chưa có)
+        ino_path = os.path.join(mission_dir, f"{mission_slug}.ino")
+        try:
+            sftp.stat(ino_path)
+            # File đã tồn tại, không ghi đè tránh mất bài sinh viên
+        except FileNotFoundError:
+            template = mission.get('template_code') or "// Bắt đầu code bài làm của bạn tại đây\nvoid setup() {\n  Serial.begin(115200);\n}\n\nvoid loop() {\n  \n}\n"
+            with sftp.open(ino_path, 'w') as f:
+                f.write(template)
+        
+        sftp.close(); client.close()
+        return jsonify(success=True, mission_slug=mission_slug)
+    except Exception as e:
+        return jsonify(success=False, error=str(e)), 500
 
 
 @user_bp.route('/api/missions/<int:mission_id>/submit', methods=['POST'])
