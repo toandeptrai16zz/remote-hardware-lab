@@ -561,18 +561,32 @@ def user_api_submit_mission(mission_id):
         sftp = client.open_sftp()
         home_dir = f"/home/{safe_username}"
         def collect(path, depth=0):
-            if depth > 3: return
+            if depth > 4: return
             try:
+                # Các thư mục cần loại bỏ không thu thập file bài làm
+                EXCLUDED_DIRS = {'libraries', 'node_modules', 'venv', '__pycache__', '.git', '.arduino15', 'Arduino'}
+                
                 for item in sftp.listdir_attr(path):
                     if item.filename.startswith('.'): continue
+                    if item.filename in EXCLUDED_DIRS: continue
+                    
                     fp = f"{path}/{item.filename}"
                     if stat_mod.S_ISDIR(item.st_mode):
                         collect(fp, depth + 1)
                     elif item.filename.endswith(('.ino', '.cpp', '.c', '.h', '.py')):
+                        # Không lấy file trong thư mục libraries (lớp bảo vệ 2)
+                        if 'libraries/' in fp or 'node_modules/' in fp: continue
+                        
                         try:
                             with sftp.open(fp, 'r') as f:
+                                # Đọc tối đa 50k ký tự mỗi file
                                 content = f.read(50000).decode('utf-8', errors='replace')
-                            files_snapshot.append({'name': item.filename, 'path': fp.replace(home_dir, ''), 'content': content, 'size': item.st_size})
+                            files_snapshot.append({
+                                'name': item.filename, 
+                                'path': fp.replace(home_dir, ''), 
+                                'content': content, 
+                                'size': item.st_size
+                            })
                         except: pass
             except: pass
         collect(home_dir)

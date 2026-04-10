@@ -49,39 +49,34 @@ def grade_submission_with_ai(mission_description: str, mission_name: str, files:
     if not files_text.strip():
         files_text = "(Các file đều trống hoặc không đọc được)"
 
-    prompt = f"""Bạn là giảng viên Điện tử Viễn thông chấm bài lập trình nhúng/IoT cho sinh viên.
-Hãy chấm điểm CÔNG BẰNG và KHUYẾN KHÍCH - sinh viên đang học, chưa phải chuyên gia.
+    prompt = f"""Bạn là một giảng viên kỹ thuật chuyên nghiệp, giàu kinh nghiệm chấm bài lập trình ESP32/Arduino.
+Nhiệm vụ: Chấm điểm bài làm của sinh viên dựa trên yêu cầu đề bài một cách CHÍNH XÁC và KHUYẾN KHÍCH.
 
-## TÊN BÀI THI
-{mission_name}
+## TÊN BÀI THI: {mission_name}
 
-## ĐỀ BÀI YÊU CẦU
+## ĐỀ BÀI YÊU CẦU:
 {mission_description or '(Không có mô tả)'}
 
-## CODE BÀI LÀM CỦA SINH VIÊN
+## DANH SÁCH FILE BÀI LÀM:
 {files_text}
 
-## NGUYÊN TẮC CHẤM ĐIỂM:
-- Sinh viên viết được code CHẠY ĐƯỢC và ĐÚNG HƯỚNG → tối thiểu 4-5 điểm
-- Code đáp ứng phần lớn yêu cầu đề bài → 6-7 điểm
-- Code tốt, sáng tạo, xử lý tốt → 8-9 điểm
-- Hoàn hảo → 10 điểm
-- KHÔNG trừ nặng vì dùng delay() hay thiếu RTOS/ISR nếu đề bài không yêu cầu
-- Đánh giá dựa trên MỨC ĐỘ phù hợp trình độ sinh viên, KHÔNG đòi hỏi chuẩn công nghiệp
+## QUY TRÌNH CHẤM ĐIỂM (BẮT BUỘC):
+1. **Phân tích kỹ lưỡng**: Kiểm tra từng file, đặc biệt là file .ino hoặc main.cpp. 
+2. **Tìm kiếm bằng chứng**: Trước khi kết luận thiếu chức năng, hãy tìm các từ khóa liên quan (ví dụ: "DHT", "digitalWrite", "led", "buzzer", "xTaskCreate").
+3. **Đánh giá logic**: Đừng chỉ nhìn từ khóa, hãy xem logic xử lý (ví dụ: có đọc DHT xong rồi so sánh nhiệt độ để bật LED không?).
+4. **Công bằng**: Nếu sinh viên đã làm đúng logic cơ bản nhưng có lỗi nhỏ, vẫn nên cho điểm ở mức đạt (5-7 điểm). 
 
-## 5 TIÊU CHÍ CHẤM (0-10 điểm mỗi mục):
-1. **Đúng yêu cầu đề bài**: Code có thực hiện đúng những gì đề bài yêu cầu không? Đây là tiêu chí quan trọng nhất.
-2. **Chất lượng code**: Code có dễ đọc, có comment, đặt tên biến hợp lý không?
-3. **Logic và thuật toán**: Cách giải quyết bài toán có hợp lý không? Luồng chương trình có mạch lạc không?
-4. **Xử lý lỗi và ngoại lệ**: Có kiểm tra điều kiện biên, xử lý lỗi cơ bản không?
-5. **Sử dụng thư viện phù hợp**: Có dùng đúng thư viện cho phần cứng/giao thức yêu cầu không?
-
-Điểm tổng = trung bình cộng 5 tiêu chí, làm tròn 1 chữ số thập phân.
+## NGUYÊN TẮC ĐIỂM SỐ:
+- 0-3 điểm: Code lỗi nặng, không đúng hướng hoặc nộp file trống.
+- 4-5 điểm: Code chạy được mức cơ bản nhưng thiếu nhiều tính năng chính.
+- 6-7 điểm: Hoàn thành các tính năng chính, có thể thiếu phần bonus hoặc code chưa tối ưu.
+- 8-9 điểm: Hoàn thành tốt, code sạch, có xử lý lỗi, dùng kỹ thuật tốt (như RTOS, ngắt, debounce).
+- 10 điểm: Hoàn hảo, không có lỗi.
 
 TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
 {{
   "score": <float 0.0-10.0>,
-  "feedback": "<nhận xét ngắn gọn 2-3 câu bằng tiếng Việt, nêu điểm mạnh trước rồi mới góp ý cải thiện. Giọng điệu thân thiện, khuyến khích>",
+  "feedback": "<Nhận xét bằng tiếng Việt. BẮT BUỘC: Nêu rõ những gì sinh viên ĐÃ LÀM ĐƯỢC trước, sau đó mới chỉ ra những gì còn thiếu hoặc cần cải thiện. Thái độ thân thiện, mang tính xây dựng.>",
   "criteria": [
     {{"name": "Đúng yêu cầu đề bài", "score": <0-10>}},
     {{"name": "Chất lượng code", "score": <0-10>}},
@@ -110,7 +105,7 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
                 from google import genai
                 client = genai.Client(api_key=gemini_key)
                 response = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gemini-1.5-flash',
                     contents=prompt,
                 )
                 raw = response.text.strip()
