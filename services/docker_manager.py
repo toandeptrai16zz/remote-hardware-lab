@@ -230,7 +230,7 @@ exec /usr/sbin/sshd -D
     
     try:
         subprocess.run(docker_command, check=True, timeout=30)
-        time.sleep(3)
+        time.sleep(5)
         
         if os.path.exists(setup_script_path):
             os.remove(setup_script_path)

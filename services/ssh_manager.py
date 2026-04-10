@@ -37,10 +37,15 @@ def get_ssh_client(username_raw):
                 port=int(ssh_port), 
                 username=safe_username, 
                 password='password123', 
-                timeout=5
+                timeout=10,
+                banner_timeout=30,
+                allow_agent=False,
+                look_for_keys=False
             ) 
             return client
-        except Exception:
+        except Exception as e:
+            if i == 29: # Last attempt
+                logger.error(f"SSH Final Attempt Failed: {str(e)}")
             time.sleep(1)
     
-    raise Exception(f"KHONG THE KET NOI SSH TOI PORT {ssh_port} SAU 5 GIAY")
+    raise Exception(f"KHONG THE KET NOI SSH TOI PORT {ssh_port} SAU 30 GIAY")
