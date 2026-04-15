@@ -142,7 +142,7 @@ def main():
         logger.info("=" * 60)
         
         # Run with SocketIO
-        socketio.run(app, host="::", port=5000, debug=True)
+        socketio.run(app, host="::", port=5000, debug=True, use_reloader=False)
         
     except KeyboardInterrupt:
         logger.info("\n⏹️ Received keyboard interrupt")
