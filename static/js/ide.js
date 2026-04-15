@@ -1439,8 +1439,8 @@ async function submitActiveMission() {
         confirmButtonColor: '#7c6af7',
         cancelButtonText: 'Chưa, tiếp tục làm',
         confirmButtonText: 'Nộp bài ngay!',
-        backdrop: `rgba(255, 255, 255, 0.05)`,
-        customClass: { popup: 'swal-no-scroll', backdrop: 'swal-glass-backdrop' }
+        backdrop: `transparent`,
+        customClass: { popup: 'swal-no-scroll' }
     });
     if (!result.isConfirmed) return;
 
@@ -1456,8 +1456,8 @@ async function submitActiveMission() {
                 showConfirmButton: false,
                 background: '#1a1a2e',
                 color: '#e0e0e0',
-                backdrop: `rgba(255, 255, 255, 0.05)`,
-                customClass: { popup: 'swal-no-scroll', backdrop: 'swal-glass-backdrop' }
+                backdrop: `transparent`,
+                customClass: { popup: 'swal-no-scroll' }
             });
 
             // Poll chờ kết quả AI
@@ -1506,10 +1506,10 @@ async function submitActiveMission() {
                 } catch (e) { /* tiếp tục poll */ }
             }, 4000);
         } else {
-            Swal.fire({ icon: 'error', title: 'Lỗi', text: data.error || 'Không thể nộp bài', backdrop: `rgba(255, 255, 255, 0.05)`, customClass: { backdrop: 'swal-glass-backdrop' } });
+            Swal.fire({ icon: 'error', title: 'Lỗi', text: data.error || 'Không thể nộp bài', backdrop: `transparent` });
         }
     } catch (e) {
-        Swal.fire({ icon: 'error', title: 'Lỗi kết nối', text: 'Không thể liên hệ server', backdrop: `rgba(255, 255, 255, 0.05)`, customClass: { backdrop: 'swal-glass-backdrop' } });
+        Swal.fire({ icon: 'error', title: 'Lỗi kết nối', text: 'Không thể liên hệ server', backdrop: `transparent` });
     }
 }
 
