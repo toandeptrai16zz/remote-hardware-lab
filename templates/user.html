@@ -1,334 +1,256 @@
+{% extends "layout.html" %}
+
 {% block title %}CodeSpace IDE - {{ username }}{% endblock %}
 
-
-
 {% block extra_head %}
-
-<link
-    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
-    rel="stylesheet">
-
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
-
-<link rel="stylesheet" href="{{ url_for('static', filename='css/user_ide.css') }}">
-
-<style>
-    /* Hiệu ứng kính mờ (Glassmorphism) - phân tán nền đen hiệu quả của popup */
-    .swal-no-scroll,
-    .swal2-popup {
-        overflow: hidden !important;
-    }
-
-    .swal2-container {
-        background: rgba(255, 255, 255, 0.05) !important;
-        backdrop-filter: blur(10px) !important;
-        -webkit-backdrop-filter: blur(10px) !important;
-        z-index: 100000 !important;
-    }
-
-    .swal2-backdrop-show, .swal2-backdrop-hide {
-        background: transparent !important;
-    }
-</style>
-
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/user_ide.css') }}">
+    <style>
+        .swal-no-scroll, .swal2-popup { overflow: hidden !important; }
+        .swal2-container { background: rgba(255, 255, 255, 0.05) !important; backdrop-filter: blur(10px) !important; -webkit-backdrop-filter: blur(10px) !important; z-index: 100000 !important; }
+        .swal2-backdrop-show, .swal2-backdrop-hide { background: transparent !important; }
+    </style>
 {% endblock %}
-
-
-
 {% block content %}
-
-<div class="ide-container">
-
-    <div class="file-panel" id="filePanel">
-
-        <div class="panel-header"><i class="fas fa-folder-tree"></i><span>EXPLORER</span>
-
-            <div class="panel-actions">
-
-                <button class="file-btn" onclick="createNewItem('file')" title="Tạo File mới"><i
-                        class="fa-solid fa-file-circle-plus"></i></button>
-
-                <button class="file-btn" onclick="createNewItem('folder')" title="Tạo Thư mục"><i
-                        class="fa-solid fa-folder-plus"></i></button>
-
-                <button class="file-btn" onclick="refreshRootFiles()" title="Làm mới"><i class="fa-solid fa-rotate"
-                        id="refreshIcon"></i></button>
-
-            </div>
-
-        </div>
-
-        <div class="panel-content">
-            <ul class="file-tree" id="file-tree-root"></ul>
-        </div>
-
-    </div>
-
-    <div class="resizer" id="resizer"></div>
-
-    <div class="main-panel" id="mainPanel">
-
-        <div class="editor-header">
-
-            <div class="editor-tabs" id="editorTabs"></div>
-
-            <div class="editor-actions">
-
-                <button class="btn btn-sm btn-dark" onclick="toggleTerminal()" title="Bật/Tắt Terminal"
-                    style="border-color: #444;"><i class="fa-solid fa-terminal"></i></button>
-
-                <button id="btnMissions" class="btn btn-sm" onclick="toggleMissionsModal()" title="Xem Bài Thi"
-                    style="background:#f59e0b; color:#000; font-weight:bold; border:none; margin-left: 8px; position:relative;"><i
-                        class="fa-solid fa-layer-group"></i> <span style="margin-left:4px;">Missions</span><span
-                        id="missionsBadge"
-                        style="display:none;position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;font-size:0.65rem;min-width:16px;height:16px;border-radius:50%;display:none;align-items:center;justify-content:center;font-weight:700;"></span></button>
-
-                <!-- Countdown mini khi có bài thi đang diễn ra -->
-
-                <span id="miniExamBar"
-                    style="display:none;align-items:center;gap:6px;margin-left:8px;padding:3px 10px;background:linear-gradient(135deg,#1a0a2e,#0f1a2e);border:1px solid #7c6af7;border-radius:6px;font-size:0.78rem;color:#e0e0ff;">
-
-                    <span
-                        style="width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse-anim 2s infinite;"></span>
-
-                    <span id="miniExamName"
-                        style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-
-                    <span id="miniExamCountdown"
-                        style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#7c6af7;">00:00:00</span>
-
-                </span>
-
-                <span class="border-end" style="height: 20px;"></span>
-
-                <button class="btn btn-sm btn-success" onclick="compileCode(event)"><i
-                        class="fa-solid fa-hammer"></i><span style="margin-left: 4px;">Biên dịch
-                        (Compile)</span></button>
-
-                <button class="btn btn-sm btn-ide" onclick="saveCurrentFile()"><i class="fa-solid fa-save"></i><span
-                        style="margin-left: 4px;">Save</span></button>
-
-                <!-- Nút Nộp bài - chỉ hiện khi có bài đang diễn ra -->
-
-                <button id="btnSubmitMission" class="btn btn-sm"
-                    style="display:none;font-weight:bold;background:linear-gradient(135deg,#7c6af7,#a855f7);color:#fff;border:none;"
-                    onclick="submitActiveMission()"><i class="fa-solid fa-paper-plane"></i><span
-                        style="margin-left:4px;" id="txtSubmitMission">Nộp Bài</span></button>
-
-            </div>
-
-        </div>
-
-        <div class="editor-container" id="editorContainer">
-            <div id="editor"></div>
-        </div>
-
-        <div class="resizer-horizontal" id="resizerHorizontal"></div>
-
-        <div id="terminal-container">
-
-            <div class="terminal-header">
-
-                <span class="terminal-title">Terminal</span>
-
-                <div class="terminal-actions">
-
-                    <button class="terminal-btn" onclick="copyFromTerminal()" title="Copy Selection (Ctrl+Shift+C)"><i
-                            class="fa-solid fa-copy"></i></button>
-
-                    <button class="terminal-btn" onclick="pasteToTerminal()" title="Paste (Ctrl+Shift+V)"><i
-                            class="fa-solid fa-paste"></i></button>
-
-                    <button class="terminal-btn" onclick="clearTerminal()" title="Clear Terminal"><i
-                            class="fa-solid fa-ban"></i></button>
-
-                    <button class="terminal-btn" onclick="scrollToTop()" title="Scroll to Top"><i
-                            class="fa-solid fa-arrow-up"></i></button>
-
-                    <button class="terminal-btn" onclick="scrollToBottom()" title="Scroll to Bottom"><i
-                            class="fa-solid fa-arrow-down"></i></button>
-
+    <div class="ide-container">
+        <div class="file-panel" id="filePanel">
+            <div class="panel-header"><i class="fas fa-folder-tree"></i><span>EXPLORER</span>
+                <div class="panel-actions">
+                    <button class="file-btn" onclick="createNewItem('file')" title="Tạo File mới"><i class="fa-solid fa-file-circle-plus"></i></button>
+                    <button class="file-btn" onclick="createNewItem('folder')" title="Tạo Thư mục"><i class="fa-solid fa-folder-plus"></i></button>
+                    <button class="file-btn" onclick="refreshRootFiles()" title="Làm mới"><i class="fa-solid fa-rotate" id="refreshIcon"></i></button>
                 </div>
-
             </div>
-
-            <div id="terminal"></div>
-
+            <div class="panel-content"><ul class="file-tree" id="file-tree-root"></ul></div>
         </div>
-
-    </div>
-
-
-
-</div>
-
-
-
-<!-- Floating Serial Monitor Window -->
-
-<div id="serial-monitor-window" class="floating-window" style="display: none;">
-
-    <div class="floating-window-header" id="serialWindowHeader">
-
-        <span class="window-title">📡 Serial Monitor</span>
-
-        <div class="window-controls">
-
-            <button class="window-control-btn" onclick="minimizeSerialWindow()" title="Minimize"><i
-                    class="fa-solid fa-minus"></i></button>
-
-            <button class="window-control-btn" onclick="closeSerialWindow()" title="Close"><i
-                    class="fa-solid fa-times"></i></button>
-
-        </div>
-
-    </div>
-
-    <div class="floating-window-content">
-
-        <div class="serial-controls">
-
-            <select id="serial-port-select" class="form-select form-select-sm">
-
-                <option value="">Select Port...</option>
-
-            </select>
-
-            <select id="baud-rate-select" class="form-select form-select-sm">
-
-                <option value="9600">9600</option>
-
-                <option value="115200" selected>115200</option>
-
-                <option value="57600">57600</option>
-
-                <option value="38400">38400</option>
-
-                <option value="19200">19200</option>
-
-            </select>
-
-            <button id="connect-serial-btn" class="btn btn-sm btn-primary">▶️</button>
-
-            <button class="btn btn-sm btn-secondary" onclick="clearSerialOutput()" title="Clear"><i
-                    class="fa-solid fa-ban"></i></button>
-
-            <button class="btn btn-sm btn-secondary" onclick="copyFromSerialOutput()" title="Copy Selected Text"><i
-                    class="fa-solid fa-copy"></i></button>
-
-            <span id="serial-status" class="status-text">Disconnected</span>
-
-        </div>
-
-        <div id="serial-output" class="serial-output-area"></div>
-
-    </div>
-
-</div>
-
-
-
-
-
-<!-- (Virtual Lab AI IDE không còn dùng Port Modal vật lý) - by Chương -->
-
-
-
-
-
-<!-- Custom File Creation Modal -->
-
-<div class="file-creation-modal" id="fileCreationModal">
-
-    <div class="file-creation-content">
-
-        <div class="file-creation-header">
-
-            <h3 class="file-creation-title" id="fileCreationTitle">
-
-                <i class="fa-solid fa-file-plus"></i>
-
-                Tạo file mới
-
-            </h3>
-
-            <p class="file-creation-subtitle" id="fileCreationSubtitle">Nhập tên file và chọn vị trí lưu trữ</p>
-
-        </div>
-
-        <div class="file-creation-form">
-
-            <div class="file-creation-input-group">
-
-                <label class="file-creation-label" for="fileNameInput">Tên file</label>
-
-                <input type="text" id="fileNameInput" class="file-creation-input"
-                    placeholder="Nhập tên file (ví dụ: main.cpp)" autocomplete="off">
-
+        <div class="resizer" id="resizer"></div>
+        <div class="main-panel" id="mainPanel">
+            <div class="editor-header">
+                <div class="editor-tabs" id="editorTabs"></div>
+                <div class="editor-actions">
+                    <button class="btn btn-sm btn-dark" onclick="toggleTerminal()" title="Bật/Tắt Terminal" style="border-color: #444;"><i class="fa-solid fa-terminal"></i></button>
+                    <button id="btnMissions" class="btn btn-sm" onclick="toggleMissionsModal()" title="Xem Bài Thi" style="background:#f59e0b; color:#000; font-weight:bold; border:none; margin-left: 8px; position:relative;"><i class="fa-solid fa-layer-group"></i> <span style="margin-left:4px;">Missions</span><span id="missionsBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;font-size:0.65rem;min-width:16px;height:16px;border-radius:50%;display:none;align-items:center;justify-content:center;font-weight:700;"></span></button>
+                    <!-- Countdown mini khi có bài thi đang diễn ra -->
+                    <span id="miniExamBar" style="display:none;align-items:center;gap:6px;margin-left:8px;padding:3px 10px;background:linear-gradient(135deg,#1a0a2e,#0f1a2e);border:1px solid #7c6af7;border-radius:6px;font-size:0.78rem;color:#e0e0ff;">
+                        <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse-anim 2s infinite;"></span>
+                        <span id="miniExamName" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+                        <span id="miniExamCountdown" style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#7c6af7;">00:00:00</span>
+                    </span>
+                    <span class="border-end" style="height: 20px;"></span>
+                    <button class="btn btn-sm btn-success" onclick="compileCode(event)"><i class="fa-solid fa-hammer"></i><span style="margin-left: 4px;">Biên dịch (Compile)</span></button>
+                    <button class="btn btn-sm btn-ide" onclick="saveCurrentFile()"><i class="fa-solid fa-save"></i><span style="margin-left: 4px;">Save</span></button>
+                    <!-- Nút Nộp bài - chỉ hiện khi có bài đang diễn ra -->
+                    <button id="btnSubmitMission" class="btn btn-sm" style="display:none;font-weight:bold;background:linear-gradient(135deg,#7c6af7,#a855f7);color:#fff;border:none;" onclick="submitActiveMission()"><i class="fa-solid fa-paper-plane"></i><span style="margin-left:4px;" id="txtSubmitMission">Nộp Bài</span></button>
+                </div>
             </div>
+            <div class="editor-container" id="editorContainer"><div id="editor"></div></div>
+            <div class="resizer-horizontal" id="resizerHorizontal"></div>
+            <div id="terminal-container">
+                <div class="terminal-header">
+                    <span class="terminal-title">Terminal</span>
+                    <div class="terminal-actions">
+                        <button class="terminal-btn" onclick="copyFromTerminal()" title="Copy Selection (Ctrl+Shift+C)"><i class="fa-solid fa-copy"></i></button>
+                        <button class="terminal-btn" onclick="pasteToTerminal()" title="Paste (Ctrl+Shift+V)"><i class="fa-solid fa-paste"></i></button>
+                        <button class="terminal-btn" onclick="clearTerminal()" title="Clear Terminal"><i class="fa-solid fa-ban"></i></button>
+                        <button class="terminal-btn" onclick="scrollToTop()" title="Scroll to Top"><i class="fa-solid fa-arrow-up"></i></button>
+                        <button class="terminal-btn" onclick="scrollToBottom()" title="Scroll to Bottom"><i class="fa-solid fa-arrow-down"></i></button>
+                    </div>
+                </div>
+                <div id="terminal"></div>
+            </div>
+        </div>
 
         </div>
 
-        <div class="file-creation-actions">
-
-            <button class="file-creation-btn secondary" onclick="closeFileCreationModal()">Hủy</button>
-
-            <button class="file-creation-btn primary" id="createFileBtn" onclick="confirmFileCreation()">
-
-                <i class="fa-solid fa-plus"></i> Tạo
-
-            </button>
-
-        </div>
-
+        <!-- Floating Serial Monitor Window -->
+        <div id="serial-monitor-window" class="floating-window" style="display: none;">
+            <div class="floating-window-header" id="serialWindowHeader">
+                <span class="window-title">📡 Serial Monitor</span>
+                <div class="window-controls">
+                    <button class="window-control-btn" onclick="minimizeSerialWindow()" title="Minimize"><i class="fa-solid fa-minus"></i></button>
+                    <button class="window-control-btn" onclick="closeSerialWindow()" title="Close"><i class="fa-solid fa-times"></i></button>
+                </div>
+            </div>
+            <div class="floating-window-content">
+                <div class="serial-controls">
+                    <select id="serial-port-select" class="form-select form-select-sm">
+                        <option value="">Select Port...</option>
+                    </select>
+                    <select id="baud-rate-select" class="form-select form-select-sm">
+                        <option value="9600">9600</option>
+                        <option value="115200" selected>115200</option>
+                        <option value="57600">57600</option>
+                        <option value="38400">38400</option>
+                        <option value="19200">19200</option>
+                    </select>
+                    <button id="connect-serial-btn" class="btn btn-sm btn-primary">▶️</button>
+                    <button class="btn btn-sm btn-secondary" onclick="clearSerialOutput()" title="Clear"><i class="fa-solid fa-ban"></i></button>
+                    <button class="btn btn-sm btn-secondary" onclick="copyFromSerialOutput()" title="Copy Selected Text"><i class="fa-solid fa-copy"></i></button>
+                    <span id="serial-status" class="status-text">Disconnected</span>
+                </div>
+                <div id="serial-output" class="serial-output-area"></div>
+            </div>
     </div>
 
-</div>
+    
+    <!-- (Virtual Lab AI IDE không còn dùng Port Modal vật lý) - by Chương -->
 
 
+    <!-- Custom File Creation Modal -->
+    <div class="file-creation-modal" id="fileCreationModal">
+        <div class="file-creation-content">
+            <div class="file-creation-header">
+                <h3 class="file-creation-title" id="fileCreationTitle">
+                    <i class="fa-solid fa-file-plus"></i>
+                    Tạo file mới
+                </h3>
+                <p class="file-creation-subtitle" id="fileCreationSubtitle">Nhập tên file và chọn vị trí lưu trữ</p>
+            </div>
+            <div class="file-creation-form">
+                <div class="file-creation-input-group">
+                    <label class="file-creation-label" for="fileNameInput">Tên file</label>
+                    <input 
+                        type="text" 
+                        id="fileNameInput" 
+                        class="file-creation-input" 
+                        placeholder="Nhập tên file (ví dụ: main.cpp)"
+                        autocomplete="off"
+                    >
+                </div>
+            </div>
+            <div class="file-creation-actions">
+                <button class="file-creation-btn secondary" onclick="closeFileCreationModal()">Hủy</button>
+                <button class="file-creation-btn primary" id="createFileBtn" onclick="confirmFileCreation()">
+                    <i class="fa-solid fa-plus"></i> Tạo
+                </button>
+            </div>
+        </div>
+    </div>
 
 <div class="file-creation-modal" id="renameModal">
-
-    <div class="file-creation-content">
-
-        <div class="file-creation-header">
-
-            <h3 class="file-creation-title">
-
-                <i class="fa-solid fa-pen-to-square"></i> Đổi tên
-
-            </h3>
-
-        </div>
-
-        <div class="file-creation-form">
-
-            <div class="file-creation-input-group">
-
-                <label class="file-creation-label">Nhập tên mới</label>
-
-                <input type="text" id="renameInput" class="file-creation-input" autocomplete="off">
-
+        <div class="file-creation-content">
+            <div class="file-creation-header">
+                <h3 class="file-creation-title">
+                    <i class="fa-solid fa-pen-to-square"></i> Đổi tên
+                </h3>
             </div>
-
+            <div class="file-creation-form">
+                <div class="file-creation-input-group">
+                    <label class="file-creation-label">Nhập tên mới</label>
+                    <input type="text" id="renameInput" class="file-creation-input" autocomplete="off">
+                </div>
+            </div>
+            <div class="file-creation-actions">
+                <button class="file-creation-btn secondary" onclick="closeRenameModal()">Hủy</button>
+                <button class="file-creation-btn primary" id="confirmRenameBtn" onclick="performRename()">Lưu</button>
+            </div>
         </div>
-
-        <div class="file-creation-actions">
-
-            <button class="file-creation-btn secondary" onclick="closeRenameModal()">Hủy</button>
-
-            <button class="file-creation-btn primary" id="confirmRenameBtn" onclick="performRename()">Lưu</button>
-
-        </div>
-
     </div>
-
+    <!-- Custom Unsaved Changes Modal -->
+    <div class="unsaved-changes-modal" id="unsavedChangesModal">
+    <div class="unsaved-changes-content">
+        <div class="unsaved-changes-header">
+            <h3 class="unsaved-changes-title">
+                <i class="fa-solid fa-exclamation-triangle"></i>
+                Thay đổi chưa lưu
+            </h3>
+            <p class="unsaved-changes-message" id="unsavedChangesMessage">Bạn có thay đổi chưa lưu. Đóng file này?</p>
+        </div>
+        <div class="unsaved-changes-actions">
+            <button class="unsaved-changes-btn secondary" onclick="cancelCloseFile()">Hủy</button>
+            <button class="unsaved-changes-btn primary" onclick="confirmCloseFile()">Đóng file</button>
+        </div>
+    </div>
 </div>
 
-<!-- Custom Unsaved Changes Modal -->
-
-<div class="unsaved-changes-modal" id="unsavedChangesModal">
-
+<div class="unsaved-changes-modal" id="deleteConfirmationModal" style="display: none;">
     <div class="unsaved-changes-content">
-
         <div class="unsaved-changes-header">
+            <h3 class="unsaved-changes-title" style="color: #f85149;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                Xác nhận Xóa
+            </h3>
+            <p class="unsaved-changes-message" id="deleteConfirmationMessage">Bạn có chắc chắn muốn xóa file này?</p>
+        </div>
+        <div class="unsaved-changes-actions">
+            <button class="unsaved-changes-btn secondary" onclick="cancelDelete()">Hủy</button>
+            <button class="unsaved-changes-btn primary" id="confirmDeleteBtn" onclick="confirmDelete()">Xóa</button>
+        </div>
+    </div>
+</div>
+<div class="toast-container" id="toastContainer"></div>
+<div class="context-menu" id="contextMenu"></div>
+<input type="file" id="fileUploadInput" multiple hidden onchange="handleFileUpload(this.files)">
+{% endblock %}
+{% block scripts %}
+    <script>
+        window.currentUsername = "{{ username }}";
+        window.userMissionsUrl = "{{ url_for('user.user_missions_page') }}?embed=1";
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.33.0/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.33.0/ext-language_tools.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.33.0/ext-modelist.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+
+    <script>
+        const DOM = {
+        filePanel: document.getElementById('filePanel'),
+        resizer: document.getElementById('resizer'),
+        mainPanel: document.getElementById('mainPanel'),
+        editorContainer: document.getElementById('editorContainer'),
+        terminalContainer: document.getElementById('terminal-container'),
+        resizerHorizontal: document.getElementById('resizerHorizontal'),
+        editorTabs: document.getElementById('editorTabs'),
+        fileTreeRoot: document.getElementById('file-tree-root'),
+        refreshIcon: document.getElementById('refreshIcon'),
+        contextMenu: document.getElementById('contextMenu'),
+        saveButton: document.querySelector('.btn-ide span'),
+        fileUploadInput: document.getElementById('fileUploadInput'),
+        toastContainer: document.getElementById('toastContainer'),
+        toastContainer: document.getElementById('toastContainer'),
+        fileCreationModal: document.getElementById('fileCreationModal'),
+        fileNameInput: document.getElementById('fileNameInput'),
+        createFileBtn: document.getElementById('createFileBtn'),
+        fileCreationTitle: document.getElementById('fileCreationTitle'),
+        fileCreationSubtitle: document.getElementById('fileCreationSubtitle'),
+        unsavedChangesModal: document.getElementById('unsavedChangesModal'),
+        unsavedChangesMessage: document.getElementById('unsavedChangesMessage'),
+        
+        // Modal Xóa
+        deleteConfirmationModal: document.getElementById('deleteConfirmationModal'),
+        deleteConfirmationMessage: document.getElementById('deleteConfirmationMessage'),
+
+        // Modal Đổi tên (Thêm mới)
+        renameModal: document.getElementById('renameModal'),
+        renameInput: document.getElementById('renameInput'),
+        confirmRenameBtn: document.getElementById('confirmRenameBtn')
+    };
+
+
+    </script>
+    <script src="{{ url_for('static', filename='js/ide.js') }}?v=1.4"></script>
+    <!-- Logic bóc tách bởi Chương -->
+    </script>
+
+    <!-- Missions Modal Container -->
+    <div id="missions-modal-wrapper" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(4px); z-index:9999; flex-direction:column; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-surface, #13131a); width:95vw; max-width:1300px; height:90vh; border-radius:12px; border:1px solid #333; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 10px 40px rgba(0,0,0,0.6);">
+            <div style="padding:12px 20px; background:linear-gradient(90deg, #1a0a2e, #0f1a2e); border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; font-size:1.1rem; color:#e8e8f0; font-weight:600;"><i class="fa-solid fa-graduation-cap" style="color:#7c6af7; margin-right:8px;"></i> Các Bài Tập & Bài Thi</h3>
+                <button onclick="toggleMissionsModal()" style="background:none; border:none; color:#8888a8; font-size:1.4rem; cursor:pointer; line-height:1; transition:color 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#8888a8'"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="flex:1; position:relative; background:#0a0a0f;">
+                <!-- Iframe tải ngầm ngay lập tức để duy trì Timer Auto-Submit của bài thi -->
+                <iframe id="missions-iframe" src="{{ url_for('user.user_missions_page') }}?embed=1" style="width:100%; height:100%; border:none; display:none;" allow="fullscreen" onload="document.getElementById('missions-iframe-loader').style.display='none'; this.style.display='block';"></iframe>
+                <div id="missions-iframe-loader" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#8888a8; gap:10px;">
+                    <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>
+                    <span>Đang tải dữ liệu bài thi...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %} 
