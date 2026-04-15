@@ -182,6 +182,7 @@ if command -v arduino-cli &> /dev/null; then
         arduino-cli config init &>/dev/null || true
         arduino-cli config add board_manager.additional_urls https://dl.espressif.com/dl/package_esp32_index.json &>/dev/null || true
         arduino-cli core update-index &>/dev/null
+        arduino-cli core uninstall esp32:esp32 &>/dev/null || true
         arduino-cli core install esp32:esp32@2.0.17 &>/dev/null
     fi
     
