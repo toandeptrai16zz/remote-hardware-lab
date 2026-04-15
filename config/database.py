@@ -3,28 +3,34 @@ Database configuration and initialization
 """
 import os
 import mysql.connector
+from mysql.connector import pooling
 import logging
 from werkzeug.security import generate_password_hash
 
 logger = logging.getLogger(__name__)
 
-def get_db_connection():
-    """Get MySQL database connection"""
-    try:
-        db_user = os.getenv('DB_USER', 'chuongdev_admin')
-        db_password = os.getenv('DB_PASSWORD', 'Chuong2004@')
-        db_database = os.getenv('DB_DATABASE', 'flask_app')
-        db_host = os.getenv('DB_HOST', 'localhost')
+# Global connection pool caching
+_db_pool = None
 
-        return mysql.connector.connect(
-            host=db_host, 
-            user=db_user, 
-            password=db_password, 
-            database=db_database, 
-            autocommit=True
-        )
+def get_db_connection():
+    """Get MySQL database connection from the Connection Pool"""
+    global _db_pool
+    try:
+        if _db_pool is None:
+            logger.info("Initializing MySQL Connection Pool (size=15)...")
+            _db_pool = pooling.MySQLConnectionPool(
+                pool_name="epu_tech_pool",
+                pool_size=15,
+                pool_reset_session=True,
+                host=os.getenv('DB_HOST', 'localhost'),
+                user=os.getenv('DB_USER', 'chuongdev_admin'),
+                password=os.getenv('DB_PASSWORD', 'Chuong2004@'),
+                database=os.getenv('DB_DATABASE', 'flask_app'),
+                autocommit=True
+            )
+        return _db_pool.get_connection()
     except Exception as e:
-        logger.error(f"DATABASE CONNECTION ERROR: {e}")
+        logger.error(f"DATABASE POOL CONNECTION ERROR: {e}")
         return None
 
 def init_db():

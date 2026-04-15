@@ -16,18 +16,10 @@ from .docker_manager import (
 )
 from .ssh_manager import get_ssh_client
 from .arduino import (
-    compile_sketch, perform_upload_worker,
-    get_serial_ports, 
+    compile_sketch,
     analyze_compile_errors,      # Hàm mới
     get_upload_error_suggestions # Hàm mới thay thế cho analyze_upload_errors
 )
-
-# Import module USB sync mới
-try:
-    from .docker_usb_sync import handle_usb_rescan
-except ImportError:
-    # Fallback nếu chưa có file docker_usb_sync (tránh lỗi import loop)
-    pass
 
 __all__ = [
     # Security
@@ -49,11 +41,7 @@ __all__ = [
     'get_ssh_client',
     
     # Arduino
-    'compile_sketch', 'perform_upload_worker',
-    'get_serial_ports', 
+    'compile_sketch',
     'analyze_compile_errors',
-    'get_upload_error_suggestions',
-
-    # USB Sync
-    'handle_usb_rescan'
+    'get_upload_error_suggestions'
 ]

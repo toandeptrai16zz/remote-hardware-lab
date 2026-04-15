@@ -33,8 +33,8 @@ from sockets import (
     register_upload_status_handlers
 )
 
-# Import background services
-from services.background_services import init_background_services, stop_background_services
+# Import background services (Removed for Virtual Assessment architecture)
+# from services.background_services import init_background_services, stop_background_services
 
 # Mute requests warnings
 # (handled above)
@@ -107,9 +107,9 @@ def cleanup_on_exit(signum=None, frame=None):
     """Cleanup handler for graceful shutdown"""
     logger.info("🛑 Shutting down application...")
 
-    # Stop background services
-    if 'background_services' in globals() and background_services:
-        stop_background_services()
+    # Stop background services (Disabled logic)
+    # if 'background_services' in globals() and background_services:
+    #     stop_background_services()
 
     logger.info("✅ Application shutdown complete")
 

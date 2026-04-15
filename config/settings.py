@@ -38,30 +38,10 @@ DEFAULT_ARDUINO_LIBRARIES = [
     "ArduinoJson"
 ]
 
-# Internal API secret for hardware events
-INTERNAL_API_SECRET = 'yiehfoie9f5feifh'
-
-# Hidden system files that should not be shown to users
-HIDDEN_SYSTEM_FILES = {
-    "setup_container.sh",
-    "startup.sh",
-    ".bashrc",
-    ".profile",
-    ".bash_logout",
-    ".local",
-    ".cache",
-    ".config",
-    ".wget-hsts",
-    ".sudo_as_admin_successful",
-    "Arduino",
-    ".arduino15",
-    "sketchbook"
+# System constants for Docker Environments
+SYSTEM_CONFIG = {
+    'BASE_SSH_PORT': int(os.getenv('BASE_SSH_PORT', 2000)),
+    'MAX_WORKSPACE_FILE_SIZE': 5242880,  # 5MB
+    'AI_GRADER_TIMEOUT': 45,             # seconds
 }
 
-# Device ID mapping for hardware identification
-DEVICE_ID_MAP = {
-    "1a86:7523": {"type": "CH340/CH341", "tag_prefix": "USB-SERIAL-CH340"},
-    "10c4:ea60": {"type": "CP2102", "tag_prefix": "USB-UART-CP2102"},
-    "0403:6001": {"type": "FTDI", "tag_prefix": "FTDI-Device"},
-    "2341:0043": {"type": "Arduino Uno", "tag_prefix": "Arduino-Uno"},
-}

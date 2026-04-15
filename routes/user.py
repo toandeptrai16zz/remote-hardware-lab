@@ -17,6 +17,7 @@ from services import (
 from config.database import get_db_connection
 from services.ai_grader import grade_submission_with_ai
 from utils.helpers import slugify_vn
+from services.workspace_manager import list_workspace_files, load_workspace_file, save_workspace_file
 
 user_bp = Blueprint('user', __name__, url_prefix='/user')
 
@@ -51,53 +52,28 @@ def user_workspace(username):
 def list_files_api(username):
     """API to list files in directory"""
     safe_username = make_safe_name(username)
-    
-    if session['username'] != username: 
+    if session.get('username') != username: 
         return jsonify(error="Unauthorized"), 403
     
     path = request.json.get("path", ".")
-    
-    # Validate path
     if '..' in path or path.startswith('/'): 
         return jsonify(error="Invalid path"), 400
     
     try:
+        from services.ssh_manager import get_ssh_client
         client = get_ssh_client(username)
         sftp = client.open_sftp()
         
-        base_path = os.path.join("/home", safe_username, path)
-        
-        files = []
-        try:
-            dir_items = sftp.listdir_attr(base_path)
-        except FileNotFoundError:
-            return jsonify(error="Directory not found"), 404
-            
-        for attr in dir_items:
-            filename = attr.filename
-            
-            # Filter hidden/system/glitch files
-            if filename.startswith('.'):
-                continue
-                
-            # Hide specific config files and folders with colons (usually FQBN glitch folders)
-            if filename in HIDDEN_SYSTEM_FILES or ':' in filename:
-                continue
-
-            files.append({
-                'name': filename, 
-                'is_dir': stat.S_ISDIR(attr.st_mode), 
-                'size': attr.st_size, 
-                'modified': attr.st_mtime
-            })
+        result = list_workspace_files(username, safe_username, sftp, path)
         
         sftp.close()
         client.close()
         
-        # Sort: folders first
-        files.sort(key=lambda x: (not x['is_dir'], x['name']))
-        
-        return jsonify(files=files, path=path)
+        if result["success"]:
+            return jsonify(files=result["files"], path=result["path"])
+        else:
+            status_code = result.get("status_code", 500)
+            return jsonify(error=result["error"]), status_code
 
     except Exception as e:
         from flask import current_app
@@ -322,17 +298,20 @@ def load_file_api(username):
         return jsonify(success=False, error="Invalid file path"), 400
 
     try:
+        from services.ssh_manager import get_ssh_client
         client = get_ssh_client(username)
         sftp = client.open_sftp()
         
-        filepath = os.path.join(home_dir, path, filename)
+        result = load_workspace_file(username, safe_username, sftp, path, filename)
         
-        with sftp.open(filepath, 'r') as f: 
-            content = f.read().decode('utf-8', errors='ignore')
-            
         sftp.close()
         client.close()
-        return jsonify(success=True, content=content)
+        
+        if result["success"]:
+            return jsonify(success=True, content=result["content"])
+        else:
+            status_code = result.get("status_code", 500)
+            return jsonify(success=False, error=result["error"]), status_code
     except Exception as e: 
         return jsonify(success=False, error=str(e)), 500
 
@@ -355,18 +334,23 @@ def save_file_api(username):
         return jsonify(success=False, error="Invalid file path"), 400
 
     try:
+        from services.ssh_manager import get_ssh_client
         client = get_ssh_client(username)
         sftp = client.open_sftp()
         
-        filepath = os.path.normpath(os.path.join(home_dir, path, filename))
+        result = save_workspace_file(username, safe_username, sftp, path, filename, content)
         
-        with sftp.open(filepath, 'w') as f: 
-            f.write(content)
-            
         sftp.close()
         client.close()
-        log_action(username, f"Save file: {filepath}")
-        return jsonify(success=True)
+        
+        if result["success"]:
+            from services import log_action
+            log_action(username, f"Save file via service: {filename}")
+            return jsonify(success=True)
+        else:
+            status_code = result.get("status_code", 500)
+            return jsonify(success=False, error=result["error"]), status_code
+            
     except Exception as e: 
         from flask import current_app
         current_app.logger.error(f"Save Error for {username}: {e} (Path: {path}, File: {filename})")
