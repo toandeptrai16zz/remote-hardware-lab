@@ -5,6 +5,7 @@ let uploadPath = '.';     // Thieu Dinh Nghia Ham (DA FIX - by CHUONG)
 let selectedTreeItem = null;
 let selectedPort = null;
 let availablePorts = [];
+let isSystemChange = false; // Cờ toàn cục chặn false-positive khi Editor tự setValue - by Chương
 const username = window.currentUsername;
 
 // File creation modal state
@@ -224,7 +225,7 @@ function setupEditor() {
         showPrintMargin: false,
         wrap: true,
     });
-let isSystemChange = false;
+
 
     editor.on("change", () => {
         if (isSystemChange) return;
