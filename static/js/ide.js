@@ -1213,7 +1213,12 @@ async function compileCode(event) {
     let boardFqbn = boardSelector ? boardSelector.value : 'arduino:avr:uno';
     if (editor && editor.getValue) {
         const codeContent = editor.getValue();
-        const esp32Keywords = ['freertos', 'WiFi.h', 'ESP32', 'xTaskCreate', 'xQueue', 'TaskHandle_t', 'QueueHandle_t', 'vTaskDelay', 'portMAX_DELAY'];
+        const esp32Keywords = [
+            'freertos', 'WiFi.h', 'ESP32', 'xTaskCreate', 'xQueue', 
+            'TaskHandle_t', 'QueueHandle_t', 'vTaskDelay', 'portMAX_DELAY',
+            'ledcSetup', 'ledcAttachPin', 'ledcWrite', 'ledcRead',
+            'analogSetWidth', 'analogReadResolution', 'sigmaDeltaSetup'
+        ];
         if (esp32Keywords.some(kw => codeContent.includes(kw))) {
             boardFqbn = 'esp32:esp32:esp32';
         }
