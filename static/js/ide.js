@@ -168,10 +168,10 @@ async function confirmFileCreation() {
 // =================================================================
 function saveIDEState() {
     try {
-        const openFileKeys = Array.from(openFiles.keys()).filter(key => key !== 'Welcome');
+        const openFileKeys = Array.from(openFiles.keys()).filter(key => key !== 'WELCOME.txt');
         const state = {
             openFileKeys: openFileKeys,
-            currentFileKey: (currentFile !== 'Welcome' ? currentFile : null)
+            currentFileKey: (currentFile !== 'WELCOME.txt' ? currentFile : null)
         };
         localStorage.setItem(`codeSpaceState_${username}`, JSON.stringify(state));
     } catch (e) {
@@ -1031,11 +1031,19 @@ async function handleFileUpload(files) {
 }
 
 function openWelcomeTab() {
-    const content = `// Welcome to CodeSpace IDE!\n// Features:\n// - Full terminal support with copy/paste\n// - Scrollable terminal with mouse wheel\n// - Context menus\n// - File management\n// - Arduino/ESP compilation\n\nconsole.log("Happy Coding!");`;
-    if (!openFiles.has('Welcome')) {
-        openFiles.set('Welcome', { content, saved: true, shortName: 'Welcome', path: '.' });
+    const content = `================================================================
+HE THONG THUC HANH IOT - EPU TECH
+================================================================
+[+] USER: ${username}
+[+] TRANG THAI: SAN SANG (Connected)
+[+] PHAN CUNG HO TRO: ESP32 , ESP8266, ARDUINO
+[+] TAT CA CAC THU VIEN CO BAN CAN THIET (LCD, DHT, MQTT...)
+[+] HE THONG PHAT TRIEN BOI: EPU TECH TEAM 
+[+] HE THONG TRONG GIAI DOAN PHAT TRIEN`;
+    if (!openFiles.has('WELCOME.txt')) {
+        openFiles.set('WELCOME.txt', { content, saved: true, shortName: 'WELCOME.txt', path: 'WELCOME.txt' });
     }
-    switchToFile('Welcome');
+    switchToFile('WELCOME.txt');
 }
 
 async function openFile(fullPath, shortName, autoSwitch = true) {
@@ -1085,7 +1093,7 @@ function renderTabs() {
         tab.title = key;
         tab.innerHTML = `<span>${data.shortName}${data.saved ? '' : ' •'}</span>`;
         tab.onclick = () => switchToFile(key);
-        if (key !== 'Welcome') {
+        if (key !== 'WELCOME.txt') {
             const closeIcon = document.createElement('i');
             closeIcon.className = 'fa-solid fa-times close-icon';
             closeIcon.onclick = (e) => closeTab(e, key);
@@ -1153,7 +1161,7 @@ function performCloseTab(fullPathKey) {
 }
 
 async function saveCurrentFile() {
-    if (!currentFile || currentFile === 'Welcome') return;
+    if (!currentFile || currentFile === 'WELCOME.txt') return;
     const fileData = openFiles.get(currentFile);
     if (!fileData || fileData.saved) return;
     const content = editor.getValue();
@@ -1186,7 +1194,7 @@ async function compileCode(event) {
         compileBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Đang xử lý...`;
     }
 
-    if (!currentFile || currentFile === 'Welcome') {
+    if (!currentFile || currentFile === 'WELCOME.txt') {
         showNotification('Vui lòng mở một file .ino để biên dịch!', 'error');
         if (compileBtn) {
             compileBtn.disabled = false;
