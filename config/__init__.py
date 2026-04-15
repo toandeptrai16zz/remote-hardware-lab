@@ -8,9 +8,8 @@ __all__ = [
     'SECURITY_CONFIG',
     'EMAIL_CONFIG', 
     'DEFAULT_ARDUINO_LIBRARIES',
-    'INTERNAL_API_SECRET',
+    'SYSTEM_CONFIG',
     'HIDDEN_SYSTEM_FILES',
-    'DEVICE_ID_MAP',
     'get_db_connection',
     'init_db'
 ]

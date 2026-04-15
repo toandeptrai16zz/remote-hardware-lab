@@ -45,3 +45,20 @@ SYSTEM_CONFIG = {
     'AI_GRADER_TIMEOUT': 45,             # seconds
 }
 
+# Các file hệ thống bị ẩn không cho người dùng thấy - by Chương
+HIDDEN_SYSTEM_FILES = {
+    "setup_container.sh",
+    "startup.sh",
+    ".bashrc",
+    ".profile",
+    ".bash_logout",
+    ".local",
+    ".cache",
+    ".config",
+    ".wget-hsts",
+    ".sudo_as_admin_successful",
+    "Arduino",
+    ".arduino15",
+    "sketchbook"
+}
+
