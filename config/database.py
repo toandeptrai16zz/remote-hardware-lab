@@ -1,5 +1,5 @@
 """
-Database configuration and initialization
+Cấu hình và khởi tạo CSDL - by Chương
 """
 import os
 import mysql.connector
@@ -9,11 +9,11 @@ from werkzeug.security import generate_password_hash
 
 logger = logging.getLogger(__name__)
 
-# Global connection pool caching
+# Bộ nhớ đệm Global cho Pool kết nối - by Chương
 _db_pool = None
 
 def get_db_connection():
-    """Get MySQL database connection from the Connection Pool"""
+    """Lấy kết nối MySQL từ Connection Pool - by Chương"""
     global _db_pool
     try:
         if _db_pool is None:
@@ -34,14 +34,14 @@ def get_db_connection():
         return None
 
 def init_db():
-    """Initialize database tables and default admin user"""
+    """Khởi tạo cấu trúc bảng CSDL và tạo user Admin mặc định - by Chương"""
     db = get_db_connection()
     if not db: 
         return
         
     cur = db.cursor()
     
-    # Create users table
+    # Tạo bảng users - by Chương
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY, 
@@ -57,7 +57,7 @@ def init_db():
         )
     """)
     
-    # Create hardware_devices table
+    # Tạo bảng hardware_devices (thiết bị phần cứng) - by Chương
     cur.execute("""
         CREATE TABLE IF NOT EXISTS hardware_devices (
             id INT AUTO_INCREMENT PRIMARY KEY, 
@@ -70,7 +70,7 @@ def init_db():
         )
     """)
     
-    # Create logs table
+    # Tạo bảng logs ghi log hệ thống - by Chương
     cur.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id INT AUTO_INCREMENT PRIMARY KEY, 
@@ -84,7 +84,7 @@ def init_db():
         )
     """)
     
-    # Create device_assignments table
+    # Tạo bảng phân công thiết bị device_assignments - by Chương
     cur.execute("""
         CREATE TABLE IF NOT EXISTS device_assignments (
             id INT AUTO_INCREMENT PRIMARY KEY, 
@@ -98,9 +98,9 @@ def init_db():
         )
     """)
     
-    # --------- EXAM & MISSION TABLES ---------
+    # --------- BẢNG QUẢN LÝ BÀI THI & NHIỆM VỤ - by Chương ---------
     
-    # Create missions table
+    # Tạo bảng missions - by Chương
     cur.execute("""
         CREATE TABLE IF NOT EXISTS missions (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -115,7 +115,7 @@ def init_db():
         )
     """)
     
-    # Create mission assignments table
+    # Tạo bảng phân công bài kiểm tra mission_assignments - by Chương
     cur.execute("""
         CREATE TABLE IF NOT EXISTS mission_assignments (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -128,7 +128,7 @@ def init_db():
         )
     """)
     
-    # Create submissions table
+    # Tạo bảng lưu bài nộp submissions - by Chương
     cur.execute("""
         CREATE TABLE IF NOT EXISTS submissions (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -146,7 +146,7 @@ def init_db():
         )
     """)
     
-    # Create default admin user if not exists
+    # Tạo user Admin mặc định nếu chưa tồn tại - by Chương
     cur.execute("SELECT id FROM users WHERE username='admin'")
     if not cur.fetchone():
         hashed_password = generate_password_hash('admin123@')

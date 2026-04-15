@@ -1,6 +1,6 @@
 """
-Flask-Kerberos-Demo - EPU Tech IoT Lab Management System
-Main application entry point
+Hệ thống Quản lý IoT Lab - by Chương
+Tệp tin khởi chạy chính - by Chương
 """
 import os
 import secrets
@@ -13,37 +13,36 @@ from prometheus_client import make_wsgi_app
 from flask_socketio import SocketIO
 from dotenv import load_dotenv
 
-# Load environment variables
+# Tải các biến môi trường - by Chương
 basedir = os.path.abspath(os.path.dirname(__file__))
 env_path = os.path.join(basedir, '.env')
 load_dotenv(env_path)
 
-# Import configurations
+# Import các cấu hình - by Chương
 from config import init_db
 
-# Import routes
+# Gọi các module điều hướng - by Chương
 from routes.auth import auth_bp
 from routes.admin import admin_bp
 from routes.user import user_bp
 
-# Import socket handlers
+# Gọi xử lý Socket - by Chương
 from sockets import (
     register_terminal_handlers,
     register_serial_handlers,
     register_upload_status_handlers
 )
 
-# Import background services (Removed for Virtual Assessment architecture)
-# from services.background_services import init_background_services, stop_background_services
+# Mute request warnings - by Chương
+# (đã xử lý bên trên) - by Chương
 
-# Mute requests warnings
-# (handled above)
+# Lấy đường dẫn JWT - by Chương
 
 # Lấy JWT path
 jwt_manager_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'venv', 'lib', 'python3.12', 'site-packages', 'flask_jwt_extended', 'jwt_manager.py')
 
 
-# ================== LOGGING SETUP ==================
+# ================== CÀI ĐẶT LOGGING - by Chương ==================
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -55,7 +54,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# ================== APP INITIALIZATION ==================
+# ================== KHỞI TẠO APP - by Chương ==================
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(24))
 
@@ -64,20 +63,20 @@ app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
     '/metrics': make_wsgi_app()
 })
 
-# Initialize SocketIO
+# Khởi chạy SocketIO - by Chương
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# ================== REGISTER BLUEPRINTS ==================
+# ================== ĐĂNG KÝ BLUEPRINTS - by Chương ==================
 app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(user_bp)
 
-# ================== REGISTER SOCKET.IO HANDLERS ==================
+# ================== ĐĂNG KÝ SOCKET.IO HANDLERS - by Chương ==================
 register_terminal_handlers(socketio)
 register_serial_handlers(socketio)
 register_upload_status_handlers(socketio)
 
-# ================== MAIN ROUTES ==================
+# ================== ĐIỀU HƯỚNG CHÍNH - by Chương ==================
 @app.route("/")
 def index():
     """Main index route - redirect based on user role"""
@@ -88,7 +87,7 @@ def index():
             return redirect(url_for("user.user_redirect"))
     return redirect(url_for("auth.login_page"))
 
-# ================== ERROR HANDLERS ==================
+# ================== XỬ LÝ LỖI - by Chương ==================
 @app.errorhandler(404)
 def not_found(e):
     """Handle 404 errors"""
@@ -100,7 +99,7 @@ def internal_error(e):
     logger.error(f"Internal error: {e}")
     return "Internal server error", 500
 
-# ================== BACKGROUND SERVICES ==================
+# ================== DỊCH VỤ NGẦM - by Chương ==================
 background_services = None
 
 def cleanup_on_exit(signum=None, frame=None):
@@ -118,7 +117,7 @@ def cleanup_on_exit(signum=None, frame=None):
 # signal.signal(signal.SIGINT, cleanup_on_exit) # Removed as signal import is gone
 # signal.signal(signal.SIGTERM, cleanup_on_exit) # Removed as signal import is gone
 
-# ================== MAIN EXECUTION ==================
+# ================== THỰC THI CHÍNH - by Chương ==================
 
 def print_banner():
     logger.info("=" * 60)

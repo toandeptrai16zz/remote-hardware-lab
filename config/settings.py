@@ -1,15 +1,15 @@
 """
-Configuration settings for the Flask application
+Cấu hình cho ứng dụng Flask - by Chương
 """
 import os
 from dotenv import load_dotenv
 
-# Load .env file using absolute path relative to project root
+# Tải file .env sử dụng đường dẫn tuyệt đối - by Chương
 basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 env_path = os.path.join(basedir, '.env')
 load_dotenv(env_path)
 
-# ================== CONFIGURATIONS ==================
+# ================== CÁC CẤU HÌNH - by Chương ==================
 SECURITY_CONFIG = {
     'MAX_LOGIN_ATTEMPTS': 5, 
     'LOCKOUT_DURATION': 300, 
@@ -29,7 +29,7 @@ EMAIL_CONFIG = {
     'FROM_EMAIL': os.getenv('FROM_EMAIL', 'EPU TECH')
 }
 
-# List of default Arduino libraries to pre-install for all users.
+# Danh sách các thư viện Arduino mặc định sẽ được cài đặt sẵn - by Chương
 DEFAULT_ARDUINO_LIBRARIES = [
     "Adafruit NeoPixel", 
     "DHT sensor library", 
@@ -38,7 +38,7 @@ DEFAULT_ARDUINO_LIBRARIES = [
     "ArduinoJson"
 ]
 
-# System constants for Docker Environments
+# Các hằng số hệ thống cho môi trường Docker ảo hóa máy ảo - by Chương
 SYSTEM_CONFIG = {
     'BASE_SSH_PORT': int(os.getenv('BASE_SSH_PORT', 2000)),
     'MAX_WORKSPACE_FILE_SIZE': 5242880,  # 5MB
