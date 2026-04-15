@@ -1438,8 +1438,7 @@ async function submitActiveMission() {
         showCancelButton: true,
         confirmButtonColor: '#7c6af7',
         cancelButtonText: 'Chưa, tiếp tục làm',
-        confirmButtonText: 'Nộp bài ngay!',
-        backdrop: `rgba(0,0,0,0.4) blur(8px)`
+        confirmButtonText: 'Nộp bài ngay!'
     });
     if (!result.isConfirmed) return;
 
@@ -1455,7 +1454,6 @@ async function submitActiveMission() {
                 showConfirmButton: false,
                 background: '#1a1a2e',
                 color: '#e0e0e0',
-                backdrop: `rgba(0,0,0,0.1) blur(10px)`,
                 customClass: { popup: 'swal-no-scroll' }
             });
 
@@ -1505,10 +1503,10 @@ async function submitActiveMission() {
                 } catch (e) { /* tiếp tục poll */ }
             }, 4000);
         } else {
-            Swal.fire({ icon: 'error', title: 'Lỗi', text: data.error || 'Không thể nộp bài', backdrop: `rgba(0,0,0,0.4) blur(8px)` });
+            Swal.fire({ icon: 'error', title: 'Lỗi', text: data.error || 'Không thể nộp bài' });
         }
     } catch (e) {
-        Swal.fire({ icon: 'error', title: 'Lỗi kết nối', text: 'Không thể liên hệ server', backdrop: `rgba(0,0,0,0.4) blur(8px)` });
+        Swal.fire({ icon: 'error', title: 'Lỗi kết nối', text: 'Không thể liên hệ server' });
     }
 }
 
