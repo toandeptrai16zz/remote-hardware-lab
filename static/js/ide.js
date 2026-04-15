@@ -5,7 +5,7 @@ let uploadPath = '.';     // Thieu Dinh Nghia Ham (DA FIX - by CHUONG)
 let selectedTreeItem = null;
 let selectedPort = null;
 let availablePorts = [];
-const username = "{{ username }}";
+const username = window.currentUsername;
 
 // File creation modal state
 let currentFileCreationType = 'file';
@@ -1325,7 +1325,7 @@ function setupRealTimeNotifications() {
             if (wrapper.style.display === 'none' || wrapper.style.display === '') {
                 wrapper.style.display = 'flex';
                 if (!iframe.src || iframe.src.includes('about:blank')) {
-                    iframe.src = "{{ url_for('user.user_missions_page') }}?embed=1";
+                    iframe.src = window.userMissionsUrl;
                 }
             } else {
                 wrapper.style.display = 'none';
