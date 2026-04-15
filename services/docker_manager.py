@@ -177,12 +177,12 @@ if command -v arduino-cli &> /dev/null; then
         arduino-cli core update-index &>/dev/null
         arduino-cli core install arduino:avr &>/dev/null
     fi
-    if ! arduino-cli core list | grep -q "esp32:esp32"; then
-        echo "Installing esp32:esp32 core..."
+    if ! arduino-cli core list | grep -q "esp32:esp32.*2.0.17"; then
+        echo "Installing/Downgrading esp32:esp32 core to v2.0.17..."
         arduino-cli config init &>/dev/null || true
         arduino-cli config add board_manager.additional_urls https://dl.espressif.com/dl/package_esp32_index.json &>/dev/null || true
         arduino-cli core update-index &>/dev/null
-        arduino-cli core install esp32:esp32 &>/dev/null
+        arduino-cli core install esp32:esp32@2.0.17 &>/dev/null
     fi
     
     # CÀI CÁC THƯ VIỆN NHÚNG THEO CONFIG CHUNG
