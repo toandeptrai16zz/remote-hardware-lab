@@ -2,6 +2,9 @@
 Hệ thống Quản lý IoT Lab - by Chương
 Tệp tin khởi chạy chính - by Chương
 """
+import eventlet
+eventlet.monkey_patch()
+
 import os
 import secrets
 import logging
@@ -64,7 +67,7 @@ app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
 })
 
 # Khởi chạy SocketIO - by Chương
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # ================== ĐĂNG KÝ BLUEPRINTS - by Chương ==================
 app.register_blueprint(auth_bp)
