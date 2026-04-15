@@ -224,7 +224,10 @@ function setupEditor() {
         showPrintMargin: false,
         wrap: true,
     });
+let isSystemChange = false;
+
     editor.on("change", () => {
+        if (isSystemChange) return;
         if (currentFile && openFiles.has(currentFile)) {
             const fileData = openFiles.get(currentFile);
             if (fileData.saved) {
@@ -1061,7 +1064,11 @@ function switchToFile(fullPathKey) {
     if (!openFiles.has(fullPathKey)) return;
     currentFile = fullPathKey;
     const fileData = openFiles.get(fullPathKey);
+    
+    isSystemChange = true;
     editor.setValue(fileData.content, -1);
+    isSystemChange = false;
+    
     const modelist = ace.require("ace/ext/modelist");
     editor.session.setMode(modelist.getModeForPath(fileData.shortName).mode);
     editor.focus();
@@ -1170,12 +1177,28 @@ async function saveCurrentFile() {
 }
 
 async function compileCode(event) {
+    const compileBtn = event ? (event.currentTarget || event.target) : null;
+    const originalBtnHTML = compileBtn ? compileBtn.innerHTML : "Biên dịch";
+    
+    if (compileBtn) {
+        compileBtn.disabled = true;
+        compileBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Đang xử lý...`;
+    }
+
     if (!currentFile || currentFile === 'Welcome') {
         showNotification('Vui lòng mở một file .ino để biên dịch!', 'error');
+        if (compileBtn) {
+            compileBtn.disabled = false;
+            compileBtn.innerHTML = originalBtnHTML;
+        }
         return;
     }
     if (!currentFile.toLowerCase().endsWith('.ino')) {
         showNotification('Chỉ có thể biên dịch file .ino (Arduino sketch)!', 'error');
+        if (compileBtn) {
+            compileBtn.disabled = false;
+            compileBtn.innerHTML = originalBtnHTML;
+        }
         return;
     }
     //Logic auto save before compile or loaded
@@ -1197,11 +1220,6 @@ async function compileCode(event) {
     const sketchPath = currentFile;
 
     terminal.write(`\r\n\x1b[1;33m[COMPILE]\x1b[0m Đang biên dịch '${sketchPath}' cho ${boardFqbn}...\r\n`);
-
-    const compileBtn = event.currentTarget;
-    const originalBtnHTML = compileBtn.innerHTML;
-    compileBtn.disabled = true;
-    compileBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Đang xử lý...`;
 
     try {
         const response = await fetch(`/user/${username}/compile`, {
