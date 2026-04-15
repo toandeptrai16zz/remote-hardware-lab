@@ -1454,7 +1454,7 @@ async function submitActiveMission() {
                 showConfirmButton: false,
                 background: '#1a1a2e',
                 color: '#e0e0e0',
-                backdrop: `rgba(10,10,30,0.6) blur(4px)`,
+                backdrop: `rgba(0,0,0,0.1) blur(10px)`,
                 customClass: { popup: 'swal-no-scroll' }
             });
 
