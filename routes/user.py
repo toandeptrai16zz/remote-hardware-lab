@@ -12,7 +12,7 @@ from utils import require_auth, make_safe_name, is_safe_path
 from config import HIDDEN_SYSTEM_FILES
 from services import (
     ensure_user_container_and_setup, get_ssh_client,
-    compile_sketch, get_serial_ports, log_action
+    compile_sketch, log_action
 )
 from config.database import get_db_connection
 from services.ai_grader import grade_submission_with_ai
@@ -358,19 +358,7 @@ def save_file_api(username):
 
 # ==================== ARDUINO OPERATIONS ====================
 
-@user_bp.route('/<username>/serial-ports', methods=['GET'])
-@require_auth('user')
-def get_serial_ports_api(username):
-    """API to get available serial ports"""
-    if session['username'] != username:
-        return jsonify(error="Unauthorized"), 403
-    
-    result = get_serial_ports(username)
-    
-    if result['success']:
-        return jsonify(result)
-    else:
-        return jsonify(result), 500
+# ==================== KẾT THÚC ARDUINO OPERATIONS ====================
 
 @user_bp.route('/<username>/compile', methods=['POST'])
 @require_auth('user')
@@ -386,41 +374,8 @@ def compile_sketch_api(username):
     result = compile_sketch(username, board_fqbn, sketch_path)
     return jsonify(result)
 
-@user_bp.route('/<username>/upload', methods=['POST'])
-@require_auth('user')
-def upload_to_board_api(username):
-    """API to upload code to board"""
-    from flask import current_app
-    from services.arduino import perform_upload_worker
-    
-    data = request.get_json()
-    if data is None:
-        return jsonify(success=False, error="Yêu cầu không chứa dữ liệu JSON."), 400
-        
-    sid = data.get('sid')
-    if not sid:
-        return jsonify(success=False, error="Lỗi Frontend: Missing SID for status updates."), 400
+# API nạp code vòng ngoài (Upload) đã bị xóa bỏ thay bằng AI Grader.
 
-    sketch_path = data.get("sketch_path")
-    board_fqbn = data.get("board_fqbn")
-    port = data.get("port")
-    
-    if not all([sketch_path, board_fqbn, port]):
-        return jsonify(success=False, error="Thiếu thông tin sketch/board/port"), 400
-    
-    # Use socketio background task
-    socketio = current_app.extensions['socketio']
-    socketio.start_background_task(
-        target=perform_upload_worker, 
-        username=username, 
-        sid=sid, 
-        sketch_path=sketch_path, 
-        board_fqbn=board_fqbn, 
-        port=port,
-        socketio=socketio
-    )
-    
-    return jsonify(success=True, message="Yêu cầu nạp code đã được đưa vào hàng đợi.")
 
 # ==================== MISSIONS ====================
 
