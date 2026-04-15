@@ -28,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupResizer();
     setupHorizontalResizer();
     setupEventListeners();
-    setupSerialMonitor();
     setupFileCreationModal();
     refreshRootFiles();
     loadIDEState();
@@ -38,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupRealTimeNotifications() {
-    const mainSocket = io.connect(location.protocol + '//' + document.domain + ':' + location.port + '/');
+    const mainSocket = io.connect(location.protocol + '//' + document.domain + ':' + location.port + '/', { transports: ['websocket'] });
     mainSocket.on('new_mission', function(data) {
         showNotification(`📢 BÀI TẬP MỚI: ${data.mission_name}. Hãy truy cập tab Bài tập/Thi để bắt đầu làm bài!`, 'info');
         if (typeof checkIDEActiveMission === 'function') checkIDEActiveMission();
@@ -79,7 +78,7 @@ function setupRealTimeNotifications() {
             });
         }
         function connectUploadSocket() {
-            socketUpload = io('/upload_status');
+            socketUpload = io('/upload_status', { transports: ['websocket'] });
 
             socketUpload.on('connect', () => {
                 currentSid = socketUpload.id;
@@ -365,7 +364,7 @@ function setupRealTimeNotifications() {
         }
         
         function connectTerminalSocket() {
-            socket = io('/terminal');
+            socket = io('/terminal', { transports: ['websocket'] });
             socket.on('connect', () => {
                 terminal.write('\r\n\x1b[32m✔\x1b[0m Terminal connected.\r\n$ ');
             });
