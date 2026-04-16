@@ -10,16 +10,40 @@ import subprocess
 import logging
 import threading
 import glob
+import fcntl
 from collections import defaultdict
+from contextlib import contextmanager
 from utils import make_safe_name
 from config import get_db_connection
 from services.logger import log_action
 
 logger = logging.getLogger(__name__)
 # [ARCHITECT PIVOT REVERSED]: Queue mechanism restored for feature/hardware-flash branch
-device_locks = defaultdict(threading.Lock)
 queue_counts = defaultdict(int) 
 
+@contextmanager
+def get_hardware_lock(port_address):
+    """
+    Cơ chế File Lock (Bản tay sắt): Khóa ở cấp độ Hệ điều hành.
+    Giúp đồng bộ hóa nạp code xuyên suốt các Process (gunicorn workers) và Containers.
+    """
+    safe_port = port_address.replace("/", "_").replace(".", "_")
+    lock_path = f"/tmp/arduino_flash_{safe_port}.lock"
+    
+    # Đảm bảo file tồn tại
+    with open(lock_path, 'a') as f:
+        pass
+        
+    lock_file = open(lock_path, 'r+')
+    try:
+        # LOCK_EX: Khóa độc quyền (Exclusive Lock)
+        # Sẽ block cho đến khi lấy được khóa
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        yield
+    finally:
+        # LOCK_UN: Mở khóa
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        lock_file.close()
 # ==============================================================================
 # 1. HÀM HỖ TRỢ PHÂN TÍCH LỖI (GIỮ NGUYÊN)
 # ==============================================================================
@@ -127,8 +151,8 @@ def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio
     if position > 1:
          socketio.emit('upload_status', {'status': 'compiling', 'message': f'⏳ Cổng {port} đang bận! Bạn đang ở vị trí chờ #{position} trong hàng đợi...'}, namespace='/upload_status', room=sid)
 
-    # 2. Bắt đầu Khóa (Lock) cổng để nạp
-    with device_locks[port]:
+    # 2. Bắt đầu Khóa (Global File Lock) cổng để nạp
+    with get_hardware_lock(port):
         # Cooldown trước khi nạp: chờ board hồi phục sau lần nạp/reset trước
         import time
         time.sleep(3)
