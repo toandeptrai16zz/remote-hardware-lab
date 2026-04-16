@@ -26,6 +26,7 @@ let socketSerial = null;
 // Exam Mode: khi đang thi thì chỉ hiện folder bài thi, ẩn hết folder khác
 let _examModeSlug = null;   // slug của folder bài thi đang active (null = không thi)
 let _prevExamSlug = null;   // slug trước đó, dùng để detect thay đổi trạng thái
+let _allMissionSlugs = [];  // danh sách slug của tất cả các bài tập (để ẩn khi không thi)
 
 document.addEventListener('DOMContentLoaded', () => {
     setupEditor();
@@ -1030,6 +1031,11 @@ async function loadFolderContents(path, parentElement) {
                     // Fallback: nếu không tìm thấy exact match thì hiện tất cả
                     filtered = data.files;
                 }
+            } else if (!_examModeSlug && path === '.' && _allMissionSlugs.length > 0) {
+                // ── NORMAL MODE: Ẩn tất cả các folder bài thi, chỉ hiện folder cá nhân ──
+                filtered = data.files.filter(item => {
+                    return !item.is_dir || !_allMissionSlugs.includes(item.name);
+                });
             }
             filtered.forEach(item => parentElement.appendChild(createTreeItem(item, path)));
             // Auto-expand folder bài thi
@@ -1680,6 +1686,10 @@ async function syncMissionsToIDE() {
     try {
         const res = await fetch('/user/api/my-missions');
         const missions = await res.json();
+        
+        // Cập nhật danh sách slug tất cả bài tập để ẩn ở mode bình thường
+        _allMissionSlugs = missions.map(m => slugifyVN(m.name) || `mission_${m.id}`);
+
         const now = Date.now();
         const active = missions.filter(m => {
             const s = new Date(m.start_time).getTime();
