@@ -363,18 +363,50 @@ def save_file_api(username):
 @user_bp.route('/<username>/compile', methods=['POST'])
 @require_auth('user')
 def compile_sketch_api(username):
-    """API to compile Arduino sketch"""
+    """API to compile Arduino sketch (Tự động nhận diện Board)"""
+    from services.arduino import get_user_assigned_device, compile_sketch
+    
     data = request.get_json()
     sketch_path = data.get("sketch_path")
-    board_fqbn = data.get("board_fqbn")
     
-    if not sketch_path or not board_fqbn:
-        return jsonify(success=False, output="Thiếu thông tương tin sketch_path hoặc board", error_analysis=None), 400
+    if not sketch_path:
+        return jsonify(success=False, output="Thiếu đường dẫn sketch_path", error_analysis=None), 400
 
+    assigned_device = get_user_assigned_device(username)
+    if not assigned_device:
+        return jsonify(success=False, output="Tài khoản của bạn chưa được Giảng viên cấp quyền kết nối phần cứng nào! Hãy báo Admin.", error_analysis=None), 403
+        
+    board_fqbn = assigned_device['fqbn']
     result = compile_sketch(username, board_fqbn, sketch_path)
     return jsonify(result)
 
-# API nạp code vòng ngoài (Upload) đã bị xóa bỏ thay bằng AI Grader.
+@user_bp.route('/<username>/flash', methods=['POST'])
+@require_auth('user')
+def flash_sketch_api(username):
+    """API to compile then flash directly to physical board via Bottleneck Queue"""
+    import threading
+    from services.arduino import get_user_assigned_device, perform_upload_worker
+    
+    data = request.get_json()
+    sketch_path = data.get("sketch_path")
+    sid = data.get("sid")
+    
+    if not sketch_path or not sid:
+        return jsonify(success=False, error="Invalid parameters"), 400
+
+    assigned_device = get_user_assigned_device(username)
+    if not assigned_device:
+        return jsonify(success=False, error="Không tìm thấy quyền phần cứng vật lý"), 403
+        
+    port = assigned_device['port']
+    board_fqbn = assigned_device['fqbn']
+    
+    # Kích hoạt luồng chạy ngầm để không bị Timeout HTTP (Do Hàng đợi Queue Nạp có thể rấy lâu)
+    from __main__ import socketio
+    threading.Thread(target=perform_upload_worker, args=(username, port, sketch_path, sid, board_fqbn, socketio), daemon=True).start()
+    
+    return jsonify(success=True, message=f"Đã đưa lệnh nạp vào hàng đợi của cổng {port}.")
+
 
 
 # ==================== MISSIONS ====================

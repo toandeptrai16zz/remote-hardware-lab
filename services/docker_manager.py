@@ -19,9 +19,27 @@ platform_cache = {}
 
 def get_assigned_ports(username):
     """
-    (Deprecated) Lấy port USB -> Cắt bỏ hoàn toàn do kiến trúc ảo hóa
+    [RESTORED] Lấy port USB theo phân quyền từ CSDL để map vào Docker
     """
-    return []
+    try:
+        db = get_db_connection()
+        if not db: return []
+        cur = db.cursor()
+        query = """
+            SELECT hd.port
+            FROM hardware_devices hd
+            JOIN device_assignments da ON hd.id = da.device_id
+            JOIN users u ON da.user_id = u.id
+            WHERE u.username = %s AND hd.status != 'disconnected'
+        """
+        cur.execute(query, (username,))
+        ports = [row[0] for row in cur.fetchall()]
+        cur.close()
+        db.close()
+        return ports
+    except Exception as e:
+        logger.error(f"Error getting assigned ports for {username}: {e}")
+        return []
 
 def docker_status(cname):
     """Check Docker container status"""
@@ -223,8 +241,10 @@ exec /usr/sbin/sshd -D
         "--group-add", "dialout", 
         "--entrypoint", "/bin/bash"
     ]
-    # [ARCHITECT PIVOT]: Removed --device mappings to enforce isolated Testbench mode
-    pass
+    # [RESTORED]: Add --device mappings to enforce physical hardware Bottleneck
+    for port in required_ports:
+        if os.path.exists(port):
+            docker_command.extend(["--device", f"{port}:{port}"])
 
     docker_command.append(image)
     docker_command.append("/startup.sh")

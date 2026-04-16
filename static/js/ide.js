@@ -181,16 +181,21 @@ function closeFileCreationModal() {
 }
 
 async function confirmFileCreation() {
-    const fileName = DOM.fileNameInput.value.trim();
-    if (!fileName) {
+    const rawName = DOM.fileNameInput.value.trim();
+    if (!rawName) {
         showNotification('Vui lòng nhập tên file/thư mục', 'error');
         return;
     }
 
     // Validate filename
-    if (!/^[^<>:"/\\|?*]+$/.test(fileName)) {
+    if (!/^[^<>:"/\\|?*]+$/.test(rawName)) {
         showNotification('Tên file/thư mục chứa ký tự không hợp lệ', 'error');
         return;
+    }
+
+    let finalName = rawName;
+    if (currentFileCreationType === 'file' && !finalName.includes('.')) {
+        finalName += '.ino';
     }
 
     // Disable button and show loading
@@ -198,7 +203,14 @@ async function confirmFileCreation() {
     DOM.createFileBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo...';
 
     try {
-        await createNewItem(currentFileCreationType, currentFileCreationPath, fileName);
+        await createNewItem(currentFileCreationType, currentFileCreationPath, finalName);
+        
+        // Theo tiêu chuẩn Arduino: Thư mục chứa mã nguồn cần có một file .ino cùng tên
+        if (currentFileCreationType === 'folder') {
+            const childFilePath = currentFileCreationPath === '.' ? finalName : `${currentFileCreationPath}/${finalName}`;
+            await createNewItem('file', childFilePath, `${finalName}.ino`);
+        }
+        
         closeFileCreationModal();
     } catch (error) {
         showNotification('Có lỗi xảy ra khi tạo file/thư mục', 'error');
@@ -1261,34 +1273,19 @@ async function compileCode(event) {
         await saveCurrentFile() // save and continue
     }
 
-    const boardSelector = document.getElementById('boardSelector');
-    // Tự động phân tích mã nguồn để chọn kiến trúc phù hợp
-    let boardFqbn = boardSelector ? boardSelector.value : 'arduino:avr:uno';
-    if (editor && editor.getValue) {
-        const codeContent = editor.getValue();
-        const esp32Keywords = [
-            'freertos', 'WiFi.h', 'ESP32', 'xTaskCreate', 'xQueue', 
-            'TaskHandle_t', 'QueueHandle_t', 'vTaskDelay', 'portMAX_DELAY',
-            'ledcSetup', 'ledcAttachPin', 'ledcWrite', 'ledcRead',
-            'analogSetWidth', 'analogReadResolution', 'sigmaDeltaSetup'
-        ];
-        if (esp32Keywords.some(kw => codeContent.includes(kw))) {
-            boardFqbn = 'esp32:esp32:esp32';
-        }
-    }
     const sketchPath = currentFile;
 
-    terminal.write(`\r\n\x1b[1;33m[COMPILE]\x1b[0m Đang biên dịch '${sketchPath}' cho ${boardFqbn}...\r\n`);
+    terminal.write(`\r\n\x1b[1;33m[COMPILE]\x1b[0m Đang biên dịch '${sketchPath}'...\r\n`);
 
     try {
         const response = await fetch(`/user/${username}/compile`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sketch_path: sketchPath, board_fqbn: boardFqbn })
+            body: JSON.stringify({ sketch_path: sketchPath })
         });
         const data = await response.json();
         if (!response.ok) {
-            throw new Error(data.error || `Server responded with status ${response.status}`);
+            throw new Error(data.error || data.output || `Server responded with status ${response.status}`);
         }
         if (data.success) {
             terminal.write(`\x1b[1;32m✓ Biên dịch thành công!\x1b[0m\r\n`);
@@ -1344,6 +1341,64 @@ async function compileCode(event) {
         compileBtn.disabled = false;
         compileBtn.innerHTML = originalBtnHTML;
         terminal.write(`\r\n$ `); // Show new prompt
+        terminal.scrollToBottom();
+    }
+}
+
+async function flashCode(event) {
+    const flashBtn = event ? (event.currentTarget || event.target) : null;
+    const originalBtnHTML = flashBtn ? flashBtn.innerHTML : "Nạp (Flash)";
+    
+    if (flashBtn) {
+        flashBtn.disabled = true;
+        flashBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Đang chờ...`;
+    }
+
+    if (!currentFile || !currentFile.toLowerCase().endsWith('.ino')) {
+        showNotification('Chỉ có thể nạp file .ino (Arduino sketch)!', 'error');
+        if (flashBtn) {
+            flashBtn.disabled = false;
+            flashBtn.innerHTML = originalBtnHTML;
+        }
+        return;
+    }
+    
+    if (openFiles.has(currentFile) && !openFiles.get(currentFile).saved) {
+        terminal.write('\r\n\x1b[90m[IDE]\x1b[0m File chưa được lưu. Tự động lưu trước khi nạp...\r\n');
+        await saveCurrentFile();
+    }
+
+    const sketchPath = currentFile;
+    terminal.write(`\r\n\x1b[1;33m[FLASH]\x1b[0m Đã đưa lệnh nạp '${sketchPath}' vào hàng đợi vật lý...\r\n`);
+
+    try {
+        const response = await fetch(`/user/${username}/flash`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sketch_path: sketchPath, sid: currentSid })
+        });
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || data.output || `Server error: ${response.status}`);
+        }
+        
+        if (data.success) {
+            showNotification(data.message || 'Đã vào hàng đợi Nạp code!', 'success');
+            // Tiến trình cụ thể sẽ được Broadcast qua Socket.IO (upload_status channel)
+        } else {
+            terminal.write(`\x1b[1;31m✗ ${data.error}\x1b[0m\r\n`);
+            showNotification(`Lỗi Nạp: ${data.error}`, 'error');
+        }
+    } catch (error) {
+        terminal.write(`\x1b[1;31m✗ Lỗi kết nối Máy chủ / Hardware: ${error.message}\x1b[0m\r\n`);
+        showNotification(`Lỗi kết nối: ${error.message}`, 'error');
+    } finally {
+        if (flashBtn) {
+            flashBtn.disabled = false;
+            flashBtn.innerHTML = originalBtnHTML;
+        }
+        terminal.write(`\r\n$ `);
         terminal.scrollToBottom();
     }
 }

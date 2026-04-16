@@ -435,17 +435,11 @@ def admin_api_scan_devices():
     import glob
     import serial
     
-    raw_ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
-    active_ports = []
+    import os
     
-    for port in raw_ports:
-        try:
-            s = serial.Serial(port)
-            s.close()
-            active_ports.append(port)
-        except Exception:
-            pass
-            
+    raw_ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
+    active_ports = [p for p in raw_ports if os.path.exists(p)]
+    
     db = get_db_connection()
     cur = db.cursor()
     
@@ -490,18 +484,11 @@ def admin_api_get_devices():
     import glob
     import serial
     
+    import os
+    
     # Tìm các thiết bị USB có thật
     raw_ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
-    active_ports = []
-    
-    # Loại trừ Ghost Ports do VMWare tạo ra (Linux device file không biến mất sau khi rút cáp)
-    for port in raw_ports:
-        try:
-            s = serial.Serial(port)
-            s.close()
-            active_ports.append(port)
-        except Exception:
-            pass # Lỗi IO / Ghost Port
+    active_ports = [p for p in raw_ports if os.path.exists(p)]
             
     db = get_db_connection()
     cur = db.cursor(dictionary=True)
@@ -555,7 +542,6 @@ def admin_api_assign_device():
     
     db = get_db_connection()
     cur = db.cursor()
-    
     # Xoá tất cả quyền cũ của cái cổng này
     cur.execute("DELETE FROM device_assignments WHERE device_id = %s", (device_id,))
     
@@ -570,13 +556,11 @@ def admin_api_assign_device():
             cur.execute("INSERT INTO device_assignments (user_id, device_id) VALUES (%s, %s)", (user_id, device_id))
             added += 1
             
-        cur.execute("UPDATE hardware_devices SET in_use_by = 'Chế độ Nhiều User' WHERE id = %s", (device_id,))
-    else:
-        cur.execute("UPDATE hardware_devices SET in_use_by = NULL WHERE id = %s", (device_id,))
+    # Xoá trường theo dõi 1:1 cũ để tránh lỗi Foreign Key
+    cur.execute("UPDATE hardware_devices SET in_use_by = NULL WHERE id = %s", (device_id,))
 
     db.commit()
     cur.close(), db.close()
     
     log_action(session['username'], f"Cập nhật Quyền Cổng USB ID {device_id} cho {added} Sinh viên.")
     return jsonify({'success': True, 'message': f'Cập nhật thành công! Đã cấp quyền sử dụng cho {len(usernames)} sinh viên chờ hàng đợi.'})
-

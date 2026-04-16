@@ -146,7 +146,7 @@ def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio
     queue_counts[port] -= 1
     log_action(username, "Flash Hardware success")
     
-    socketio.emit('upload_status', {'status': 'success', 'message': '✅ ĐÃ NẠP XUỐNG BO MẠCH THÀNH CÔNG! HỆ THỐNG SẼ TỰ ĐỘNG GỌI AI CHẤM ĐIỂM NGAY BÂY GIỜ...'}, namespace='/upload_status', room=sid)
+    socketio.emit('upload_status', {'status': 'success', 'message': '✅ ĐÃ NẠP XUỐNG BO MẠCH THÀNH CÔNG! Code của bạn đang chạy trên thiết bị vật lý.'}, namespace='/upload_status', room=sid)
 
 # ==============================================================================
 # 5. CÁC HÀM SCAN & HELPERS KHÁC
@@ -166,7 +166,7 @@ def get_boards_by_type(db_type):
     
     if "esp32" in t: return [esp32_default, {"name": "AI Thinker ESP32-CAM", "fqbn": "esp32:esp32:esp32cam"}]
     elif "esp8266" in t: return [esp8266_default]
-    else: return [esp32_default] + [esp8266_default] + arduino_list
+    else: return arduino_list + [esp32_default] + [esp8266_default]
 
 def get_serial_ports(username):
     """
@@ -227,6 +227,43 @@ def get_serial_ports(username):
         return {'success': True, 'ports': final_list}
     except Exception as e:
         return {'success': False, 'error': str(e)}
+
+def get_user_assigned_device(username):
+    """Tự động tìm Port và FQBN tương ứng đã được cấp quyền cho User"""
+    try:
+        db = get_db_connection()
+        if not db: return None
+        cur = db.cursor(dictionary=True)
+        query = """
+            SELECT hd.port, hd.type, hd.status
+            FROM hardware_devices hd
+            JOIN device_assignments da ON hd.id = da.device_id
+            JOIN users u ON da.user_id = u.id
+            WHERE u.username = %s AND hd.status != 'disconnected'
+            LIMIT 1
+        """
+        cur.execute(query, (username,))
+        device = cur.fetchone()
+        cur.close()
+        db.close()
+        
+        if not device:
+            return None
+            
+        boards = get_boards_by_type(device['type'])
+        if boards and len(boards) > 0:
+            fqbn = boards[0]['fqbn']
+        else:
+            fqbn = "arduino:avr:uno"
+            
+        return {
+            'port': device['port'],
+            'fqbn': fqbn,
+            'type': device['type']
+        }
+    except Exception as e:
+        logger.error(f"Error getting assigned device for {username}: {e}")
+        return None
 
 def compile_sketch(username, board_fqbn, sketch_path):
     safe_username = make_safe_name(username)

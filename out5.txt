@@ -1,0 +1,3 @@
+Raw ports: ['/dev/ttyUSB0']
+Exception for /dev/ttyUSB0 : [errno 5] could not open port /dev/ttyusb0: [errno 5] input/output error: '/dev/ttyusb0'
+Active ports: []
