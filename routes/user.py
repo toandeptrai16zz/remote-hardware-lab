@@ -399,7 +399,8 @@ def flash_sketch_api(username):
     if not sketch_path or not sid:
         return jsonify(success=False, error="Invalid parameters"), 400
 
-    assigned_device = get_user_assigned_device(username)
+    # [RACE CONDITION PROTECTION] Giữ chỗ lập tức trên RAM
+    assigned_device = get_user_assigned_device(username, reserve=True)
     if not assigned_device:
         return jsonify(success=False, error="Không tìm thấy quyền phần cứng vật lý"), 403
         

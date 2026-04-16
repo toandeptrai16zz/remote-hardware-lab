@@ -247,11 +247,13 @@ def get_boards_by_type(db_type):
     t = str(db_type).lower() if db_type else "generic"
     esp32_default = {"name": "ESP32 Dev Module", "fqbn": "esp32:esp32:esp32"}
     esp8266_default = {"name": "ESP8266 NodeMCU", "fqbn": "esp8266:esp8266:nodemcuv2"}
-    arduino_list = [{"name": "Arduino Uno", "fqbn": "arduino:avr:uno"}]
+    nano_default = {"name": "Arduino Nano", "fqbn": "arduino:avr:nano:cpu=atmega328old"}
+    uno_default = {"name": "Arduino Uno", "fqbn": "arduino:avr:uno"}
     
     if "esp32" in t: return [esp32_default]
     elif "esp8266" in t: return [esp8266_default]
-    else: return arduino_list + [esp32_default]
+    elif "nano" in t: return [nano_default]
+    else: return [uno_default, esp32_default]
 
 def get_serial_ports(username):
     safe_username = make_safe_name(username)
@@ -295,27 +297,59 @@ def get_serial_ports(username):
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
-def get_user_assigned_device(username):
-    try:
-        db = get_db_connection()
-        if not db: return None
-        cur = db.cursor(dictionary=True)
-        query = """
-            SELECT hd.port, hd.type FROM hardware_devices hd
-            JOIN device_assignments da ON hd.id = da.device_id
-            JOIN users u ON da.user_id = u.id
-            WHERE u.username = %s AND hd.status != 'disconnected' LIMIT 1
-        """
-        cur.execute(query, (username,))
-        device = cur.fetchone()
-        cur.close()
-        db.close()
-        if not device: return None
-        boards = get_boards_by_type(device['type'])
-        return {'port': device['port'], 'fqbn': boards[0]['fqbn'] if boards else "arduino:avr:uno"}
-    except Exception as e:
-        logger.error(f"Error getting assigned device for {username}: {e}")
-        return None
+_routing_lock = None
+
+def get_user_assigned_device(username, reserve=False):
+    """
+    [HARDWARE LOAD BALANCING & POOLING]
+    Áp dụng thuật toán Load Balancing với Race Condition Protection (Reserve).
+    """
+    import threading
+    global _routing_lock
+    if _routing_lock is None:
+        _routing_lock = threading.Lock()
+        
+    with _routing_lock:
+        try:
+            db = get_db_connection()
+            if not db: return None
+            cur = db.cursor(dictionary=True)
+            query = """
+                SELECT hd.port, hd.type FROM hardware_devices hd
+                JOIN device_assignments da ON hd.id = da.device_id
+                JOIN users u ON da.user_id = u.id
+                WHERE u.username = %s AND hd.status != 'disconnected'
+            """
+            cur.execute(query, (username,))
+            devices = cur.fetchall()
+            cur.close()
+            db.close()
+            
+            # --- THUẬT TOÁN ĐỊNH TUYẾN THÔNG MINH (SMART ROUTING) ---
+            import random
+            
+            # 1. Tìm giá trị queue nhỏ nhất hiện tại
+            min_queue = min(queue_counts[d['port']] for d in devices)
+            
+            # 2. Lọc ra danh sách các thiết bị có cùng lượng queue nhỏ nhất này
+            candidates = [d for d in devices if queue_counts[d['port']] == min_queue]
+            
+            # 3. Random 1 cổng trong nhóm rảnh nhất để chia đều hao mòn phần cứng (Round-Robin Random)
+            best_device = random.choice(candidates)
+            
+            if reserve:
+                queue_counts[best_device['port']] += 1
+                logger.info(f"⚡ [LOAD BALANCER] {username} RESERVED {best_device['port']} (Queue increased to {queue_counts[best_device['port']]}, Candidates size: {len(candidates)})")
+            
+            boards = get_boards_by_type(best_device['type'])
+            return {
+                'port': best_device['port'], 
+                'fqbn': boards[0]['fqbn'] if boards else "arduino:avr:uno",
+                'type': best_device['type']
+            }
+        except Exception as e:
+            logger.error(f"Error in Load Balancing for {username}: {e}")
+            return None
 
 def detect_board_from_sketch(username, sketch_path):
     safe_username = make_safe_name(username)
