@@ -1734,9 +1734,27 @@ async function syncMissionsToIDE() {
             // ── EXAM MODE: Cô lập Explorer chỉ hiện folder bài thi ──
             const newSlug = slugifyVN(active[0].name) || `mission_${active[0].id}`;
             if (newSlug !== _examModeSlug) {
+                // Tiền xử lý khi BẮT ĐẦU VÀO THI
+                const isEnteringFirstTime = (_examModeSlug === null);
                 _prevExamSlug = _examModeSlug;
                 _examModeSlug = newSlug;
-                refreshRootFiles(); // Reload Explorer với filter
+
+                if (isEnteringFirstTime) {
+                    // Đóng hết tab cũ để bảo mật bài vở cá nhân
+                    saveCurrentFile().then(() => {
+                        const tabs = Array.from(openFiles.keys());
+                        tabs.forEach(t => closeFile(t));
+                        
+                        // Tự động mở file bài thi chính
+                        const missionIno = `/${newSlug}/${newSlug}.ino`;
+                        openFile(missionIno);
+                        
+                        refreshRootFiles();
+                        showNotification("Đã bắt đầu bài thi. Các tab cá nhân đã tạm ẩn.", "info");
+                    });
+                } else {
+                    refreshRootFiles();
+                }
             }
         } else {
             _ideActiveMission = null;
@@ -1747,11 +1765,35 @@ async function syncMissionsToIDE() {
             // ── THOÁT EXAM MODE: Khôi phục Explorer bình thường ──
             if (_examModeSlug !== null) {
                 _prevExamSlug = _examModeSlug;
+                const oldSlug = _examModeSlug;
                 _examModeSlug = null;
-                refreshRootFiles(); // Reload Explorer không filter
+                
+                // Đóng tab bài thi vừa xong
+                const missionIno = `/${oldSlug}/${oldSlug}.ino`;
+                closeFile(missionIno);
+                
+                refreshRootFiles();
+                showNotification("Bài thi kết thúc. Đã khôi phục không gian học tập.", "info");
             }
         }
     } catch (e) { /* im lặng */ }
+}
+
+function showMissionDescription() {
+    if (!_ideActiveMission) return;
+    Swal.fire({
+        title: `<i class="fa-solid fa-file-lines" style="color:#7c6af7"></i> Đề Bài: ${_ideActiveMission.name}`,
+        html: `<div style="text-align:left; padding:10px; font-size:0.95rem; line-height:1.6; color:#ddd; background:#111; border-radius:8px; border:1px solid #333; max-height:400px; overflow-y:auto;">
+                ${_ideActiveMission.description || "Không có mô tả chi tiết."}
+               </div>`,
+        confirmButtonText: 'Đã hiểu',
+        confirmButtonColor: '#7c6af7',
+        background: '#1a1a2e',
+        color: '#e0e0e0',
+        width: '600px',
+        heightAuto: false,
+        backdrop: `rgba(0,0,0,0.4)`
+    });
 }
 
 function tickIDECountdown() {
