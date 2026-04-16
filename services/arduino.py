@@ -282,6 +282,43 @@ def get_user_assigned_device(username):
         logger.error(f"Error getting assigned device for {username}: {e}")
         return None
 
+def detect_board_from_sketch(username, sketch_path):
+    """
+    Tự động nhận diện loại board từ nội dung code .ino
+    Dựa vào các thư viện #include đặc trưng của từng platform:
+    - ESP32: WiFi.h, BluetoothSerial.h, ESP32Servo.h, esp_camera.h, ...
+    - Mặc định: Arduino Uno (arduino:avr:uno)
+    """
+    safe_username = make_safe_name(username)
+    cname = f"{safe_username}-dev"
+    
+    # Đọc nội dung file sketch từ container
+    try:
+        read_cmd = ["docker", "exec", cname, "cat", f"/home/{safe_username}/{sketch_path}"]
+        result = subprocess.run(read_cmd, capture_output=True, text=True, timeout=10)
+        code = result.stdout if result.returncode == 0 else ""
+    except Exception:
+        code = ""
+    
+    # Danh sách thư viện đặc trưng chỉ có trên ESP32
+    ESP32_LIBS = [
+        'WiFi.h', 'WiFiClient.h', 'WiFiServer.h', 'WiFiUdp.h',
+        'BluetoothSerial.h', 'BLEDevice.h', 'BLEServer.h',
+        'ESP32Servo.h', 'esp_camera.h', 'esp_wifi.h',
+        'WebServer.h', 'HTTPClient.h', 'SPIFFS.h',
+        'esp_sleep.h', 'driver/ledc.h', 'esp32-hal-ledc.h',
+    ]
+    
+    for lib in ESP32_LIBS:
+        if f'#include <{lib}>' in code or f'#include "{lib}"' in code:
+            logger.info(f"Auto-detect: Found {lib} → ESP32 for {username}")
+            return 'esp32:esp32:esp32'
+    
+    # Mặc định: Arduino Uno
+    logger.info(f"Auto-detect: No ESP32 libs found → Arduino Uno for {username}")
+    return 'arduino:avr:uno'
+
+
 def compile_sketch(username, board_fqbn, sketch_path):
     safe_username = make_safe_name(username)
     cname = f"{safe_username}-dev"

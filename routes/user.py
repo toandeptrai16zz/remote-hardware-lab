@@ -363,8 +363,9 @@ def save_file_api(username):
 @user_bp.route('/<username>/compile', methods=['POST'])
 @require_auth('user')
 def compile_sketch_api(username):
-    """API to compile Arduino sketch (Tự động nhận diện Board)"""
-    from services.arduino import get_user_assigned_device, compile_sketch
+    """API to compile Arduino sketch (Tự động nhận diện Board nếu không có phần cứng)"""
+    from flask import current_app
+    from services.arduino import get_user_assigned_device, compile_sketch, detect_board_from_sketch
     
     data = request.get_json()
     sketch_path = data.get("sketch_path")
@@ -373,10 +374,14 @@ def compile_sketch_api(username):
         return jsonify(success=False, output="Thiếu đường dẫn sketch_path", error_analysis=None), 400
 
     assigned_device = get_user_assigned_device(username)
-    if not assigned_device:
-        return jsonify(success=False, output="Tài khoản của bạn chưa được Giảng viên cấp quyền kết nối phần cứng nào! Hãy báo Admin.", error_analysis=None), 403
+    if assigned_device:
+        board_fqbn = assigned_device['fqbn']
+        current_app.logger.info(f"Compiling using assigned device FQBN: {board_fqbn}")
+    else:
+        # PIVOT: Nếu không có phần cứng, tự nhận diện từ code
+        board_fqbn = detect_board_from_sketch(username, sketch_path)
+        current_app.logger.info(f"No hardware assigned. Auto-detected FQBN from code: {board_fqbn}")
         
-    board_fqbn = assigned_device['fqbn']
     result = compile_sketch(username, board_fqbn, sketch_path)
     return jsonify(result)
 
