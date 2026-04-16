@@ -116,6 +116,14 @@ def ensure_user_container(username):
         
         if ssh_port:
             subprocess.run(["docker", "exec", cname, "service", "ssh", "start"], check=False)
+            
+            # [HOTFIX] Tự động cài pyserial cho các container cũ đang chạy
+            try:
+                # Chạy ngầm để không làm chậm quá trình load IDE
+                fix_cmd = f"docker exec {cname} bash -c 'if ! python3 -c \"import serial\" &>/dev/null; then apt-get update -y && apt-get install -y python3-serial; fi'"
+                subprocess.Popen(fix_cmd, shell=True)
+            except Exception: pass
+
             return ssh_port
 
     # --- TẠO MỚI CONTAINER ---

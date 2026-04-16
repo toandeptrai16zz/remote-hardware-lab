@@ -7,11 +7,11 @@ ENV PATH="/usr/local/bin:${PATH}"
 
 # 1. Cài đặt các gói hệ thống
 RUN apt-get update && apt-get install -y \
-    openssh-server sudo curl wget vim git ca-certificates coreutils dos2unix python3 python3-pip \
+    openssh-server sudo curl wget vim git ca-certificates coreutils dos2unix python3 python3-pip python3-serial \
     && rm -rf /var/lib/apt/lists/*
 
 # 1.1 Cài pyserial cho esptool.py (yêu cầu bắt buộc khi compile ESP32)
-RUN pip3 install pyserial
+RUN pip3 install pyserial esptool --break-system-packages || pip3 install pyserial esptool
 
 # 2. Cấu hình SSH và Tắt log rác
 RUN mkdir -p /var/run/sshd && \
