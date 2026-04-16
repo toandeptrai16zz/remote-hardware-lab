@@ -712,6 +712,17 @@ function initSerialSocket() {
             const statusEl = document.getElementById('serial-status');
             if (statusEl) statusEl.textContent = 'Error';
         });
+
+        // [GRACEFUL SYNC]: Lắng nghe lệnh từ Backend để nhường port cho mạch nạp
+        socketSerial.on('system_kick_serial', function(msg) {
+            console.log('System requested serial disconnect for port:', msg.port);
+            const portSelect = document.getElementById('serial-port-select');
+            // Nếu port trùng khớp thì mới đá ra
+            if (portSelect && portSelect.value === msg.port) {
+                showNotification('⚡ Hệ thống tạm ngắt Serial để Nạp Code...', 'warning');
+                closeSerialWindow();
+            }
+        });
     }
 }
 

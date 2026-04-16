@@ -153,15 +153,32 @@ def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio
 
     # 2. Bắt đầu Khóa (Global File Lock) cổng để nạp
     with get_hardware_lock(port):
-        # --- [TACTICAL KILL] Giải phóng port cưỡng bức nếu có Serial Monitor đang găm ---
+        # --- [SMART RELEASE] Giải phóng port thông minh ---
         try:
-            subprocess.run(["fuser", "-k", port], check=False, timeout=5)
-        except Exception:
-            pass
+            # 1. Phát tín hiệu cho toàn bộ IDE đóng Serial Monitor (SocketIO)
+            socketio.emit('system_kick_serial', {'port': port}, namespace='/serial', broadcast=True)
             
-        # Cooldown trước khi nạp: chờ board hồi phục sau lần nạp/reset trước
-        import time
-        time.sleep(3)
+            # 2. "Lọc PID" để giết các tiến trình Terminal đang găm port (không giết chính mình)
+            import os
+            try:
+                # Lấy danh sách PID găm port
+                pids_out = subprocess.check_output(["fuser", port], stderr=subprocess.STDOUT).decode()
+                pids = pids_out.strip().split()
+                my_pid = str(os.getpid())
+                for pid in pids:
+                    if pid != my_pid:
+                        subprocess.run(["kill", "-9", pid], check=False)
+            except subprocess.CalledProcessError:
+                pass # Không ai dùng port
+
+            # 3. Chờ 1s để HĐH dọn dẹp file descriptor và Board hồi phục
+            import time
+            time.sleep(1.5)
+        except Exception as e:
+            logger.warning(f"Smart Release warning: {e}")
+            
+        # Cooldown trước khi nạp: chờ board hồi phục thêm 1 chút
+        time.sleep(1)
         
         max_retries = 3
         up_code = -1
