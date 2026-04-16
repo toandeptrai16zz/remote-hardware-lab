@@ -98,7 +98,7 @@ async function loadData() {
 }
 
 async function reloadDevices() {
-    const devRes = await fetch('/admin/api/devices');
+    const devRes = await fetch('/admin/api/devices?t=' + new Date().getTime());
     const devices = await devRes.json();
     
     const tbody = document.getElementById('devicesTableBody');
@@ -119,13 +119,13 @@ async function reloadDevices() {
         });
         
         const statusBadge = dev.status === 'disconnected' 
-                            ? `<span class="badge bg-danger">Đã Rút Cáp</span>` 
-                            : `<span class="badge bg-success">Đang Cắm</span>`;
+                            ? `<span class="badge bg-danger"><i class="fa-solid fa-plug-circle-minus"></i> Đã Rút Cáp</span>` 
+                            : `<span class="badge bg-success"><i class="fa-solid fa-plug-circle-check"></i> Đang Cắm</span>`;
                             
         const chipLabel = `<span class="badge bg-secondary text-white px-3"><i class="fa-solid fa-microchip"></i> Serial Port (Arduino/ESP)</span>`;
 
         tr.innerHTML = `
-            <td><strong class="text-white">${dev.tag_name}</strong><br>${statusBadge}</td>
+            <td><strong class="text-white">${dev.tag_name}</strong><br><div class="mt-1">${statusBadge}</div></td>
             <td><span class="badge" style="background:#2c2c4d; border:1px solid #7c6af7;">${dev.port}</span></td>
             <td>${chipLabel}</td>
             <td>
