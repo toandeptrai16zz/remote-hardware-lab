@@ -1308,11 +1308,18 @@ HE THONG THUC HANH IOT - EPU TECH
 }
 
 async function openFile(fullPath, shortName, autoSwitch = true) {
+    if (!shortName && fullPath) {
+        shortName = fullPath.split('/').pop();
+    }
     if (openFiles.has(fullPath)) {
         if (autoSwitch) switchToFile(fullPath);
         return;
     }
-    const parentPath = fullPath.includes('/') ? fullPath.split('/').slice(0, -1).join('/') : '.';
+    // Đảm bảo parentPath là tương đối (không có / ở đầu nếu không cần)
+    let cleanPath = fullPath.startsWith('/') ? fullPath.substring(1) : fullPath;
+    const pathParts = cleanPath.split('/');
+    const parentPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : '.';
+    
     try {
         const data = await apiCall(`/user/${username}/editor/load`, {
             method: 'POST',
@@ -1745,8 +1752,8 @@ async function syncMissionsToIDE() {
                         const tabs = Array.from(openFiles.keys());
                         tabs.forEach(t => closeFile(t));
                         
-                        // Tự động mở file bài thi chính
-                        const missionIno = `/${newSlug}/${newSlug}.ino`;
+                        // Tự động mở file bài thi chính (đường dẫn tương đối)
+                        const missionIno = `${newSlug}/${newSlug}.ino`;
                         openFile(missionIno);
                         
                         refreshRootFiles();
@@ -1768,8 +1775,8 @@ async function syncMissionsToIDE() {
                 const oldSlug = _examModeSlug;
                 _examModeSlug = null;
                 
-                // Đóng tab bài thi vừa xong
-                const missionIno = `/${oldSlug}/${oldSlug}.ino`;
+                // Đóng tab bài thi vừa xong (đường dẫn tương đối)
+                const missionIno = `${oldSlug}/${oldSlug}.ino`;
                 closeFile(missionIno);
                 
                 refreshRootFiles();
