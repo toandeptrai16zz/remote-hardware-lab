@@ -474,9 +474,32 @@ def admin_api_scan_devices():
 @admin_bp.route("/api/devices", methods=['GET'])
 @require_auth('admin')
 def admin_api_get_devices():
-    """Lấy danh sách các USB và sinh viên được phân quyền đa user"""
+    """Lấy danh sách các USB và sinh viên được phân quyền đa user (Auto-Scan)"""
+    import glob
+    ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
+    
     db = get_db_connection()
     cur = db.cursor(dictionary=True)
+    
+    # --- AUTO-SCAN LOGIC ---
+    cur.execute("SELECT port FROM hardware_devices")
+    db_ports = [row['port'] for row in cur.fetchall()]
+    
+    for port in ports:
+        tag = f"Cáp Serial ({os.path.basename(port)})"
+        board_type = "generic"
+        if port not in db_ports:
+            try:
+                cur.execute("INSERT IGNORE INTO hardware_devices (tag_name, type, port, status) VALUES (%s, %s, %s, 'available')", (tag, board_type, port))
+            except Exception: pass
+        else:
+            cur.execute("UPDATE hardware_devices SET status = 'available' WHERE port = %s", (port,))
+            
+    for dbp in db_ports:
+        if dbp not in ports:
+            cur.execute("UPDATE hardware_devices SET status = 'disconnected' WHERE port = %s", (dbp,))
+    db.commit()
+    # -----------------------
     
     # Join qua bảng multi-assignment
     cur.execute("""
