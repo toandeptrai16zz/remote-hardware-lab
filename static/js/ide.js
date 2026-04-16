@@ -1783,16 +1783,14 @@ function showMissionDescription() {
     if (!_ideActiveMission) return;
     Swal.fire({
         title: `<i class="fa-solid fa-file-lines" style="color:#7c6af7"></i> Đề Bài: ${_ideActiveMission.name}`,
-        html: `<div style="text-align:left; padding:10px; font-size:0.95rem; line-height:1.6; color:#ddd; background:#111; border-radius:8px; border:1px solid #333; max-height:400px; overflow-y:auto;">
-                ${_ideActiveMission.description || "Không có mô tả chi tiết."}
-               </div>`,
+        html: `<div style="text-align:left; padding:15px; font-size:0.92rem; line-height:1.7; color:#eee; background:#0d0d1a; border-radius:10px; border:1px solid rgba(124,106,247,0.4); max-height:450px; overflow-y:auto; white-space:pre-wrap; font-family:'Inter', sans-serif;">${_ideActiveMission.description || "Không có mô tả chi tiết."}</div>`,
         confirmButtonText: 'Đã hiểu',
         confirmButtonColor: '#7c6af7',
         background: '#1a1a2e',
         color: '#e0e0e0',
-        width: '600px',
+        width: '650px',
         heightAuto: false,
-        backdrop: `rgba(0,0,0,0.4)`
+        backdrop: `rgba(0,0,0,0.6)`
     });
 }
 
