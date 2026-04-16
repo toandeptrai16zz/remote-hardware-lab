@@ -129,11 +129,28 @@ def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio
 
     # 2. Bắt đầu Khóa (Lock) cổng để nạp
     with device_locks[port]:
-        socketio.emit('upload_status', {'status': 'compiling', 'message': f'🔥 Tới lượt bạn! Đang nạp code thật xuống board qua cổng {port}...'}, namespace='/upload_status', room=sid)
+        # Cooldown trước khi nạp: chờ board hồi phục sau lần nạp/reset trước
+        import time
+        time.sleep(3)
         
-        # Chạy lệnh upload flash của Arduino-CLI
-        upload_cmd = ["docker", "exec", cname, "arduino-cli", "upload", "-p", port, "--fqbn", board_fqbn, container_sketch_path]
-        up_code, up_log = run_and_stream(upload_cmd, socketio, sid)
+        max_retries = 3
+        up_code = -1
+        up_log = ""
+        
+        for attempt in range(1, max_retries + 1):
+            socketio.emit('upload_status', {'status': 'compiling', 'message': f'🔥 Tới lượt bạn! Đang nạp code thật xuống board qua cổng {port}... (Lần {attempt}/{max_retries})'}, namespace='/upload_status', room=sid)
+            
+            # Chạy lệnh upload flash của Arduino-CLI
+            upload_cmd = ["docker", "exec", cname, "arduino-cli", "upload", "-p", port, "--fqbn", board_fqbn, container_sketch_path]
+            up_code, up_log = run_and_stream(upload_cmd, socketio, sid)
+            
+            if up_code == 0:
+                break  # Nạp thành công, thoát vòng lặp
+            
+            # Nếu lỗi I/O -> chờ rồi thử lại
+            if attempt < max_retries:
+                socketio.emit('upload_status', {'status': 'compiling', 'message': f'⚠️ Lỗi kết nối phần cứng. Đang chờ board hồi phục... ({attempt}/{max_retries})'}, namespace='/upload_status', room=sid)
+                time.sleep(3)
         
         if up_code != 0:
             suggestions = get_upload_error_suggestions(up_log)
