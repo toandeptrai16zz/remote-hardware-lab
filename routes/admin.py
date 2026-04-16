@@ -419,3 +419,83 @@ def admin_api_export_mission(mission_id):
         download_name=filename,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
+
+# ==================== DEVICES (HARDWARE-FLASH FEATURE) ====================
+
+@admin_bp.route("/devices")
+@require_auth('admin')
+def admin_devices_page():
+    """Devices management page for hardware flashing feature"""
+    return render_template("admin/devices.html")
+
+@admin_bp.route("/api/devices/scan", methods=['POST'])
+@require_auth('admin')
+def admin_api_scan_devices():
+    """Tự động quét các cổng USB vật lý đang cắm vào Server và đồng bộ vào CSDL"""
+    import glob
+    ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
+    db = get_db_connection()
+    cur = db.cursor()
+    
+    new_count = 0
+    for i, port in enumerate(ports):
+        # Tự động cấp tên Tag theo tên cổng USB
+        tag = f"Phần cứng vật lý ({os.path.basename(port)})"
+        board_type = "esp32" if "USB" in port else "arduino"
+        try:
+            cur.execute("INSERT IGNORE INTO hardware_devices (tag_name, type, port, status) VALUES (%s, %s, %s, 'available')",
+                       (tag, board_type, port))
+            if cur.rowcount > 0:
+                new_count += 1
+        except Exception as e:
+            pass
+            
+    db.commit()
+    cur.close()
+    db.close()
+    log_action(session['username'], f"Quét thiết bị USB phát hiện {len(ports)} cổng, thêm mới {new_count} cổng.")
+    return jsonify({'success': True, 'message': f'Đã quét xong. Tìm thấy {len(ports)} cổng kết nối vật lý, đã thêm vào kho {new_count} thiết bị mới.'})
+
+@admin_bp.route("/api/devices", methods=['GET'])
+@require_auth('admin')
+def admin_api_get_devices():
+    """Lấy danh sách các USB đã đồng bộ vào CSDL"""
+    db = get_db_connection()
+    cur = db.cursor(dictionary=True)
+    cur.execute("SELECT id, tag_name, type, port, status, in_use_by FROM hardware_devices")
+    devices = cur.fetchall()
+    cur.close()
+    db.close()
+    return jsonify(devices)
+
+@admin_bp.route("/api/devices/assign", methods=['POST'])
+@require_auth('admin')
+def admin_api_assign_device():
+    """Giao hoặc Lấy lại quyền sử dụng cổng USB vật lý cho một Sinh viên cụ thể"""
+    data = request.get_json()
+    device_id = data.get('device_id')
+    username = data.get('username')
+    
+    db = get_db_connection()
+    cur = db.cursor()
+    if username:
+        # Check if username exists
+        cur.execute("SELECT id FROM users WHERE username = %s LIMIT 1", (username,))
+        user_row = cur.fetchone()
+        if not user_row:
+            cur.close(), db.close()
+            return jsonify({'success': False, 'message': f'User {username} không tồn tại'})
+
+        cur.execute("UPDATE hardware_devices SET in_use_by = %s, status = 'in_use' WHERE id = %s", (username, device_id))
+        log_msg = f"Đã giao Thiết bị ID {device_id} cho User {username}"
+    else:
+        cur.execute("UPDATE hardware_devices SET in_use_by = NULL, status = 'available' WHERE id = %s", (device_id,))
+        log_msg = f"Đã thu hồi Thiết bị ID {device_id}"
+        
+    db.commit()
+    cur.close()
+    db.close()
+    
+    log_action(session['username'], log_msg)
+    return jsonify({'success': True, 'message': 'Cập nhật phân quyền Cổng thiết bị thành công!'})
+

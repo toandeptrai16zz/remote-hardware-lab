@@ -181,17 +181,15 @@ def get_serial_ports(username):
             db = get_db_connection()
             if db:
                 cur = db.cursor(dictionary=True)
-                cur.execute("SELECT id FROM users WHERE username = %s", (username,))
-                user_row = cur.fetchone()
-                if user_row:
-                    cur.execute("SELECT port, tag_name, type FROM hardware_devices WHERE in_use_by = %s", (user_row['id'],))
-                    for row in cur.fetchall():
-                        db_devices[row['port']] = row
+                # Sửa [BUG FIX]: in_use_by lưu varchar username chứ không phải id
+                cur.execute("SELECT port, tag_name, type FROM hardware_devices WHERE in_use_by = %s", (username,))
+                for row in cur.fetchall():
+                    db_devices[row['port']] = row
                 cur.close()
                 db.close()
         except: pass
 
-        # 2. Quét Docker
+        # 2. Quét Docker (chỉ để verify cổng thật sự tồn tại)
         cmd = ["docker", "exec", cname, "arduino-cli", "board", "list", "--format", "json"]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
         
@@ -204,23 +202,18 @@ def get_serial_ports(username):
                 # Bỏ cổng rác ttyS
                 if "ttyS" in address: continue 
                 
-                # --- [FIXED] LOGIC HIỂN THỊ CỔNG ---
+                # --- [STRICT MODE] CHỈ HIỂN THỊ NẾU ĐƯỢC ADMIN CẤP QUYỀN ---
                 if address in db_devices:
-                    # Nếu có trong DB -> Lấy tên đẹp
                     display_name = db_devices[address]['tag_name']
                     board_type = db_devices[address]['type']
-                else:
-                    # [QUAN TRỌNG] Nếu không có trong DB nhưng Docker thấy -> Vẫn hiện ra
-                    display_name = f"USB Device ({os.path.basename(address)})"
-                    board_type = "esp32" # Mặc định
 
-                boards = get_boards_by_type(board_type)
-                
-                final_list.append({
-                    "port": {"address": address, "label": display_name, "protocol": "serial"},
-                    "matching_boards": boards,
-                    "boards": boards
-                })
+                    boards = get_boards_by_type(board_type)
+                    
+                    final_list.append({
+                        "port": {"address": address, "label": display_name, "protocol": "serial"},
+                        "matching_boards": boards,
+                        "boards": boards
+                    })
         
         return {'success': True, 'ports': final_list}
     except Exception as e:

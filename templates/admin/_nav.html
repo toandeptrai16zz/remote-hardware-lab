@@ -20,5 +20,10 @@
       <i class="fa-solid fa-bullseye me-2"></i>Giao Mission
     </a>
   </li>
+  <li class="nav-item">
+    <a class="nav-link {% if request.endpoint == 'admin.admin_devices_page' %}active{% endif %}" href="{{ url_for('admin.admin_devices_page') }}">
+      <i class="fa-solid fa-microchip me-2"></i>Cấp quyền Thiết bị
+    </a>
+  </li>
 </ul>
 
