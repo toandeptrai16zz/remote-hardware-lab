@@ -451,17 +451,16 @@ def admin_api_scan_devices():
     # Cập nhật hoặc Thêm mới thành available
     for port in active_ports:
         tag = f"Cáp Serial ({os.path.basename(port)})"
-        board_type = "generic" # Hỗ trợ cắm mọi mạch (Arduino, ESP32...)
         if port not in db_ports:
-            # Thêm mới
+            # Thêm mới với type generic mặc định
             try:
                 cur.execute("INSERT IGNORE INTO hardware_devices (tag_name, type, port, status) VALUES (%s, %s, %s, 'available')",
-                           (tag, board_type, port))
+                           (tag, 'generic', port))
                 if cur.rowcount > 0:
                     new_count += 1
             except Exception: pass
         else:
-            # Thu hồi trạng thái nếu cắm lại
+            # Thu hồi trạng thái nếu cắm lại, KHÔNG ghi đè type
             cur.execute("UPDATE hardware_devices SET status = 'available' WHERE port = %s", (port,))
             
     # Xử lý Rút cáp (port không tồn tại nữa / Ghost port)
@@ -499,12 +498,13 @@ def admin_api_get_devices():
     
     for port in active_ports:
         tag = f"Cáp Serial ({os.path.basename(port)})"
-        board_type = "generic"
         if port not in db_ports:
+            # Thiết bị MỚI: chèn với type mặc định generic
             try:
-                cur.execute("INSERT IGNORE INTO hardware_devices (tag_name, type, port, status) VALUES (%s, %s, %s, 'available')", (tag, board_type, port))
+                cur.execute("INSERT IGNORE INTO hardware_devices (tag_name, type, port, status) VALUES (%s, %s, %s, 'available')", (tag, 'generic', port))
             except Exception: pass
         else:
+            # Thiết bị CŨ: chỉ cập nhật trạng thái, KHÔNG ghi đè type
             cur.execute("UPDATE hardware_devices SET status = 'available' WHERE port = %s", (port,))
             
     # Thu hồi lại trạng thái đối với các port ko có trong active_ports
