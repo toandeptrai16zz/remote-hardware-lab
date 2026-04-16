@@ -55,7 +55,7 @@ async function loadBoardInfo() {
         const data = await res.json();
         const badge = document.getElementById('boardInfoBadge');
         const text = document.getElementById('boardInfoText');
-        
+
         if (data.success && data.device) {
             assignedDevice = data.device;
             const chipNames = {
@@ -84,12 +84,12 @@ async function refreshSerialPorts() {
     const portSelect = document.getElementById('serial-port-select');
     if (!portSelect) return;
     portSelect.innerHTML = '<option value="">Đang tải...</option>';
-    
+
     try {
         const res = await fetch(`/user/${username}/api/my-device`);
         const data = await res.json();
         portSelect.innerHTML = '';
-        
+
         if (data.success && data.device) {
             const port = data.device.port;
             const portName = port.split('/').pop();
@@ -171,44 +171,44 @@ function connectUploadSocket() {
             terminal.write(`\x1b[1;36m[AI SYSTEM] Hệ thống đang tự động gửi mã nguồn gốc lên AI Server... Vui lòng chờ kết quả!\x1b[0m\r\n`);
             // Trigger auto-submit without prompt
             fetch(`/user/api/missions/${_ideActiveMission.id}/submit`, { method: 'POST' })
-            .then(res => res.json())
-            .then(resData => {
-                if (resData.success || (resData.error && resData.error.includes('already submitted'))) {
-                    // Call the manual submit active mission function to just pop up the loading/polling screen
-                    // We can reuse the UI from submitActiveMission but bypass the prompt. 
-                    // To do this simply, we will just call a quick poll here directly!
-                    let pollCount = 0;
-                    const pollInterval = setInterval(async () => {
-                        pollCount++;
-                        try {
-                            const mRes = await fetch('/user/api/my-missions');
-                            const missions = await mRes.json();
-                            const m = missions.find(x => x.id === _ideActiveMission.id);
+                .then(res => res.json())
+                .then(resData => {
+                    if (resData.success || (resData.error && resData.error.includes('already submitted'))) {
+                        // Call the manual submit active mission function to just pop up the loading/polling screen
+                        // We can reuse the UI from submitActiveMission but bypass the prompt. 
+                        // To do this simply, we will just call a quick poll here directly!
+                        let pollCount = 0;
+                        const pollInterval = setInterval(async () => {
+                            pollCount++;
+                            try {
+                                const mRes = await fetch('/user/api/my-missions');
+                                const missions = await mRes.json();
+                                const m = missions.find(x => x.id === _ideActiveMission.id);
 
-                            if ((m && m.submission && m.submission.score !== null) || pollCount >= 12) {
-                                clearInterval(pollInterval);
-                                if (m && m.submission && m.submission.score !== null) {
-                                    const score = m.submission.score;
-                                    const feedback = m.submission.ai_feedback || m.submission.feedback || 'Không có nhận xét.';
-                                    const scoreColor = score >= 7 ? '#22c55e' : score >= 5 ? '#f59e0b' : '#ef4444';
-                                    Swal.fire({
-                                        title: `<span style="font-size:3rem;font-weight:900;color:${scoreColor}">${score.toFixed(1)}</span><span style="color:#888;font-size:1.2rem"> / 10</span>`,
-                                        html: `<h3 style="margin:8px 0;color:#ccc;">Kết Quả Nạp Thật + AI Chấm: ${escapeHtml(_ideActiveMission.name)}</h3>
+                                if ((m && m.submission && m.submission.score !== null) || pollCount >= 12) {
+                                    clearInterval(pollInterval);
+                                    if (m && m.submission && m.submission.score !== null) {
+                                        const score = m.submission.score;
+                                        const feedback = m.submission.ai_feedback || m.submission.feedback || 'Không có nhận xét.';
+                                        const scoreColor = score >= 7 ? '#22c55e' : score >= 5 ? '#f59e0b' : '#ef4444';
+                                        Swal.fire({
+                                            title: `<span style="font-size:3rem;font-weight:900;color:${scoreColor}">${score.toFixed(1)}</span><span style="color:#888;font-size:1.2rem"> / 10</span>`,
+                                            html: `<h3 style="margin:8px 0;color:#ccc;">Kết Quả Nạp Thật + AI Chấm: ${escapeHtml(_ideActiveMission.name)}</h3>
                                                        <div style="text-align:left;padding:14px 18px;background:rgba(255,255,255,0.03);border-radius:12px;border:1px solid rgba(124,106,247,0.3);box-shadow:inset 0 0 10px rgba(124,106,247,0.1);margin-top:15px;font-size:0.85rem;color:#ccc;line-height:1.7;max-height:180px;overflow-y:auto;">💬 <b>AI Nhận xét:</b><br><span style="color:#aaa;">${escapeHtml(feedback).replace(/\n/g, '<br>')}</span></div>`,
-                                        icon: score >= 5 ? 'success' : 'warning',
-                                        confirmButtonColor: '#7c6af7',
-                                        confirmButtonText: 'Tuyệt đỉnh',
-                                        background: '#1a1a2e',
-                                        color: '#e0e0e0',
-                                        backdrop: `rgba(10,10,30,0.6) blur(4px)`,
-                                        customClass: { popup: 'swal-no-scroll' }
-                                    });
+                                            icon: score >= 5 ? 'success' : 'warning',
+                                            confirmButtonColor: '#7c6af7',
+                                            confirmButtonText: 'Tuyệt đỉnh',
+                                            background: '#1a1a2e',
+                                            color: '#e0e0e0',
+                                            backdrop: `rgba(10,10,30,0.6) blur(4px)`,
+                                            customClass: { popup: 'swal-no-scroll' }
+                                        });
+                                    }
                                 }
-                            }
-                        } catch (e) {}
-                    }, 5000);
-                }
-            });
+                            } catch (e) { }
+                        }, 5000);
+                    }
+                });
         }
     });
 }
@@ -268,13 +268,13 @@ async function confirmFileCreation() {
 
     try {
         await createNewItem(currentFileCreationType, currentFileCreationPath, finalName);
-        
+
         // Theo tiêu chuẩn Arduino: Thư mục chứa mã nguồn cần có một file .ino cùng tên
         if (currentFileCreationType === 'folder') {
             const childFilePath = currentFileCreationPath === '.' ? finalName : `${currentFileCreationPath}/${finalName}`;
             await createNewItem('file', childFilePath, `${finalName}.ino`);
         }
-        
+
         closeFileCreationModal();
     } catch (error) {
         showNotification('Có lỗi xảy ra khi tạo file/thư mục', 'error');
@@ -1194,11 +1194,11 @@ function switchToFile(fullPathKey) {
     if (!openFiles.has(fullPathKey)) return;
     currentFile = fullPathKey;
     const fileData = openFiles.get(fullPathKey);
-    
+
     isSystemChange = true;
     editor.setValue(fileData.content, -1);
     isSystemChange = false;
-    
+
     const modelist = ace.require("ace/ext/modelist");
     editor.session.setMode(modelist.getModeForPath(fileData.shortName).mode);
     editor.focus();
@@ -1309,7 +1309,7 @@ async function saveCurrentFile() {
 async function compileCode(event) {
     const compileBtn = event ? (event.currentTarget || event.target) : null;
     const originalBtnHTML = compileBtn ? compileBtn.innerHTML : "Biên dịch";
-    
+
     if (compileBtn) {
         compileBtn.disabled = true;
         compileBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Đang xử lý...`;
@@ -1331,7 +1331,7 @@ async function compileCode(event) {
         }
         return;
     }
-    //Logic auto save before compile or loaded
+    //Logic auto save trước khi compile và nạp
     if (openFiles.has(currentFile) && !openFiles.get(currentFile).saved) {
         terminal.write('\r\n\x1b[90m[IDE]\x1b[0m File chưa được lưu. Tự động lưu...\r\n');
         await saveCurrentFile() // save and continue
@@ -1412,7 +1412,7 @@ async function compileCode(event) {
 async function flashCode(event) {
     const flashBtn = event ? (event.currentTarget || event.target) : null;
     const originalBtnHTML = flashBtn ? flashBtn.innerHTML : "Nạp (Flash)";
-    
+
     if (flashBtn) {
         flashBtn.disabled = true;
         flashBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Đang chờ...`;
@@ -1426,7 +1426,7 @@ async function flashCode(event) {
         }
         return;
     }
-    
+
     if (openFiles.has(currentFile) && !openFiles.get(currentFile).saved) {
         terminal.write('\r\n\x1b[90m[IDE]\x1b[0m File chưa được lưu. Tự động lưu trước khi nạp...\r\n');
         await saveCurrentFile();
@@ -1442,11 +1442,11 @@ async function flashCode(event) {
             body: JSON.stringify({ sketch_path: sketchPath, sid: currentSid })
         });
         const data = await response.json();
-        
+
         if (!response.ok) {
             throw new Error(data.error || data.output || `Server error: ${response.status}`);
         }
-        
+
         if (data.success) {
             showNotification(data.message || 'Đã vào hàng đợi Nạp code!', 'success');
             // Tiến trình cụ thể sẽ được Broadcast qua Socket.IO (upload_status channel)
