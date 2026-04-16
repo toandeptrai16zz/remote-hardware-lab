@@ -539,9 +539,14 @@ def admin_api_assign_device():
     data = request.get_json()
     device_id = data.get('device_id')
     usernames = data.get('usernames', []) # Mảng các user
+    board_type = data.get('board_type', 'generic')  # Loại Board do Admin chọn
     
     db = get_db_connection()
     cur = db.cursor()
+    
+    # Cập nhật loại Board vào CSDL
+    cur.execute("UPDATE hardware_devices SET type = %s WHERE id = %s", (board_type, device_id))
+    
     # Xoá tất cả quyền cũ của cái cổng này
     cur.execute("DELETE FROM device_assignments WHERE device_id = %s", (device_id,))
     

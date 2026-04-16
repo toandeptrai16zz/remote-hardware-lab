@@ -162,12 +162,23 @@
                 ? `<span class="badge bg-danger"><i class="fa-solid fa-plug-circle-minus"></i> Đã Rút Cáp</span>`
                 : `<span class="badge bg-success"><i class="fa-solid fa-plug-circle-check"></i> Đang Cắm</span>`;
 
-            const chipLabel = `<span class="badge bg-secondary text-white px-3"><i class="fa-solid fa-microchip"></i> Serial Port (Arduino/ESP)</span>`;
+            const boardOptions = [
+                { value: 'generic', label: 'Arduino Uno', icon: 'fa-microchip' },
+                { value: 'esp32', label: 'ESP32', icon: 'fa-wifi' },
+                { value: 'esp8266', label: 'ESP8266', icon: 'fa-wifi' },
+            ];
+            const currentType = dev.type || 'generic';
+            let boardSelectHtml = `<select class="form-select form-select-sm" id="boardtype_${dev.id}" style="width:180px; background:#0f0f1a; color:#fff; border:1px solid rgba(124,106,247,0.5); border-radius:8px;">`;
+            boardOptions.forEach(opt => {
+                const sel = opt.value === currentType ? 'selected' : '';
+                boardSelectHtml += `<option value="${opt.value}" ${sel}><i class="fa-solid ${opt.icon}"></i> ${opt.label}</option>`;
+            });
+            boardSelectHtml += `</select>`;
 
             tr.innerHTML = `
             <td><strong class="text-white">${dev.tag_name}</strong><br>${statusBadge}</td>
             <td><span class="badge" style="background:#2c2c4d; border:1px solid #7c6af7;">${dev.port}</span></td>
-            <td>${chipLabel}</td>
+            <td>${boardSelectHtml}</td>
             <td>
                 <select class="form-select form-select-sm select2-user" id="assign_${dev.id}" multiple="multiple" style="width:250px;">
                     ${options}
@@ -231,10 +242,11 @@
         if (!result.isConfirmed) return;
 
         try {
+            const boardType = document.getElementById('boardtype_' + deviceId)?.value || 'generic';
             const res = await fetch('/admin/api/devices/assign', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ device_id: deviceId, usernames: usernames })
+                body: JSON.stringify({ device_id: deviceId, usernames: usernames, board_type: boardType })
             });
             const data = await res.json();
             if (data.success) {
