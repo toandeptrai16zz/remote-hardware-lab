@@ -74,6 +74,18 @@ def stop_existing_monitor(sid):
             except Exception as e:
                 logger.warning(f"Ignoring error while closing port: {e}")
 
+def force_close_port(port):
+    """[SMART RELEASE] Đóng ngay lập tức đối tượng pyserial đang giữ port này trên Server-side"""
+    for sid, ser in list(serial_sessions.items()):
+        if ser and ser.port == port:
+            if ser.is_open:
+                try:
+                    ser.close()
+                    logger.info(f"Forcefully closed serial port {port} for session {sid} on server-side.")
+                except Exception as e:
+                    logger.warning(f"Ignoring error while force closing port: {e}")
+            serial_sessions.pop(sid, None)
+
 def register_serial_handlers(socketio):
     """Register serial monitor namespace handlers"""
     
