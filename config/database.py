@@ -64,7 +64,7 @@ def init_db():
             tag_name VARCHAR(100) NOT NULL UNIQUE, 
             type VARCHAR(100) NOT NULL, 
             port VARCHAR(100) NOT NULL UNIQUE, 
-            status ENUM('available', 'in_use', 'maintenance') NOT NULL DEFAULT 'available', 
+            status ENUM('available', 'in_use', 'maintenance', 'error', 'disconnected') NOT NULL DEFAULT 'available', 
             in_use_by VARCHAR(50) NULL, 
             FOREIGN KEY (in_use_by) REFERENCES users(username) ON DELETE SET NULL
         )
