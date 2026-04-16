@@ -26,7 +26,6 @@ def read_serial_data(socketio, sid, ser, username):
     
     buffer = ""
     last_emit_time = time.time()
-    EMIT_INTERVAL = 0.1  # Giới hạn gửi: 10 lần/giây (đủ mượt mà không lag)
 
     try:
         while True:
@@ -35,32 +34,28 @@ def read_serial_data(socketio, sid, ser, username):
                 break
                 
             # 1. Đọc dữ liệu vào bộ đệm
-            if ser.in_waiting > 0:
-                try:
-                    # Đọc tối đa 1024 bytes một lúc để tránh nghẽn
-                    data = ser.read(min(ser.in_waiting, 1024))
+            try:
+                available = ser.in_waiting
+                if available > 0:
+                    data = ser.read(min(available, 4096))
                     if data:
-                        text = data.decode('utf-8', errors='replace')
-                        buffer += text
-                except Exception as e:
-                    logger.error(f"Serial read error: {e}")
-                    socketio.emit('serial_error', {'error': str(e)}, namespace='/serial', room=sid)
-                    break
+                        buffer += data.decode('utf-8', errors='replace')
+            except Exception as e:
+                logger.error(f"Serial read error: {e}")
+                socketio.emit('serial_error', {'error': str(e)}, namespace='/serial', room=sid)
+                break
             
-            # 2. Kiểm tra thời gian để gửi (Throttling)
+            # 2. Gom lô (Batching) để gửi qua WebSocket
             current_time = time.time()
-            if (current_time - last_emit_time) > EMIT_INTERVAL:
-                if buffer:
-                    # Chỉ gửi khi có dữ liệu trong buffer
-                    socketio.emit('serial_data', {'data': buffer}, namespace='/serial', room=sid)
-                    buffer = ""  # Xóa buffer sau khi gửi
-                
+            if buffer and ((current_time - last_emit_time) > 0.2 or len(buffer) > 2048):
+                socketio.emit('serial_data', {'data': buffer}, namespace='/serial', room=sid)
+                buffer = ""
                 last_emit_time = current_time
 
-            # 3. QUAN TRỌNG: Nhường CPU cho các tiến trình khác
-            # Dùng socketio.sleep thay vì time.sleep để không chặn server
-            socketio.sleep(0.02) 
-            
+            # 3. Tránh ăn CPU vọt lên 100%
+            # Ngủ 50ms nếu đang rảnh rỗi (Không có data chờ), ngược lại ngủ 10ms để dọn nốt buffer
+            socketio.sleep(0.01 if ser.in_waiting > 0 else 0.05)
+                        
     except Exception as e:
         logger.error(f"Serial thread crash: {e}")
     finally:

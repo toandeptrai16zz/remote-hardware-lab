@@ -686,6 +686,11 @@ function initSerialSocket() {
             span.textContent = text;
             outputEl.appendChild(span);
             
+            // Giữ cho DOM nhẹ nhàng - xóa các dòng cũ nhất nếu quá 300 thẻ span
+            while (outputEl.childNodes.length > 300) {
+                outputEl.removeChild(outputEl.firstChild);
+            }
+            
             if (isAtBottom) {
                 outputEl.scrollTop = outputEl.scrollHeight;
             }
