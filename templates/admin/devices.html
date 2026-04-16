@@ -4,30 +4,64 @@
 {% block extra_head %}
 <!-- Select2 -->
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
 <style>
-    .mission-container { padding: 2rem; max-width: 1000px; margin: 0 auto; color: #fff; }
-    .mission-header { margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }
-    .card-soft { background: #1a1a2e; border: 1px solid rgba(124,106,247,0.2); border-radius: 12px; }
-    .table-dark-custom { background: transparent; color: #ccc; }
-    .table-dark-custom th { border-bottom: 2px solid #7c6af7; color: #7c6af7; }
-    .table-dark-custom td { border-bottom: 1px solid rgba(255,255,255,0.1); padding: 15px 10px; vertical-align: middle; }
-    
+    .mission-container {
+        padding: 2rem;
+        max-width: 1000px;
+        margin: 0 auto;
+        color: #fff;
+    }
+
+    .mission-header {
+        margin-bottom: 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .card-soft {
+        background: #1a1a2e;
+        border: 1px solid rgba(124, 106, 247, 0.2);
+        border-radius: 12px;
+    }
+
+    .table-dark-custom {
+        background: transparent;
+        color: #ccc;
+    }
+
+    .table-dark-custom th {
+        border-bottom: 2px solid #7c6af7;
+        color: #7c6af7;
+    }
+
+    .table-dark-custom td {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 15px 10px;
+        vertical-align: middle;
+    }
+
     .select2-container--bootstrap-5 .select2-selection {
         background-color: #0f0f1a;
         color: white;
-        border: 1px solid rgba(124,106,247,0.5);
+        border: 1px solid rgba(124, 106, 247, 0.5);
     }
+
     .select2-container--bootstrap-5 .select2-selection__rendered {
         color: white !important;
     }
+
     .select2-container--bootstrap-5 .select2-dropdown {
         background-color: #0f0f1a;
-        border: 1px solid rgba(124,106,247,0.5);
+        border: 1px solid rgba(124, 106, 247, 0.5);
     }
+
     .select2-results__option {
         color: white;
     }
+
     .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] {
         background-color: #7c6af7;
     }
@@ -44,7 +78,8 @@
                 (Gán USB Port cho 1 Sinh Viên)
             </small>
         </h2>
-        <button class="btn btn-primary shadow" style="background: linear-gradient(135deg, #7c6af7, #4b3acb); border:none;" onclick="scanDevices()">
+        <button class="btn btn-primary shadow"
+            style="background: linear-gradient(135deg, #7c6af7, #4b3acb); border:none;" onclick="scanDevices()">
             <i class="fa-solid fa-rotate-right me-1"></i> Quét cổng kết nối vật lý Host
         </button>
     </header>
@@ -52,7 +87,9 @@
     {% include 'admin/_nav.html' %}
 
     <div class="card card-soft p-4 shadow-lg mt-3">
-        <p class="text-muted mb-4"><i class="fa-solid fa-triangle-exclamation text-warning me-2"></i>Tính năng này ép sinh viên phải đợi nhau dùng chung phần cứng. Đóng vai trò là Bottleneck để so sánh với thiết kế "AI Siêu Tốc".</p>
+        <p class="text-muted mb-4"><i class="fa-solid fa-triangle-exclamation text-warning me-2"></i>Tính năng này ép
+            sinh viên phải đợi nhau dùng chung phần cứng. Đóng vai trò là Bottleneck để so sánh với thiết kế "AI Siêu
+            Tốc".</p>
         <div class="table-responsive">
             <table class="table table-dark-custom w-100">
                 <thead>
@@ -65,7 +102,10 @@
                     </tr>
                 </thead>
                 <tbody id="devicesTableBody">
-                    <tr><td colspan="5" class="text-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-primary"></i> Đang tải danh sách...</td></tr>
+                    <tr>
+                        <td colspan="5" class="text-center py-4"><i
+                                class="fa-solid fa-circle-notch fa-spin text-primary"></i> Đang tải danh sách...</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -77,55 +117,55 @@
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-let allUsers = [];
+    let allUsers = [];
 
-async function loadData() {
-    Swal.fire({
-        title: 'Đang kết nối Server...',
-        allowEscapeKey: false,
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading()
-    });
-    
-    try {
-        const usersRes = await fetch('/admin/api/users');
-        allUsers = await usersRes.json();
-        await reloadDevices();
-        Swal.close();
-    } catch (e) {
-        Swal.fire('Lỗi', 'Không thể kết nối đến máy chủ API', 'error');
-    }
-}
-
-async function reloadDevices() {
-    const devRes = await fetch('/admin/api/devices?t=' + new Date().getTime());
-    const devices = await devRes.json();
-    
-    const tbody = document.getElementById('devicesTableBody');
-    tbody.innerHTML = '';
-    
-    if (devices.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4"><i class="fa-solid fa-plug-circle-xmark fa-2x mb-3 text-secondary"></i><br>Chưa phát hiện cổng USB phần cứng vật lý nào.<br>Hãy cắm mạch vào máy chủ và bấm Quét lại cổng.</td></tr>';
-        return;
-    }
-    
-    devices.forEach(dev => {
-        const tr = document.createElement('tr');
-        
-        let options = '';
-        allUsers.forEach(u => {
-            const selected = dev.assigned_users && dev.assigned_users.includes(u.username) ? "selected" : "";
-            options += `<option value="${u.username}" ${selected}>🧑‍🎓 ${u.username}</option>`;
+    async function loadData() {
+        Swal.fire({
+            title: 'Đang kết nối Server...',
+            allowEscapeKey: false,
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
         });
-        
-        const statusBadge = dev.status === 'disconnected' 
-                            ? `<span class="badge bg-danger"><i class="fa-solid fa-plug-circle-minus"></i> Đã Rút Cáp</span>` 
-                            : `<span class="badge bg-success"><i class="fa-solid fa-plug-circle-check"></i> Đang Cắm</span>`;
-                            
-        const chipLabel = `<span class="badge bg-secondary text-white px-3"><i class="fa-solid fa-microchip"></i> Serial Port (Arduino/ESP)</span>`;
 
-        tr.innerHTML = `
-            <td><strong class="text-white">${dev.tag_name}</strong><br><div class="mt-1">${statusBadge}</div></td>
+        try {
+            const usersRes = await fetch('/admin/api/users');
+            allUsers = await usersRes.json();
+            await reloadDevices();
+            Swal.close();
+        } catch (e) {
+            Swal.fire('Lỗi', 'Không thể kết nối đến máy chủ API', 'error');
+        }
+    }
+
+    async function reloadDevices() {
+        const devRes = await fetch('/admin/api/devices?t=' + new Date().getTime());
+        const devices = await devRes.json();
+
+        const tbody = document.getElementById('devicesTableBody');
+        tbody.innerHTML = '';
+
+        if (devices.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4"><i class="fa-solid fa-plug-circle-xmark fa-2x mb-3 text-secondary"></i><br>Chưa phát hiện cổng USB phần cứng vật lý nào.<br>Hãy cắm mạch vào máy chủ và bấm Quét lại cổng.</td></tr>';
+            return;
+        }
+
+        devices.forEach(dev => {
+            const tr = document.createElement('tr');
+
+            let options = '';
+            allUsers.forEach(u => {
+                const selected = dev.assigned_users && dev.assigned_users.includes(u.username) ? "selected" : "";
+                options += `<option value="${u.username}" ${selected}>🧑‍🎓 ${u.username}</option>`;
+            });
+
+            const statusBadge = dev.status === 'disconnected'
+                ? `<span class="badge bg-danger"><i class="fa-solid fa-plug-circle-minus"></i> Đã Rút Cáp</span>`
+                : `<span class="badge bg-success"><i class="fa-solid fa-plug-circle-check"></i> Đang Cắm</span>`;
+
+            const chipLabel = `<span class="badge bg-secondary text-white px-3"><i class="fa-solid fa-microchip"></i> Serial Port (Arduino/ESP)</span>`;
+
+            tr.innerHTML = `
+            <td><strong class="text-white">${dev.tag_name}</strong><br>${statusBadge}</td>
             <td><span class="badge" style="background:#2c2c4d; border:1px solid #7c6af7;">${dev.port}</span></td>
             <td>${chipLabel}</td>
             <td>
@@ -140,96 +180,96 @@ async function reloadDevices() {
                 </button>
             </td>
         `;
-        tbody.appendChild(tr);
-    });
-    
-    // Init select2
-    $('.select2-user').select2({ theme: 'bootstrap-5', placeholder: "-- Khóa cổng (Không ai được dùng) --" });
-}
-
-async function scanDevices() {
-    Swal.fire({
-        title: 'Đang quét cổng Com/USB Host...',
-        text: 'Quá trình này rà soát thư mục /dev/ chứa phần cứng hệ điều hành Linux.',
-        didOpen: () => Swal.showLoading(),
-        allowOutsideClick: false
-    });
-    try {
-        const res = await fetch('/admin/api/devices/scan', { method: 'POST' });
-        const data = await res.json();
-        
-        if (data.success) {
-            Swal.fire('Quét thành công!', data.message, 'success');
-            await reloadDevices();
-        } else {
-            Swal.fire('Thất bại', data.message || 'Lỗi không xác định', 'error');
-        }
-    } catch(e) {
-        Swal.fire('Lỗi', 'API Server không phản hồi yêu cầu quét thiết bị', 'error');
-    }
-}
-
-async function assignDevice(deviceId) {
-    // Array of selected usernames
-    const usernames = $('#assign_' + deviceId).val() || [];
-    
-    const icon = usernames.length > 0 ? '<i class="fa-solid fa-users text-success"></i>' : '<i class="fa-solid fa-lock text-warning"></i>';
-    const textTarget = usernames.length > 0 ? `Cấp quyền cổng này cho <b>${usernames.length} sinh viên</b> xếp hàng chung?` : `Hủy bỏ quyền sử dụng và thu hồi lại cổng USB này?`;
-    
-    const result = await Swal.fire({
-        title: 'Xác nhận Quyền Phần cứng?',
-        html: `${icon} ${textTarget}`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#7c6af7',
-        cancelButtonText: 'Đóng',
-        confirmButtonText: 'Cập nhật Quyền',
-        background: '#1a1a2e',
-        color: '#e0e0e0',
-    });
-    
-    if (!result.isConfirmed) return;
-
-    try {
-        const res = await fetch('/admin/api/devices/assign', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ device_id: deviceId, usernames: usernames })
+            tbody.appendChild(tr);
         });
-        const data = await res.json();
-        if(data.success) {
-            Swal.fire({
-                title: 'Thành công',
-                text: data.message,
-                icon: 'success',
-                timer: 1500,
-                showConfirmButton: false,
-                background: '#1a1a2e',
-                color: '#e0e0e0',
-            });
-            await reloadDevices();
-        } else {
-            Swal.fire({
-                title: 'Cấp quyền lỗi',
-                text: data.message,
-                icon: 'error',
-                background: '#1a1a2e',
-                color: '#e0e0e0',
-            });
-        }
-    } catch(e) {
-        Swal.fire('Lỗi', 'Gửi lệnh lưu vào CSDL thất bại.', 'error');
+
+        // Init select2
+        $('.select2-user').select2({ theme: 'bootstrap-5', placeholder: "-- Khóa cổng (Không ai được dùng) --" });
     }
-}
 
-// Utils
-function escapeHtml(unsafe) {
-    return (unsafe || '').toString()
-         .replace(/&/g, "&amp;")
-         .replace(/</g, "&lt;")
-         .replace(/>/g, "&gt;");
-}
+    async function scanDevices() {
+        Swal.fire({
+            title: 'Đang quét cổng Com/USB Host...',
+            text: 'Quá trình này rà soát thư mục /dev/ chứa phần cứng hệ điều hành Linux.',
+            didOpen: () => Swal.showLoading(),
+            allowOutsideClick: false
+        });
+        try {
+            const res = await fetch('/admin/api/devices/scan', { method: 'POST' });
+            const data = await res.json();
 
-document.addEventListener('DOMContentLoaded', loadData);
+            if (data.success) {
+                Swal.fire('Quét thành công!', data.message, 'success');
+                await reloadDevices();
+            } else {
+                Swal.fire('Thất bại', data.message || 'Lỗi không xác định', 'error');
+            }
+        } catch (e) {
+            Swal.fire('Lỗi', 'API Server không phản hồi yêu cầu quét thiết bị', 'error');
+        }
+    }
+
+    async function assignDevice(deviceId) {
+        // Array of selected usernames
+        const usernames = $('#assign_' + deviceId).val() || [];
+
+        const icon = usernames.length > 0 ? '<i class="fa-solid fa-users text-success"></i>' : '<i class="fa-solid fa-lock text-warning"></i>';
+        const textTarget = usernames.length > 0 ? `Cấp quyền cổng này cho <b>${usernames.length} sinh viên</b> xếp hàng chung?` : `Hủy bỏ quyền sử dụng và thu hồi lại cổng USB này?`;
+
+        const result = await Swal.fire({
+            title: 'Xác nhận Quyền Phần cứng?',
+            html: `${icon} ${textTarget}`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#7c6af7',
+            cancelButtonText: 'Đóng',
+            confirmButtonText: 'Cập nhật Quyền',
+            background: '#1a1a2e',
+            color: '#e0e0e0',
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+            const res = await fetch('/admin/api/devices/assign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device_id: deviceId, usernames: usernames })
+            });
+            const data = await res.json();
+            if (data.success) {
+                Swal.fire({
+                    title: 'Thành công',
+                    text: data.message,
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    background: '#1a1a2e',
+                    color: '#e0e0e0',
+                });
+                await reloadDevices();
+            } else {
+                Swal.fire({
+                    title: 'Cấp quyền lỗi',
+                    text: data.message,
+                    icon: 'error',
+                    background: '#1a1a2e',
+                    color: '#e0e0e0',
+                });
+            }
+        } catch (e) {
+            Swal.fire('Lỗi', 'Gửi lệnh lưu vào CSDL thất bại.', 'error');
+        }
+    }
+
+    // Utils
+    function escapeHtml(unsafe) {
+        return (unsafe || '').toString()
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+    }
+
+    document.addEventListener('DOMContentLoaded', loadData);
 </script>
 {% endblock %}
