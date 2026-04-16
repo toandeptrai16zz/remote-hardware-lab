@@ -153,6 +153,12 @@ def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio
 
     # 2. Bắt đầu Khóa (Global File Lock) cổng để nạp
     with get_hardware_lock(port):
+        # --- [TACTICAL KILL] Giải phóng port cưỡng bức nếu có Serial Monitor đang găm ---
+        try:
+            subprocess.run(["fuser", "-k", port], check=False, timeout=5)
+        except Exception:
+            pass
+            
         # Cooldown trước khi nạp: chờ board hồi phục sau lần nạp/reset trước
         import time
         time.sleep(3)
