@@ -23,6 +23,10 @@ let pendingDeleteItemPath = null;
 // Serial monitor variables
 let socketSerial = null;
 
+// Exam Mode: khi đang thi thì chỉ hiện folder bài thi, ẩn hết folder khác
+let _examModeSlug = null;   // slug của folder bài thi đang active (null = không thi)
+let _prevExamSlug = null;   // slug trước đó, dùng để detect thay đổi trạng thái
+
 document.addEventListener('DOMContentLoaded', () => {
     setupEditor();
     setupTerminal();
@@ -1015,7 +1019,26 @@ async function loadFolderContents(path, parentElement) {
         });
         parentElement.innerHTML = '';
         if (data.files?.length > 0) {
-            data.files.forEach(item => parentElement.appendChild(createTreeItem(item, path)));
+            let filtered = data.files;
+            // ── EXAM MODE: Nếu đang thi, chỉ hiện folder bài thi ở root ──
+            if (_examModeSlug && path === '.') {
+                filtered = data.files.filter(item => {
+                    // Giữ lại folder trùng tên slug bài thi, ẩn hết các thứ khác
+                    return item.is_dir && item.name === _examModeSlug;
+                });
+                if (filtered.length === 0) {
+                    // Fallback: nếu không tìm thấy exact match thì hiện tất cả
+                    filtered = data.files;
+                }
+            }
+            filtered.forEach(item => parentElement.appendChild(createTreeItem(item, path)));
+            // Auto-expand folder bài thi
+            if (_examModeSlug && path === '.') {
+                const examLi = parentElement.querySelector(`[data-path="${_examModeSlug}"]`)?.parentElement;
+                if (examLi && !examLi.classList.contains('is-open')) {
+                    toggleFolder(examLi);
+                }
+            }
         } else if (path !== '.') {
             parentElement.innerHTML = '<li style="padding-left: 20px; color: #888; font-style: italic;">(empty)</li>';
         }
@@ -1642,6 +1665,17 @@ function toggleMissionsModal() {
 let _ideMissionTimer = null;
 let _ideActiveMission = null;
 
+// Hàm slugify giống backend Python để tính tên folder bài thi
+function slugifyVN(text) {
+    if (!text) return '';
+    const MAP = {'à':'a','á':'a','ả':'a','ã':'a','ạ':'a','ă':'a','ắ':'a','ằ':'a','ẳ':'a','ẵ':'a','ặ':'a','â':'a','ấ':'a','ầ':'a','ẩ':'a','ẫ':'a','ậ':'a','è':'e','é':'e','ẻ':'e','ẽ':'e','ẹ':'e','ê':'e','ế':'e','ề':'e','ể':'e','ễ':'e','ệ':'e','ì':'i','í':'i','ỉ':'i','ĩ':'i','ị':'i','ò':'o','ó':'o','ỏ':'o','õ':'o','ọ':'o','ô':'o','ố':'o','ồ':'o','ổ':'o','ỗ':'o','ộ':'o','ơ':'o','ớ':'o','ờ':'o','ở':'o','ỡ':'o','ợ':'o','ù':'u','ú':'u','ủ':'u','ũ':'u','ụ':'u','ư':'u','ứ':'u','ừ':'u','ử':'u','ữ':'u','ự':'u','ỳ':'y','ý':'y','ỷ':'y','ỹ':'y','ỵ':'y','đ':'d','À':'A','Á':'A','Ả':'A','Ã':'A','Ạ':'A','Ă':'A','Ắ':'A','Ằ':'A','Ẳ':'A','Ẵ':'A','Ặ':'A','Â':'A','Ấ':'A','Ầ':'A','Ẩ':'A','Ẫ':'A','Ậ':'A','È':'E','É':'E','Ẻ':'E','Ẽ':'E','Ẹ':'E','Ê':'E','Ế':'E','Ề':'E','Ể':'E','Ễ':'E','Ệ':'E','Ì':'I','Í':'I','Ỉ':'I','Ĩ':'I','Ị':'I','Ò':'O','Ó':'O','Ỏ':'O','Õ':'O','Ọ':'O','Ô':'O','Ố':'O','Ồ':'O','Ổ':'O','Ỗ':'O','Ộ':'O','Ơ':'O','Ớ':'O','Ờ':'O','Ở':'O','Ỡ':'O','Ợ':'O','Ù':'U','Ú':'U','Ủ':'U','Ũ':'U','Ụ':'U','Ư':'U','Ứ':'U','Ừ':'U','Ử':'U','Ữ':'U','Ự':'U','Ỳ':'Y','Ý':'Y','Ỷ':'Y','Ỹ':'Y','Ỵ':'Y','Đ':'D'};
+    let res = '';
+    for (const ch of text) res += MAP[ch] || ch;
+    res = res.replace(/[^\w\s-]/g, '').trim().toLowerCase();
+    res = res.replace(/[-\s]+/g, '_');
+    return res;
+}
+
 async function syncMissionsToIDE() {
     try {
         const res = await fetch('/user/api/my-missions');
@@ -1658,15 +1692,20 @@ async function syncMissionsToIDE() {
             return !m.submitted && now <= e;
         });
 
-        // Badge trên nút Missions
+        // ── NÚT MISSIONS: Ẩn khi không có bài, ẩn khi đang thi, hiện khi có bài chưa thi ──
+        const btnMissions = document.getElementById('btnMissions');
         const badge = document.getElementById('missionsBadge');
-        if (badge) {
-            if (total.length > 0) {
-                badge.textContent = total.length;
-                badge.style.display = 'flex';
-            } else {
-                badge.style.display = 'none';
-            }
+        if (active.length > 0) {
+            // Đang thi → ẩn nút Missions (không cần bấm vào nữa)
+            if (btnMissions) btnMissions.style.display = 'none';
+        } else if (total.length > 0) {
+            // Có bài chưa thi/chưa hết hạn → hiện nút + badge
+            if (btnMissions) btnMissions.style.display = '';
+            if (badge) { badge.textContent = total.length; badge.style.display = 'flex'; }
+        } else {
+            // Không có bài nào → ẩn nút Missions
+            if (btnMissions) btnMissions.style.display = 'none';
+            if (badge) badge.style.display = 'none';
         }
 
         // Countdown mini + nút submit
@@ -1681,11 +1720,26 @@ async function syncMissionsToIDE() {
                 _ideMissionTimer = setInterval(tickIDECountdown, 1000);
                 tickIDECountdown();
             }
+
+            // ── EXAM MODE: Cô lập Explorer chỉ hiện folder bài thi ──
+            const newSlug = slugifyVN(active[0].name) || `mission_${active[0].id}`;
+            if (newSlug !== _examModeSlug) {
+                _prevExamSlug = _examModeSlug;
+                _examModeSlug = newSlug;
+                refreshRootFiles(); // Reload Explorer với filter
+            }
         } else {
             _ideActiveMission = null;
             if (bar) bar.style.display = 'none';
             if (btnSubmit) btnSubmit.style.display = 'none';
             if (_ideMissionTimer) { clearInterval(_ideMissionTimer); _ideMissionTimer = null; }
+
+            // ── THOÁT EXAM MODE: Khôi phục Explorer bình thường ──
+            if (_examModeSlug !== null) {
+                _prevExamSlug = _examModeSlug;
+                _examModeSlug = null;
+                refreshRootFiles(); // Reload Explorer không filter
+            }
         }
     } catch (e) { /* im lặng */ }
 }
