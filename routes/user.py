@@ -407,6 +407,15 @@ def flash_sketch_api(username):
     
     return jsonify(success=True, message=f"Đã đưa lệnh nạp vào hàng đợi của cổng {port}.")
 
+@user_bp.route('/<username>/api/my-device', methods=['GET'])
+@require_auth('user')
+def get_my_device_api(username):
+    """API trả về Board vật lý được Admin gán cho user này"""
+    from services.arduino import get_user_assigned_device
+    device = get_user_assigned_device(username)
+    if not device:
+        return jsonify(success=True, device=None)
+    return jsonify(success=True, device=device)
 
 
 # ==================== MISSIONS ====================

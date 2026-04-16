@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     connectTerminalSocket();
     connectUploadSocket();
     setupRealTimeNotifications();
+    loadBoardInfo();
 });
 
 function setupRealTimeNotifications() {
@@ -43,6 +44,69 @@ function setupRealTimeNotifications() {
         showNotification(` BÀI TẬP MỚI: ${data.mission_name}. Hãy truy cập tab Bài tập/Thi để bắt đầu làm bài!`, 'info');
         if (typeof checkIDEActiveMission === 'function') checkIDEActiveMission();
     });
+}
+
+// Biến lưu trữ thông tin Board được cấp quyền
+let assignedDevice = null;
+
+async function loadBoardInfo() {
+    try {
+        const res = await fetch(`/user/${username}/api/my-device`);
+        const data = await res.json();
+        const badge = document.getElementById('boardInfoBadge');
+        const text = document.getElementById('boardInfoText');
+        
+        if (data.success && data.device) {
+            assignedDevice = data.device;
+            const chipNames = {
+                'generic': 'Arduino Uno',
+                'esp32': 'ESP32',
+                'esp8266': 'ESP8266'
+            };
+            const chipName = chipNames[data.device.type] || data.device.type;
+            const portName = data.device.port.split('/').pop();
+            text.textContent = `${chipName} • ${portName}`;
+            badge.style.display = 'flex';
+        } else {
+            assignedDevice = null;
+            text.textContent = 'Chưa cấp Board';
+            badge.style.display = 'flex';
+            badge.style.borderColor = '#ef4444';
+            badge.style.color = '#fca5a5';
+            badge.style.background = 'linear-gradient(135deg,#2e0a0a,#2e0f0f)';
+        }
+    } catch (e) {
+        console.warn('Could not load board info:', e);
+    }
+}
+
+async function refreshSerialPorts() {
+    const portSelect = document.getElementById('serial-port-select');
+    if (!portSelect) return;
+    portSelect.innerHTML = '<option value="">Đang tải...</option>';
+    
+    try {
+        const res = await fetch(`/user/${username}/api/my-device`);
+        const data = await res.json();
+        portSelect.innerHTML = '';
+        
+        if (data.success && data.device) {
+            const port = data.device.port;
+            const portName = port.split('/').pop();
+            const opt = document.createElement('option');
+            opt.value = port;
+            opt.textContent = `📡 ${portName} (Được cấp quyền)`;
+            opt.selected = true;
+            portSelect.appendChild(opt);
+        } else {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = '⚠️ Chưa được Admin cấp quyền cổng nào';
+            portSelect.appendChild(opt);
+        }
+    } catch (e) {
+        portSelect.innerHTML = '<option value="">Lỗi kết nối Server</option>';
+    }
 }
 
 // =================================================================

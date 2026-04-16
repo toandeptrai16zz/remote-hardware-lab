@@ -42,6 +42,10 @@
                         <span id="miniExamCountdown" style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#7c6af7;">00:00:00</span>
                     </span>
                     <span class="border-end" style="height: 20px;"></span>
+                    <span id="boardInfoBadge" style="display:none;align-items:center;gap:5px;padding:3px 12px;background:linear-gradient(135deg,#1a2e0a,#0f2e1a);border:1px solid #22c55e;border-radius:6px;font-size:0.78rem;color:#86efac;cursor:default;" title="Board vật lý được Admin cấp quyền">
+                        <i class="fa-solid fa-microchip"></i>
+                        <span id="boardInfoText">Đang tải...</span>
+                    </span>
                     <button class="btn btn-sm btn-success" onclick="compileCode(event)"><i class="fa-solid fa-hammer"></i><span style="margin-left: 4px;">Biên dịch (Compile)</span></button>
                     <button class="btn btn-sm" style="background:linear-gradient(135deg, #eab308, #d97706); color:#fff; font-weight:bold; border:none;" onclick="flashCode(event)" title="Khởi chạy Code xuống Bo Mạch"><i class="fa-solid fa-bolt"></i><span style="margin-left: 4px;">Nạp (Flash)</span></button>
                     <button class="btn btn-sm btn-ide" onclick="saveCurrentFile()"><i class="fa-solid fa-save"></i><span style="margin-left: 4px;">Save</span></button>
