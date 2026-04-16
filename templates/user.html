@@ -145,6 +145,10 @@
                     class="fa-solid fa-copy"></i></button>
             <span id="serial-status" class="status-text">Disconnected</span>
         </div>
+        <div class="serial-input-container" style="display: flex; gap: 8px; padding: 10px; background: #161b22; border-bottom: 1px solid #30363d;">
+            <input type="text" id="serial-input" class="form-control form-control-sm" placeholder="Nhập lệnh để gửi xuống board (Nhấn Enter)..." onkeypress="handleSerialInputKeyPress(event)" style="background: #30363d; color: white; border-color: #444; flex: 1;">
+            <button class="btn btn-sm btn-primary" onclick="sendSerialData()">Gửi</button>
+        </div>
         <div id="serial-output" class="serial-output-area"></div>
     </div>
 </div>

@@ -752,6 +752,27 @@ function clearSerialOutput() {
     if (outputEl) outputEl.innerHTML = '';
 }
 
+function sendSerialData() {
+    const inputEl = document.getElementById('serial-input');
+    if (!inputEl) return;
+    const text = inputEl.value;
+    
+    if (socketSerial && socketSerial.connected) {
+        // Luôn đính kèm kít tự kết thúc chuỗi \r\n (CRLF) khi gửi cho board mạch thực tế
+        socketSerial.emit('send_data', { data: text + '\r\n' });
+        inputEl.value = ''; // xóa input sau khi gửi
+    } else {
+        showNotification('Cần kết nối Serial Monitor trước khi gửi lệnh', 'warning');
+    }
+}
+
+function handleSerialInputKeyPress(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        sendSerialData();
+    }
+}
+
 function makeDraggable(element) {
     const header = element.querySelector('.floating-window-header');
     let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
