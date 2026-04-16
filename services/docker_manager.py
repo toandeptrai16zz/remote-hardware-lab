@@ -8,6 +8,7 @@ import time
 import logging
 import json
 import glob
+import secrets
 from utils import make_safe_name, find_free_port
 from config import get_db_connection, DEFAULT_ARDUINO_LIBRARIES
 from services.logger import log_action
@@ -145,7 +146,7 @@ def ensure_user_container(username):
     # Prepare host directory
     host_user_dir = f"/home/toan/QUAN_LY_USER/{safe_username}"
     os.makedirs(host_user_dir, exist_ok=True)
-    os.chmod(host_user_dir, 0o777)
+    os.chmod(host_user_dir, 0o750)
 
     # Create setup script
     setup_script_path = os.path.join(host_user_dir, "setup_container.sh")
@@ -166,7 +167,7 @@ USER="{safe_username}"
 
 if ! id "$USER" &>/dev/null; then
     useradd -m -s /bin/bash "$USER"
-    echo "$USER:password123" | chpasswd
+    echo "$USER:$CONTAINER_PASSWORD" | chpasswd
     usermod -aG dialout "$USER" || true
     usermod -aG sudo "$USER" || true
 fi
@@ -235,16 +236,33 @@ exec /usr/sbin/sshd -D
     logger.info(f"Starting container {cname} with devices: {required_ports}...")
     
     # Xây dựng lệnh Docker Run (ĐÃ XÓA DÒNG MOUNT VOLUME LÀM HỎNG CORE ESP32)
+    # [SECURITY] Sinh mật khẩu ngẫu nhiên cho SSH Container
+    container_password = secrets.token_urlsafe(16)
+    
+    # Lưu mật khẩu vào DB để Server có thể SSH vào container
+    try:
+        db2 = get_db_connection()
+        cur2 = db2.cursor()
+        cur2.execute("UPDATE users SET container_password=%s WHERE username=%s", (container_password, username))
+        db2.commit()
+        cur2.close()
+        db2.close()
+    except Exception as e:
+        logger.warning(f"Could not save container password: {e}")
+        container_password = secrets.token_urlsafe(16)
+    
     docker_command = [
         "docker", "run", "-d", 
         "--name", cname, 
         "--restart", "unless-stopped",
-        "--privileged",  
+        # [SECURITY HARDENING] Loại bỏ --privileged, thay bằng quyền tối thiểu
+        "--cap-drop=ALL",
+        "--security-opt", "no-new-privileges:true",
         "-p", f"{ssh_port}:22", 
-        "-e", f"USERNAME={safe_username}", 
+        "-e", f"USERNAME={safe_username}",
+        "-e", f"CONTAINER_PASSWORD={container_password}",
         "-v", f"{host_user_dir}:/home/{safe_username}",
         "-v", f"{setup_script_path}:/startup.sh",
-        # THÊM LẠI CÁI DÒNG NÀY ĐỂ NÓ NHẬN LÕI ESP32 TỪ MÁY CHỦ:
         "-v", "/home/toan/flask-kerberos-demo/esp32_core:/root/.arduino15",
         "--group-add", "dialout", 
         "--entrypoint", "/bin/bash"

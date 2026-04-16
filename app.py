@@ -61,6 +61,13 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(24))
 
+# ================== [SECURITY HARDENING] SESSION & COOKIE ==================
+from datetime import timedelta
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)
+app.config['SESSION_COOKIE_HTTPONLY'] = True      # Chặn JS đọc Cookie (Anti-XSS)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'     # Chặn CSRF qua cross-site request
+app.config['SESSION_COOKIE_SECURE'] = False        # True nếu dùng HTTPS
+
 # Cọc endpoint /metrics phục vụ cho hệ thống giám sát Monitoring Kubernetes
 app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
     '/metrics': make_wsgi_app()

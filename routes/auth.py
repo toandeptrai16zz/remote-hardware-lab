@@ -13,6 +13,7 @@ from services import (
     validate_password_strength,
     otp_storage, log_action
 )
+from utils import require_rate_limit
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -27,6 +28,7 @@ def generate_csrf_api():
     return jsonify({'csrf_token': generate_csrf_token()})
 
 @auth_bp.route("/api/login", methods=["POST"])
+@require_rate_limit(max_requests=10, window_seconds=60)
 def login_api():
     """Login API endpoint"""
     # Debug logging
@@ -117,6 +119,7 @@ def login_api():
         return jsonify({'success': False, 'message': 'Sai tài khoản hoặc mật khẩu!'}), 401
 
 @auth_bp.route("/api/verify-otp", methods=["POST"])
+@require_rate_limit(max_requests=5, window_seconds=60)
 def verify_otp():
     """Verify OTP code"""
     otp = request.json.get('otp')
@@ -208,6 +211,7 @@ def resend_otp_api():
     return jsonify({'success': False, 'message': 'Không tìm thấy phiên xác thực.'}), 400
 
 @auth_bp.route("/register", methods=["GET", "POST"])
+@require_rate_limit(max_requests=5, window_seconds=60)
 def register():
     """User registration with OTP"""
     if "username" in session: 

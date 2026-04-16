@@ -38,13 +38,29 @@ def require_auth(role=None):
         return decorated_function
     return decorator
 
-def require_rate_limit(f):
-    """Decorator for rate limiting (placeholder for future implementation)"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Basic rate limiting logic can be added here
-        return f(*args, **kwargs)
-    return decorated_function
+def require_rate_limit(max_requests=10, window_seconds=60):
+    """Decorator for rate limiting - chặn brute-force attacks.
+    Mặc định: 10 request/phút/IP.
+    """
+    from collections import defaultdict
+    _rate_store = defaultdict(list)
+    
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            ip = request.remote_addr or 'unknown'
+            now = time.time()
+            
+            # Dọn dẹp request cũ ngoài cửa sổ thời gian
+            _rate_store[ip] = [t for t in _rate_store[ip] if now - t < window_seconds]
+            
+            if len(_rate_store[ip]) >= max_requests:
+                return jsonify(success=False, error=f'Quá nhiều yêu cầu. Vui lòng thử lại sau {window_seconds} giây.'), 429
+            
+            _rate_store[ip].append(now)
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 def require_internal_secret(f):
     """Decorator to validate internal API secret for hardware events"""
