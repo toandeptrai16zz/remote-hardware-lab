@@ -170,7 +170,8 @@ def get_boards_by_type(db_type):
 
 def get_serial_ports(username):
     """
-    SỬA LẠI LOGIC: Luôn hiển thị cổng nếu Docker thấy (kể cả khi DB lỗi hoặc chưa khớp)
+    SỬA LẠI LOGIC: Truy vấn qua bảng device_assignments (N-N) để hỗ trợ chia sẻ 1 cổng cho N sinh viên.
+    Tuyệt đối không hiển thị nếu port không tồn tại hoặc bị ngắt kết nối (status='disconnected').
     """
     safe_username = make_safe_name(username)
     cname = f"{safe_username}-dev"
@@ -181,8 +182,16 @@ def get_serial_ports(username):
             db = get_db_connection()
             if db:
                 cur = db.cursor(dictionary=True)
-                # Sửa [BUG FIX]: in_use_by lưu varchar username chứ không phải id
-                cur.execute("SELECT port, tag_name, type FROM hardware_devices WHERE in_use_by = %s", (username,))
+                
+                # Sửa [MULTI-USER FIX]: Join qua bảng device_assignments và lấy cột status
+                query = """
+                    SELECT hd.port, hd.tag_name, hd.type, hd.status
+                    FROM hardware_devices hd
+                    JOIN device_assignments da ON hd.id = da.device_id
+                    JOIN users u ON da.user_id = u.id
+                    WHERE u.username = %s AND hd.status != 'disconnected'
+                """
+                cur.execute(query, (username,))
                 for row in cur.fetchall():
                     db_devices[row['port']] = row
                 cur.close()
@@ -202,7 +211,7 @@ def get_serial_ports(username):
                 # Bỏ cổng rác ttyS
                 if "ttyS" in address: continue 
                 
-                # --- [STRICT MODE] CHỈ HIỂN THỊ NẾU ĐƯỢC ADMIN CẤP QUYỀN ---
+                # --- [STRICT MODE] CHỈ HIỂN THỊ NẾU ĐƯỢC ADMIN CẤP QUYỀN VÀ KHÔNG BỊ DISCONNECTED ---
                 if address in db_devices:
                     display_name = db_devices[address]['tag_name']
                     board_type = db_devices[address]['type']

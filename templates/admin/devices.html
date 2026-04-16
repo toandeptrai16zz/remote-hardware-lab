@@ -112,20 +112,27 @@ async function reloadDevices() {
     devices.forEach(dev => {
         const tr = document.createElement('tr');
         
-        let options = `<option value="">🚫 Không được sử dụng</option>`;
+        let options = '';
         allUsers.forEach(u => {
-            const selected = (dev.in_use_by === u.username) ? "selected" : "";
+            const selected = dev.assigned_users && dev.assigned_users.includes(u.username) ? "selected" : "";
             options += `<option value="${u.username}" ${selected}>🧑‍🎓 ${u.username}</option>`;
         });
         
+        const statusBadge = dev.status === 'disconnected' 
+                            ? `<span class="badge bg-danger">Đã Rút Cáp</span>` 
+                            : `<span class="badge bg-success">Đang Cắm</span>`;
+                            
+        const chipLabel = `<span class="badge bg-secondary text-white px-3"><i class="fa-solid fa-microchip"></i> Serial Port (Arduino/ESP)</span>`;
+
         tr.innerHTML = `
-            <td><strong class="text-white">${dev.tag_name}</strong></td>
+            <td><strong class="text-white">${dev.tag_name}</strong><br>${statusBadge}</td>
             <td><span class="badge" style="background:#2c2c4d; border:1px solid #7c6af7;">${dev.port}</span></td>
-            <td><span class="badge bg-success text-white px-3">${dev.type.toUpperCase()}</span></td>
+            <td>${chipLabel}</td>
             <td>
-                <select class="form-select form-select-sm select2-user" id="assign_${dev.id}" style="width:220px;">
+                <select class="form-select form-select-sm select2-user" id="assign_${dev.id}" multiple="multiple" style="width:250px;">
                     ${options}
                 </select>
+                <div style="font-size: 0.75rem; color: #aaa; margin-top: 5px;">* Có thể chọn N sinh viên chia hàng đợi</div>
             </td>
             <td>
                 <button class="btn btn-sm btn-outline-primary px-3 rounded-pill" onclick="assignDevice(${dev.id})">
@@ -137,7 +144,7 @@ async function reloadDevices() {
     });
     
     // Init select2
-    $('.select2-user').select2({ theme: 'bootstrap-5' });
+    $('.select2-user').select2({ theme: 'bootstrap-5', placeholder: "-- Khóa cổng (Không ai được dùng) --" });
 }
 
 async function scanDevices() {
@@ -163,11 +170,11 @@ async function scanDevices() {
 }
 
 async function assignDevice(deviceId) {
-    const select = document.getElementById('assign_' + deviceId);
-    const username = select.value;
+    // Array of selected usernames
+    const usernames = $('#assign_' + deviceId).val() || [];
     
-    const icon = username ? '<i class="fa-solid fa-lock text-success"></i>' : '<i class="fa-solid fa-lock-open text-warning"></i>';
-    const textTarget = username ? `Gán độc quyền cổng này cho sinh viên <b>${escapeHtml(username)}</b>?` : `Hủy bỏ quyền sử dụng và thu hồi lại cổng USB này?`;
+    const icon = usernames.length > 0 ? '<i class="fa-solid fa-users text-success"></i>' : '<i class="fa-solid fa-lock text-warning"></i>';
+    const textTarget = usernames.length > 0 ? `Cấp quyền cổng này cho <b>${usernames.length} sinh viên</b> xếp hàng chung?` : `Hủy bỏ quyền sử dụng và thu hồi lại cổng USB này?`;
     
     const result = await Swal.fire({
         title: 'Xác nhận Quyền Phần cứng?',
@@ -187,7 +194,7 @@ async function assignDevice(deviceId) {
         const res = await fetch('/admin/api/devices/assign', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ device_id: deviceId, username: username || null })
+            body: JSON.stringify({ device_id: deviceId, usernames: usernames })
         });
         const data = await res.json();
         if(data.success) {

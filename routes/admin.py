@@ -431,71 +431,103 @@ def admin_devices_page():
 @admin_bp.route("/api/devices/scan", methods=['POST'])
 @require_auth('admin')
 def admin_api_scan_devices():
-    """Tự động quét các cổng USB vật lý đang cắm vào Server và đồng bộ vào CSDL"""
+    """Tự động quét các cổng USB vật lý đang cắm vào Server và xử lý trạng thái"""
     import glob
     ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
     db = get_db_connection()
     cur = db.cursor()
     
+    # Lấy danh sách cổng hiện tại trong DB
+    cur.execute("SELECT port FROM hardware_devices")
+    db_ports = [row[0] for row in cur.fetchall()]
+    
     new_count = 0
-    for i, port in enumerate(ports):
-        # Tự động cấp tên Tag theo tên cổng USB
-        tag = f"Phần cứng vật lý ({os.path.basename(port)})"
-        board_type = "esp32" if "USB" in port else "arduino"
-        try:
-            cur.execute("INSERT IGNORE INTO hardware_devices (tag_name, type, port, status) VALUES (%s, %s, %s, 'available')",
-                       (tag, board_type, port))
-            if cur.rowcount > 0:
-                new_count += 1
-        except Exception as e:
-            pass
+    # Cập nhật hoặc Thêm mới thành available
+    for port in ports:
+        tag = f"Cáp Serial ({os.path.basename(port)})"
+        board_type = "generic" # Hỗ trợ cắm mọi mạch (Arduino, ESP32...)
+        if port not in db_ports:
+            # Thêm mới
+            try:
+                cur.execute("INSERT IGNORE INTO hardware_devices (tag_name, type, port, status) VALUES (%s, %s, %s, 'available')",
+                           (tag, board_type, port))
+                if cur.rowcount > 0:
+                    new_count += 1
+            except Exception: pass
+        else:
+            # Thu hồi trạng thái nếu cắm lại
+            cur.execute("UPDATE hardware_devices SET status = 'available' WHERE port = %s", (port,))
+            
+    # Xử lý Rút cáp (port không tồn tại nữa)
+    offline_count = 0
+    for dbp in db_ports:
+        if dbp not in ports:
+            cur.execute("UPDATE hardware_devices SET status = 'disconnected' WHERE port = %s", (dbp,))
+            offline_count += 1
             
     db.commit()
-    cur.close()
-    db.close()
-    log_action(session['username'], f"Quét thiết bị USB phát hiện {len(ports)} cổng, thêm mới {new_count} cổng.")
-    return jsonify({'success': True, 'message': f'Đã quét xong. Tìm thấy {len(ports)} cổng kết nối vật lý, đã thêm vào kho {new_count} thiết bị mới.'})
+    cur.close(), db.close()
+    
+    log_action(session['username'], f"Quét thiết bị USB: {new_count} thiết bị mới, {offline_count} thiết bị bị ngắt kết nối.")
+    return jsonify({'success': True, 'message': f'Tìm thấy {len(ports)} cổng kết nối. Đã thêm mới {new_count} thiết bị và phát hiện {offline_count} thiết bị bị ngắt cáp (Offline).'})
 
 @admin_bp.route("/api/devices", methods=['GET'])
 @require_auth('admin')
 def admin_api_get_devices():
-    """Lấy danh sách các USB đã đồng bộ vào CSDL"""
+    """Lấy danh sách các USB và sinh viên được phân quyền đa user"""
     db = get_db_connection()
     cur = db.cursor(dictionary=True)
-    cur.execute("SELECT id, tag_name, type, port, status, in_use_by FROM hardware_devices")
+    
+    # Join qua bảng multi-assignment
+    cur.execute("""
+        SELECT hd.id, hd.tag_name, hd.type, hd.port, hd.status,
+               GROUP_CONCAT(u.username SEPARATOR ',') as assigned_users
+        FROM hardware_devices hd
+        LEFT JOIN device_assignments da ON hd.id = da.device_id
+        LEFT JOIN users u ON da.user_id = u.id
+        GROUP BY hd.id
+        ORDER BY hd.port ASC
+    """)
     devices = cur.fetchall()
-    cur.close()
-    db.close()
+    
+    for dev in devices:
+        dev['assigned_users'] = dev['assigned_users'].split(',') if dev['assigned_users'] else []
+        
+    cur.close(), db.close()
     return jsonify(devices)
 
 @admin_bp.route("/api/devices/assign", methods=['POST'])
 @require_auth('admin')
 def admin_api_assign_device():
-    """Giao hoặc Lấy lại quyền sử dụng cổng USB vật lý cho một Sinh viên cụ thể"""
+    """Lưu phân quyền Multi-user cho Device_id"""
     data = request.get_json()
     device_id = data.get('device_id')
-    username = data.get('username')
+    usernames = data.get('usernames', []) # Mảng các user
     
     db = get_db_connection()
     cur = db.cursor()
-    if username:
-        # Check if username exists
-        cur.execute("SELECT id FROM users WHERE username = %s LIMIT 1", (username,))
-        user_row = cur.fetchone()
-        if not user_row:
-            cur.close(), db.close()
-            return jsonify({'success': False, 'message': f'User {username} không tồn tại'})
-
-        cur.execute("UPDATE hardware_devices SET in_use_by = %s, status = 'in_use' WHERE id = %s", (username, device_id))
-        log_msg = f"Đã giao Thiết bị ID {device_id} cho User {username}"
-    else:
-        cur.execute("UPDATE hardware_devices SET in_use_by = NULL, status = 'available' WHERE id = %s", (device_id,))
-        log_msg = f"Đã thu hồi Thiết bị ID {device_id}"
-        
-    db.commit()
-    cur.close()
-    db.close()
     
-    log_action(session['username'], log_msg)
-    return jsonify({'success': True, 'message': 'Cập nhật phân quyền Cổng thiết bị thành công!'})
+    # Xoá tất cả quyền cũ của cái cổng này
+    cur.execute("DELETE FROM device_assignments WHERE device_id = %s", (device_id,))
+    
+    added = 0
+    if usernames:
+        # Map usernames list qua user_ids
+        format_strings = ','.join(['%s'] * len(usernames))
+        cur.execute(f"SELECT id FROM users WHERE username IN ({format_strings})", tuple(usernames))
+        user_ids = [row[0] for row in cur.fetchall()]
+        
+        for user_id in user_ids:
+            cur.execute("INSERT INTO device_assignments (user_id, device_id) VALUES (%s, %s)", (user_id, device_id))
+            added += 1
+            
+        cur.execute("UPDATE hardware_devices SET in_use_by = 'Chế độ Nhiều User' WHERE id = %s", (device_id,))
+    else:
+        cur.execute("UPDATE hardware_devices SET in_use_by = NULL WHERE id = %s", (device_id,))
+
+    db.commit()
+    cur.close(), db.close()
+    
+    log_action(session['username'], f"Cập nhật Quyền Cổng USB ID {device_id} cho {added} Sinh viên.")
+    return jsonify({'success': True, 'message': f'Cập nhật thành công! Đã cấp quyền sử dụng cho {len(usernames)} sinh viên chờ hàng đợi.'})
 
