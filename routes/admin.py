@@ -433,7 +433,19 @@ def admin_devices_page():
 def admin_api_scan_devices():
     """Tự động quét các cổng USB vật lý đang cắm vào Server và xử lý trạng thái"""
     import glob
-    ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
+    import serial
+    
+    raw_ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
+    active_ports = []
+    
+    for port in raw_ports:
+        try:
+            s = serial.Serial(port)
+            s.close()
+            active_ports.append(port)
+        except Exception:
+            pass
+            
     db = get_db_connection()
     cur = db.cursor()
     
@@ -443,7 +455,7 @@ def admin_api_scan_devices():
     
     new_count = 0
     # Cập nhật hoặc Thêm mới thành available
-    for port in ports:
+    for port in active_ports:
         tag = f"Cáp Serial ({os.path.basename(port)})"
         board_type = "generic" # Hỗ trợ cắm mọi mạch (Arduino, ESP32...)
         if port not in db_ports:
@@ -458,10 +470,10 @@ def admin_api_scan_devices():
             # Thu hồi trạng thái nếu cắm lại
             cur.execute("UPDATE hardware_devices SET status = 'available' WHERE port = %s", (port,))
             
-    # Xử lý Rút cáp (port không tồn tại nữa)
+    # Xử lý Rút cáp (port không tồn tại nữa / Ghost port)
     offline_count = 0
     for dbp in db_ports:
-        if dbp not in ports:
+        if dbp not in active_ports:
             cur.execute("UPDATE hardware_devices SET status = 'disconnected' WHERE port = %s", (dbp,))
             offline_count += 1
             
@@ -469,23 +481,36 @@ def admin_api_scan_devices():
     cur.close(), db.close()
     
     log_action(session['username'], f"Quét thiết bị USB: {new_count} thiết bị mới, {offline_count} thiết bị bị ngắt kết nối.")
-    return jsonify({'success': True, 'message': f'Tìm thấy {len(ports)} cổng kết nối. Đã thêm mới {new_count} thiết bị và phát hiện {offline_count} thiết bị bị ngắt cáp (Offline).'})
+    return jsonify({'success': True, 'message': f'Tìm thấy {len(active_ports)} cổng kết nối. Đã thêm mới {new_count} thiết bị và phát hiện {offline_count} thiết bị bị ngắt cáp (Offline).'})
 
 @admin_bp.route("/api/devices", methods=['GET'])
 @require_auth('admin')
 def admin_api_get_devices():
     """Lấy danh sách các USB và sinh viên được phân quyền đa user (Auto-Scan)"""
     import glob
-    ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
+    import serial
     
+    # Tìm các thiết bị USB có thật
+    raw_ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
+    active_ports = []
+    
+    # Loại trừ Ghost Ports do VMWare tạo ra (Linux device file không biến mất sau khi rút cáp)
+    for port in raw_ports:
+        try:
+            s = serial.Serial(port)
+            s.close()
+            active_ports.append(port)
+        except Exception:
+            pass # Lỗi IO / Ghost Port
+            
     db = get_db_connection()
     cur = db.cursor(dictionary=True)
     
-    # --- AUTO-SCAN LOGIC ---
+    # --- AUTO-SCAN LOGIC GHOST-PROOF ---
     cur.execute("SELECT port FROM hardware_devices")
     db_ports = [row['port'] for row in cur.fetchall()]
     
-    for port in ports:
+    for port in active_ports:
         tag = f"Cáp Serial ({os.path.basename(port)})"
         board_type = "generic"
         if port not in db_ports:
@@ -495,11 +520,12 @@ def admin_api_get_devices():
         else:
             cur.execute("UPDATE hardware_devices SET status = 'available' WHERE port = %s", (port,))
             
+    # Thu hồi lại trạng thái đối với các port ko có trong active_ports
     for dbp in db_ports:
-        if dbp not in ports:
+        if dbp not in active_ports:
             cur.execute("UPDATE hardware_devices SET status = 'disconnected' WHERE port = %s", (dbp,))
     db.commit()
-    # -----------------------
+    # -----------------------------------
     
     # Join qua bảng multi-assignment
     cur.execute("""
