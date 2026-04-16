@@ -662,6 +662,91 @@ function minimizeSerialWindow() {
     const serialWindow = document.getElementById('serial-monitor-window');
     serialWindow.style.display = 'none';
 }
+// ==================== SERIAL MONITOR SOCKET.IO LOGIC ====================
+
+function initSerialSocket() {
+    if (!socketSerial) {
+        socketSerial = io.connect(location.protocol + '//' + document.domain + ':' + location.port + '/serial');
+
+        socketSerial.on('status', function(msg) {
+            const statusEl = document.getElementById('serial-status');
+            if (statusEl) statusEl.textContent = msg.message;
+        });
+
+        socketSerial.on('serial_data', function(msg) {
+            const outputEl = document.getElementById('serial-output');
+            if (!outputEl) return;
+            
+            // Append data and autoscroll if at bottom
+            const isAtBottom = outputEl.scrollHeight - outputEl.scrollTop <= outputEl.clientHeight + 20;
+            
+            // Xử lý xuống dòng cho chuẩn
+            const text = msg.data.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const span = document.createElement('span');
+            span.textContent = text;
+            outputEl.appendChild(span);
+            
+            if (isAtBottom) {
+                outputEl.scrollTop = outputEl.scrollHeight;
+            }
+        });
+
+        socketSerial.on('serial_error', function(msg) {
+            showNotification(`Serial Error: ${msg.error}`, 'error');
+            const btn = document.getElementById('connect-serial-btn');
+            if (btn) {
+                btn.textContent = '▶️ Connect';
+                btn.classList.remove('btn-danger');
+                btn.classList.add('btn-primary');
+            }
+            const statusEl = document.getElementById('serial-status');
+            if (statusEl) statusEl.textContent = 'Error';
+        });
+    }
+}
+
+function toggleSerialConnection() {
+    const btn = document.getElementById('connect-serial-btn');
+    const portSelect = document.getElementById('serial-port-select');
+    const baudSelect = document.getElementById('baud-rate-select');
+    const statusEl = document.getElementById('serial-status');
+    
+    if (!portSelect || !portSelect.value) {
+        showNotification('Vui lòng chọn cổng COM', 'warning');
+        return;
+    }
+
+    if (!socketSerial || !socketSerial.connected) {
+        initSerialSocket();
+    }
+
+    if (btn.textContent.includes('Connect') || btn.textContent === '▶️') {
+        // Trạng thái đang Stop -> Bấm để Connect
+        btn.innerHTML = '<i class="fa-solid fa-square"></i> Stop';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-danger');
+        if (statusEl) statusEl.textContent = 'Connecting...';
+        
+        socketSerial.emit('start_monitor', {
+            port: portSelect.value,
+            baud_rate: baudSelect.value
+        });
+    } else {
+        // Trạng thái đang Connect -> Bấm để Stop
+        btn.innerHTML = '▶️ Connect';
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-primary');
+        if (statusEl) statusEl.textContent = 'Disconnected';
+        
+        socketSerial.emit('stop_monitor');
+    }
+}
+
+function clearSerialOutput() {
+    const outputEl = document.getElementById('serial-output');
+    if (outputEl) outputEl.innerHTML = '';
+}
+
 function makeDraggable(element) {
     const header = element.querySelector('.floating-window-header');
     let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
