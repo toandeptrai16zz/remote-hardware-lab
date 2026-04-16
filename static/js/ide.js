@@ -101,6 +101,51 @@ function connectUploadSocket() {
             terminal.write(`\r\n$ `);
         }
         terminal.scrollToBottom();
+
+        // [FEATURE/HARDWARE-FLASH] AUTO-TRIGGER AI GRADER AFTER PHYSICAL UPLOAD SUCCESS
+        if (data.status === 'success' && _ideActiveMission) {
+            terminal.write(`\x1b[1;36m[AI SYSTEM] Hệ thống đang tự động gửi mã nguồn gốc lên AI Server... Vui lòng chờ kết quả!\x1b[0m\r\n`);
+            // Trigger auto-submit without prompt
+            fetch(`/user/api/missions/${_ideActiveMission.id}/submit`, { method: 'POST' })
+            .then(res => res.json())
+            .then(resData => {
+                if (resData.success || (resData.error && resData.error.includes('already submitted'))) {
+                    // Call the manual submit active mission function to just pop up the loading/polling screen
+                    // We can reuse the UI from submitActiveMission but bypass the prompt. 
+                    // To do this simply, we will just call a quick poll here directly!
+                    let pollCount = 0;
+                    const pollInterval = setInterval(async () => {
+                        pollCount++;
+                        try {
+                            const mRes = await fetch('/user/api/my-missions');
+                            const missions = await mRes.json();
+                            const m = missions.find(x => x.id === _ideActiveMission.id);
+
+                            if ((m && m.submission && m.submission.score !== null) || pollCount >= 12) {
+                                clearInterval(pollInterval);
+                                if (m && m.submission && m.submission.score !== null) {
+                                    const score = m.submission.score;
+                                    const feedback = m.submission.ai_feedback || m.submission.feedback || 'Không có nhận xét.';
+                                    const scoreColor = score >= 7 ? '#22c55e' : score >= 5 ? '#f59e0b' : '#ef4444';
+                                    Swal.fire({
+                                        title: `<span style="font-size:3rem;font-weight:900;color:${scoreColor}">${score.toFixed(1)}</span><span style="color:#888;font-size:1.2rem"> / 10</span>`,
+                                        html: `<h3 style="margin:8px 0;color:#ccc;">Kết Quả Nạp Thật + AI Chấm: ${escapeHtml(_ideActiveMission.name)}</h3>
+                                                       <div style="text-align:left;padding:14px 18px;background:rgba(255,255,255,0.03);border-radius:12px;border:1px solid rgba(124,106,247,0.3);box-shadow:inset 0 0 10px rgba(124,106,247,0.1);margin-top:15px;font-size:0.85rem;color:#ccc;line-height:1.7;max-height:180px;overflow-y:auto;">💬 <b>AI Nhận xét:</b><br><span style="color:#aaa;">${escapeHtml(feedback).replace(/\n/g, '<br>')}</span></div>`,
+                                        icon: score >= 5 ? 'success' : 'warning',
+                                        confirmButtonColor: '#7c6af7',
+                                        confirmButtonText: 'Tuyệt đỉnh',
+                                        background: '#1a1a2e',
+                                        color: '#e0e0e0',
+                                        backdrop: `rgba(10,10,30,0.6) blur(4px)`,
+                                        customClass: { popup: 'swal-no-scroll' }
+                                    });
+                                }
+                            }
+                        } catch (e) {}
+                    }, 5000);
+                }
+            });
+        }
     });
 }
 

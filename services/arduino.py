@@ -16,7 +16,9 @@ from config import get_db_connection
 from services.logger import log_action
 
 logger = logging.getLogger(__name__)
-# [ARCHITECT PIVOT]: device_locks bị vô hiệu hóa vì dễ gây lỗi Distributed Data Race trên Kubernetes
+# [ARCHITECT PIVOT REVERSED]: Queue mechanism restored for feature/hardware-flash branch
+device_locks = defaultdict(threading.Lock)
+queue_counts = defaultdict(int) 
 
 # ==============================================================================
 # 1. HÀM HỖ TRỢ PHÂN TÍCH LỖI (GIỮ NGUYÊN)
@@ -112,13 +114,39 @@ def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio
     code, log = run_and_stream(compile_cmd, socketio, sid)
     
     if code != 0:
-        socketio.emit('upload_status', {'status': 'error', 'message': '❌ Lỗi biên dịch Biên mẫu!', 'details': log, 'suggestions': ["Vui lòng kiểm tra cú pháp mã nguồn C/C++."]}, namespace='/upload_status', room=sid)
-        log_action(username, "Virtual Compile failed", success=False)
+        socketio.emit('upload_status', {'status': 'error', 'message': '❌ Lỗi biên dịch!', 'details': log, 'suggestions': ["Vui lòng kiểm tra cú pháp mã nguồn C/C++."]}, namespace='/upload_status', room=sid)
+        log_action(username, "Compile failed", success=False)
         return
 
-    # Mocking completion phase directly to sidestep physical USB limits
-    log_action(username, "Virtual Compile success")
-    socketio.emit('upload_status', {'status': 'success', 'message': '✅ MÔ PHỎNG THÀNH CÔNG! SẴN SÀNG ĐỂ AI CHẤM ĐIỂM.'}, namespace='/upload_status', room=sid)
+    # --- BƯỚC MỚI: XẾP HÀNG CHỜ PORT VÀ FLASH THẬT CẤP ĐỘ PHẦN CỨNG ---
+    socketio.emit('upload_status', {'status': 'compiling', 'message': f'Đang xếp hàng chờ cắm mạch vào cổng {port}...'}, namespace='/upload_status', room=sid)
+    
+    # 1. Thông báo thứ tự chờ
+    queue_counts[port] += 1
+    position = queue_counts[port]
+    if position > 1:
+         socketio.emit('upload_status', {'status': 'compiling', 'message': f'⏳ Cổng {port} đang bận! Bạn đang ở vị trí chờ #{position} trong hàng đợi...'}, namespace='/upload_status', room=sid)
+
+    # 2. Bắt đầu Khóa (Lock) cổng để nạp
+    with device_locks[port]:
+        socketio.emit('upload_status', {'status': 'compiling', 'message': f'🔥 Tới lượt bạn! Đang nạp code thật xuống board qua cổng {port}...'}, namespace='/upload_status', room=sid)
+        
+        # Chạy lệnh upload flash của Arduino-CLI
+        upload_cmd = ["docker", "exec", cname, "arduino-cli", "upload", "-p", port, "--fqbn", board_fqbn, container_sketch_path]
+        up_code, up_log = run_and_stream(upload_cmd, socketio, sid)
+        
+        if up_code != 0:
+            suggestions = get_upload_error_suggestions(up_log)
+            socketio.emit('upload_status', {'status': 'error', 'message': '❌ Lỗi Nạp Code vào bo mạch!', 'details': up_log, 'suggestions': suggestions}, namespace='/upload_status', room=sid)
+            log_action(username, "Flash failed", success=False)
+            queue_counts[port] -= 1
+            return
+
+    # 3. Mở Khóa cổng, trả lại cho user khác
+    queue_counts[port] -= 1
+    log_action(username, "Flash Hardware success")
+    
+    socketio.emit('upload_status', {'status': 'success', 'message': '✅ ĐÃ NẠP XUỐNG BO MẠCH THÀNH CÔNG! HỆ THỐNG SẼ TỰ ĐỘNG GỌI AI CHẤM ĐIỂM NGAY BÂY GIỜ...'}, namespace='/upload_status', room=sid)
 
 # ==============================================================================
 # 5. CÁC HÀM SCAN & HELPERS KHÁC
