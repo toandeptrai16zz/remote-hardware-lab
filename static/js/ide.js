@@ -1750,7 +1750,7 @@ async function syncMissionsToIDE() {
                     // Đóng hết tab cũ để bảo mật bài vở cá nhân
                     saveCurrentFile().then(() => {
                         const tabs = Array.from(openFiles.keys());
-                        tabs.forEach(t => closeFile(t));
+                        tabs.forEach(t => performCloseTab(t));
                         
                         // Tự động mở file bài thi chính (đường dẫn tương đối)
                         const missionIno = `${newSlug}/${newSlug}.ino`;
@@ -1775,9 +1775,13 @@ async function syncMissionsToIDE() {
                 const oldSlug = _examModeSlug;
                 _examModeSlug = null;
                 
-                // Đóng tab bài thi vừa xong (đường dẫn tương đối)
-                const missionIno = `${oldSlug}/${oldSlug}.ino`;
-                closeFile(missionIno);
+                // Đóng tất cả tab thuộc về bài thi vừa xong
+                const tabs = Array.from(openFiles.keys());
+                tabs.forEach(path => {
+                    if (path.startsWith(oldSlug + '/')) {
+                        performCloseTab(path);
+                    }
+                });
                 
                 refreshRootFiles();
                 showNotification("Bài thi kết thúc. Đã khôi phục không gian học tập.", "info");
