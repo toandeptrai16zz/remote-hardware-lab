@@ -314,8 +314,15 @@ def detect_board_from_sketch(username, sketch_path):
             logger.info(f"Auto-detect: Found {lib} → ESP32 for {username}")
             return 'esp32:esp32:esp32'
     
+    # Danh sách các hàm đặc trưng chỉ có trên ESP32
+    ESP32_FUNCS = ['ledcSetup', 'ledcWrite', 'ledcAttachPin', 'ledcAttach', 'analogReadResolution', 'hallRead']
+    for func in ESP32_FUNCS:
+        if func in code:
+            logger.info(f"Auto-detect: Found function {func} → ESP32 for {username}")
+            return 'esp32:esp32:esp32'
+    
     # Mặc định: Arduino Uno
-    logger.info(f"Auto-detect: No ESP32 libs found → Arduino Uno for {username}")
+    logger.info(f"Auto-detect: No ESP32 indicators found → Arduino Uno for {username}")
     return 'arduino:avr:uno'
 
 
