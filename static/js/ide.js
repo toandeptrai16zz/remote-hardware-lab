@@ -1729,6 +1729,20 @@ function slugifyVN(text) {
     return res;
 }
 
+    // ── GIAO TIẾP VỚI MODAL Iframe (User Missions) ── by Chương
+    window.addEventListener('message', (event) => {
+        if (event.data && event.data.action === 'mission_started') {
+            const modalEl = document.getElementById('missionsModal');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+            syncMissionsToIDE();
+        } else if (event.data && event.data.action === 'sync_ide_only') {
+            syncMissionsToIDE();
+        }
+    });
+
 async function syncMissionsToIDE() {
     try {
         const res = await fetch('/user/api/my-missions');

@@ -280,6 +280,7 @@ async function handleTimeOut(mission) {
     const data = await res.json();
     
     if (data.success || data.error.includes("already submitted")) {
+      if (window.parent && window.parent !== window) window.parent.postMessage({ action: 'sync_ide_only' }, '*');
       // Bắt đầu chờ điểm của AI Grader
       let pollCount = 0;
       const pollInterval = setInterval(async () => {
@@ -330,9 +331,12 @@ async function startMission(missionId) {
     const data = await res.json();
     
     if (data.success) {
-      // Mở workspace trong tab mới
-      window.open(`/user/${currentUsername}/workspace`, '_blank');
-      toast('✅ Khởi tạo thành công! Chúc bạn làm bài tốt.', 'success');
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ action: 'mission_started' }, '*');
+        toast('✅ Khởi tạo thành công! IDE đang được làm mới...', 'success');
+      } else {
+        window.location.href = `/user/${currentUsername}/workspace`;
+      }
     } else {
       toast(data.error || 'Lỗi khởi tạo bài thi', 'error');
     }
@@ -397,6 +401,8 @@ async function confirmSubmit() {
       document.getElementById('pageWrap').classList.remove('has-banner');
       activeMission = null;
       await loadMyMissions();
+      if (window.parent && window.parent !== window) window.parent.postMessage({ action: 'sync_ide_only' }, '*');
+
       // Kiểm tra điểm định kỳ mỗi 8 giây, tối đa 10 lần (Polling)
       let pollCount = 0;
       const mId = submitMissionId;
