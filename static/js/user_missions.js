@@ -276,6 +276,10 @@ async function handleTimeOut(mission) {
   
   // Tự động nộp bài (Auto submit)
   try {
+    // Yêu cầu IDE parent auto-save trước khi nộp
+    if (window.parent && window.parent !== window) window.parent.postMessage({ action: 'save_before_submit' }, '*');
+    await new Promise(r => setTimeout(r, 1500)); // Chờ 1.5s cho IDE save xong
+    
     const res = await fetch(`/user/api/missions/${mission.id}/submit`, { method: 'POST' });
     const data = await res.json();
     
@@ -391,6 +395,10 @@ async function confirmSubmit() {
   btn.disabled = true;
   btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang nộp...';
   try {
+    // Yêu cầu IDE parent auto-save trước khi nộp
+    if (window.parent && window.parent !== window) window.parent.postMessage({ action: 'save_before_submit' }, '*');
+    await new Promise(r => setTimeout(r, 1500)); // Chờ 1.5s cho IDE save xong
+    
     const res = await fetch(`/user/api/missions/${submitMissionId}/submit`, { method: 'POST' });
     const data = await res.json();
     closeSubmitModal();

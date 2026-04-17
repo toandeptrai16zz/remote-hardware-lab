@@ -1493,6 +1493,33 @@ async function saveCurrentFile() {
     }
 }
 
+// ── AUTO-SAVE: Lưu toàn bộ file đang mở trước khi nộp bài ── by Chương
+async function saveAllOpenFiles() {
+    const unsaved = [];
+    for (const [path, data] of openFiles.entries()) {
+        if (path === 'WELCOME.txt') continue;
+        if (!data.saved) unsaved.push({ path, data });
+    }
+    if (unsaved.length === 0) return;
+    
+    for (const { path, data } of unsaved) {
+        try {
+            await apiCall(`/user/${username}/editor/save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: data.shortName,
+                    content: data.content,
+                    path: data.path
+                })
+            });
+            data.saved = true;
+            updateTabAppearance(path);
+        } catch (e) { /* Bỏ qua lỗi, ưu tiên nộp bài */ }
+    }
+    showNotification(`Đã tự động lưu ${unsaved.length} file trước khi nộp bài.`, 'info');
+}
+
 async function compileCode(event) {
     const compileBtn = event ? (event.currentTarget || event.target) : null;
     const originalBtnHTML = compileBtn ? compileBtn.innerHTML : "Biên dịch";
@@ -1740,6 +1767,8 @@ function slugifyVN(text) {
             syncMissionsToIDE();
         } else if (event.data && event.data.action === 'sync_ide_only') {
             syncMissionsToIDE();
+        } else if (event.data && event.data.action === 'save_before_submit') {
+            saveAllOpenFiles();
         }
     });
 
@@ -1903,6 +1932,9 @@ async function submitActiveMission() {
     if (!result.isConfirmed) return;
 
     try {
+        // ── AUTO-SAVE trước khi nộp bài ──
+        await saveAllOpenFiles();
+        
         const res = await fetch(`/user/api/missions/${missionId}/submit`, { method: 'POST' });
         const data = await res.json();
         if (data.success || (data.error && data.error.includes('already submitted'))) {
