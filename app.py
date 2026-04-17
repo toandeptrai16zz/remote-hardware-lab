@@ -148,8 +148,8 @@ def main():
         logger.info("🌐 Server đang chạy tại địa chỉ http://[::]:5000")
         logger.info("=" * 60)
         
-        # Chạy với SocketIO
-        socketio.run(app, host="::", port=5000, debug=True, use_reloader=False)
+        # Chạy với SocketIO (Bật use_reloader=True để tự động cập nhật code mới)
+        socketio.run(app, host="::", port=5000, debug=True, use_reloader=True)
         
     except KeyboardInterrupt:
         logger.info("\n⏹️ Nhận tín hiệu dừng từ bàn phím")

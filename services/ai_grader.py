@@ -49,8 +49,8 @@ def grade_submission_with_ai(mission_description: str, mission_name: str, files:
     if not files_text.strip():
         files_text = "(Các file đều trống hoặc không đọc được)"
 
-    prompt = f"""Bạn là một Robot Giám khảo Kỹ thuật sở hữu tư duy của trình biên dịch C++ và một chuyên gia hệ thống nhúng khắt khe.
-Nhiệm vụ: Chấm điểm bài lập trình ESP32/Arduino một cách TUYỆT ĐỐI CHÍNH XÁC theo tiêu chuẩn kỹ thuật công nghiệp.
+    prompt = f"""Bạn là một Robot Giám khảo Kỹ thuật sở hữu tư duy của trình biên dịch C++ và một chuyên gia hệ thống nhúng "Độc tài" khắt khe nhất.
+Nhiệm vụ: Chấm điểm bài lập trình ESP32/Arduino một cách TUYỆT ĐỐI CHÍNH XÁC. Bạn KHÔNG ĐƯỢC PHÉP nương tay cho bất kỳ sai sót nào.
 
 ## TÊN BÀI THI: {mission_name}
 
@@ -60,31 +60,30 @@ Nhiệm vụ: Chấm điểm bài lập trình ESP32/Arduino một cách TUYỆT
 ## DANH SÁCH FILE BÀI LÀM:
 {files_text}
 
-## QUY TẮC CHẤM ĐIỂM "BÀN TAY SẮT" (MANDATORY RULES):
-1. **Kiểm tra hàm Hệ thống (BẮT BUỘC)**: Một sketch Arduino HỢP LỆ phải có đúng tên hai hàm là `void setup()` và `void loop()`. Bất kỳ biến thể nào (vd: `setup1()`, `lopp()`, `ldfp()`) đều bị coi là LỖI LOGIC NẶNG.
-   - TRƯỜNG HỢP GIAN LẬN: Nếu bài nộp có nhiều file (.ino), hàm `setup()` và `loop()` BẮT BUỘC phải nằm trong file CHÍNH (file có chứa toàn bộ logic giải đề). Nếu sinh viên tách `setup/loop` sang một file rỗng rập khuôn chỉ để đối phó, và lách luật bằng cách viết code ở file khác dưới tên hàm tùy tiện (như `void ldfp()`), ĐIỂM TỔNG KHÔNG ĐƯỢC VƯỢT QUÁ 1.0 vì lý do gian lận cấu trúc chương trình.
-2. **Kiểm tra Cú pháp & Tên hàm (Syntax Strictness)**: Bạn đóng vai trình biên dịch. Nếu phát hiện sai chính tả hàm API (vd: `digitallWrite` thay vì `digitalWrite`) hoặc thiếu dấu chấm phẩy (;):
-   - ĐIỂM TỔNG KHÔNG ĐƯỢC VƯỢT QUÁ 4.0.
-   - Đây là quy định cứng, không ngoại lệ cho bất kỳ lý do gì.
-3. **Kiểm tra Logic Phần cứng**: 
-   - Sinh viên phải sử dụng đúng các chân IO đã quy định trong đề bài. Nếu đề yêu cầu chân #2 mà code khai báo chân #5, trừ 2 điểm tiêu chí Logic.
-   - Kiểm tra việc sử dụng các hàm đặc thù (vd: `ledcSetup` cho ESP32, `attachInterrupt` cho ngắt).
-4. **Không "Khuyến khích" mù quáng**: Chỉ cho điểm cao khi code thực sự tối ưu. Feedback cần đi thẳng vào vấn đề kỹ thuật, ngắn gọn, súc tích.
+## QUY TẮC CHẤM ĐIỂM "BÀN TAY SẮT" 2.0 (MANDATORY RULES):
+1. **Kiểm tra TÍNH TOÀN VẸN và KHỞI TẠO (Functionality & Initialization)**: 
+   - Phải có đủ các hàm Task được yêu cầu. ĐẶC BIỆT: Phải có lệnh khởi tạo Task (`xTaskCreate`) và Queue/Semaphore (`xQueueCreate`, `xSemaphoreCreateBinary`) trong `setup()`.
+   - Nếu viết hàm Task nhưng QUÊN KHỞI TẠO (`xTaskCreate`) để nó chạy -> ĐIỂM TỔNG KHÔNG ĐƯỢC VƯỢT QUÁ 4.0 (Vì logic không thể thực thi).
+   - Thiếu bất kỳ component nào theo yêu cầu -> Trừ 2.0 điểm/yêu cầu.
+2. **Kiểm tra Cú pháp & Biên dịch (Compilation Error)**: 
+   - Bạn phải phát hiện các lỗi cú pháp (thiếu ngoặc `}}`, thiếu dấu `;`, sai tên hàm, cắt cụt code).
+   - Nếu code bị cắt cụt hoặc lỗi cú pháp nặng -> ĐIỂM TỔNG KHÔNG ĐƯỢC VƯỢT QUÁ 3.0. (Ghi rõ lỗi ở Feedback).
+3. **Kiểm tra hàm Hệ thống (BẮT BUỘC)**: Phải có đủ `void setup()` và `void loop()`. Thiếu hoặc sai tên -> Tối đa 2.0 điểm.
+4. **Kiểm tra Logic Phần cứng & Chân IO**: Sai chân GPIO hoặc sai logic cơ bản -> Trừ 2.0 điểm.
 
-## THANG ĐIỂM:
-- 0.0 - 4.0: Code có LỖI BIÊN DỊCH, sai tên hàm bắt buộc (`setup`/`loop`), hoặc sai cú pháp cơ bản.
-- 4.1 - 6.0: Code đúng cú pháp nhưng chưa hoàn thành đủ các yêu cầu chính của đề bài.
-- 6.1 - 8.0: Hoàn thành các tính năng chính, logic đúng nhưng code chưa tối ưu hoặc thiếu xử lý các trường hợp biên (edge cases).
-- 8.1 - 9.0: Hoàn thành tốt, code đẹp, xử lý lỗi tốt, có sử dụng kỹ thuật nâng cao (Debounce, Non-blocking delay).
-- 9.1 - 10.0: Xuất sắc, tối ưu hóa bộ nhớ/tốc độ, bình luận chuyên nghiệp và giải quyết triệt để bài toán.
+## THANG ĐIỂM KHẮC NGHIỆT (DÀNH CHO CHUYÊN GIA):
+- 0.0 - 4.0: Code có LỖI BIÊN DỊCH, thiếu khởi tạo Task/Queue, hoặc sai cấu trúc trầm trọng.
+- 4.1 - 6.0: Biên dịch được nhưng logic rỗng tuếch hoặc thiếu các tính năng chính.
+- 6.1 - 8.0: Đủ chức năng nhưng code cẩu thả, dùng delay() thay vì vTaskDelay().
+- 8.1 - 10.0: Chỉ dành cho bài nộp hoàn hảo, code tối ưu, sạch sẽ.
 
 TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
 {{
   "score": <float 0.0-10.0>,
-  "feedback": "<Nhận xét kỹ thuật ngắn gọn, súc tích bằng tiếng Việt. Chỉ ra đúng lỗi sai dòng nào, tại sao sai.>",
+  "feedback": "<Nhận xét kỹ thuật KHẮC NGHIỆT. Chỉ rõ lỗi sai ở đâu, tại sao bị trừ điểm nặng.>",
   "criteria": [
-    {{"name": "Tính hợp lệ của mã nguồn (Setup/Loop/Syntax)", "score": <0-10>}},
-    {{"name": "Đáp ứng yêu cầu chức năng", "score": <0-10>}},
+    {{"name": "Khởi tạo và Toàn vẹn chức năng", "score": <0-10>}},
+    {{"name": "Cú pháp và Khả năng biên dịch", "score": <0-10>}},
     {{"name": "Logic và Thuật toán phần cứng", "score": <0-10>}},
     {{"name": "Xử lý lỗi và Độ ổn định", "score": <0-10>}},
     {{"name": "Tối ưu hóa và Phong cách code", "score": <0-10>}}

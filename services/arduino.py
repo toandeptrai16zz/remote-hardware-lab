@@ -358,7 +358,13 @@ def detect_board_from_sketch(username, sketch_path):
         read_cmd = ["docker", "exec", cname, "cat", f"/home/{safe_username}/{sketch_path}"]
         result = subprocess.run(read_cmd, capture_output=True, text=True, timeout=10)
         code = result.stdout if result.returncode == 0 else ""
-        if 'WiFi.h' in code or 'BLEDevice.h' in code or 'ledcSetup' in code:
+        # Nhận diện ESP32 qua các thư viện và hàm đặc thù, bao gồm cả FreeRTOS
+        esp32_keywords = [
+            'WiFi.h', 'BLEDevice.h', 'ledcSetup', 
+            'xTaskCreate', 'vTaskDelay', 'SemaphoreHandle_t', 
+            'xQueueCreate', 'portMAX_DELAY', 'xSemaphore'
+        ]
+        if any(kw in code for kw in esp32_keywords):
             return 'esp32:esp32:esp32'
         return 'arduino:avr:uno'
     except:
