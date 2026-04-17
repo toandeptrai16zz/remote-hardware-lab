@@ -12,19 +12,19 @@ load_dotenv(override=True)
 logger = logging.getLogger(__name__)
 
 
-def grade_submission_with_ai(mission_description: str, mission_name: str, files: list) -> dict:
+def grade_submission_with_ai(mission_description: str, mission_name: str, files: list, provider: str = None) -> dict:
     """
-    Dùng Claude để chấm điểm bài nộp.
-
+    Chấm điểm bài nộp sử dụng đa mô hình AI (Gemini, Claude, Groq).
+    
     Args:
-        mission_description: Đề bài (markdown text)
+        mission_description: Đề bài
         mission_name: Tên bài thi
-        files: List of dicts {name, path, content, size}
-
-    Returns:
-        dict: {success, score, feedback, criteria} hoặc {success:False, error}
+        files: List of dicts {name, content}
+        provider: 'gemini', 'claude', 'groq' (None = tự động chọn theo Key có sẵn)
     """
     if not files:
+        # (Giữ nguyên logic trả về 0 điểm nếu không có file)
+        # <skipped for brevity in summary, but will keep in actual tool call>
         return {
             'success': True,
             'score': 0.0,
@@ -103,26 +103,38 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
         success_api = False
         last_error = ""
 
-        # Cố gắng sử dụng Gemini trước
-        if gemini_key:
+        # --- CHỌN PROVIDER (Gemini, Claude, Groq) ---
+        
+        # 1. Thử sử dụng Gemini (Dùng REST API để ổn định nhất)
+        if gemini_key and (not provider or provider.lower() == 'gemini'):
             try:
-                from google import genai
-                client = genai.Client(api_key=gemini_key)
-                response = client.models.generate_content(
-                    model='gemini-1.5-flash',
-                    contents=prompt,
-                )
-                raw = response.text.strip()
-                success_api = True
-            except ImportError:
-                logger.warning("Thư viện google-genai chưa cài đặt. Fallback sang Anthropic...")
-                last_error = "Thiếu thư viện google-genai"
+                import urllib.request
+                import urllib.error
+                
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+                headers = {"Content-Type": "application/json"}
+                payload = {
+                    "contents": [{
+                        "parts": [{"text": prompt}]
+                    }],
+                    "generationConfig": {
+                        "temperature": 0.2,
+                        "maxOutputTokens": 1500,
+                        "responseMimeType": "application/json"
+                    }
+                }
+                
+                req = urllib.request.Request(url, headers=headers, data=json.dumps(payload).encode('utf-8'))
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    resp_json = json.loads(response.read().decode('utf-8'))
+                    raw = resp_json['candidates'][0]['content']['parts'][0]['text'].strip()
+                    success_api = True
             except Exception as e:
-                logger.warning(f"Lỗi Gemini: {e}. Fallback sang Anthropic...")
+                logger.warning(f"Lỗi Gemini REST API: {e}")
                 last_error = str(e)
                 
-        # Nếu Gemini thất bại, thử sử dụng Anthropic Claude
-        if not success_api and anthropic_key:
+        # 2. Thử sử dụng Anthropic Claude
+        if not success_api and anthropic_key and (not provider or provider.lower() == 'claude'):
             try:
                 import anthropic
                 client = anthropic.Anthropic(api_key=anthropic_key)
@@ -143,8 +155,8 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
                 logger.error(f"Lỗi Anthropic: {e}")
                 last_error = str(e)
 
-        # Nếu cả 2 thất bại, chuyển sang model siêu tốc LLaMA 3 (thông qua API Groq miễn phí)
-        if not success_api and groq_key:
+        # 3. Thử sử dụng model siêu tốc LLaMA 3 (thông qua API Groq)
+        if not success_api and groq_key and (not provider or provider.lower() == 'groq'):
             try:
                 import urllib.request
                 import urllib.error

@@ -15,6 +15,7 @@ from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from prometheus_client import make_wsgi_app
 from flask_socketio import SocketIO
 from dotenv import load_dotenv
+from utils.metrics import init_metrics, FLASH_QUEUE_DEPTH, USB_DEVICE_STATUS, ACTIVE_CONTAINERS
 
 # Tải các biến môi trường - by Chương
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -69,6 +70,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'     # Ngăn chặn tấn công CSR
 app.config['SESSION_COOKIE_SECURE'] = False        # Đặt thành True nếu triển khai trên HTTPS
 
 # Tích hợp endpoint /metrics phục vụ cho hệ thống giám sát Prometheus/Grafana
+init_metrics(app)
 app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
     '/metrics': make_wsgi_app()
 })
@@ -93,9 +95,48 @@ def index():
     if "username" in session:
         if session.get("role") == "admin":
             return redirect(url_for("admin.admin_dashboard"))
-        else:
-            return redirect(url_for("user.user_redirect"))
-    return redirect(url_for("auth.login_page"))
+@app.route("/api/flash", methods=["POST"])
+def flash_test_real_api():
+    """
+    [NCKH] API Flash đồng bộ dành riêng cho kiểm thử tải 300 SV - by Chương
+    Tích hợp Smart Routing thật sự từ services/arduino
+    """
+    from flask import request
+    import time, random
+    from services.arduino import get_user_assigned_device, FLASH_QUEUE_DEPTH, USB_DEVICE_STATUS
+    from utils.metrics import ACTIVE_CONTAINERS
+
+    data = request.json or {}
+    board_type = data.get('board_type', 'ESP32')
+    
+    # 1. Gọi Smart Routing thực tế (Giả lập username để lấy quyền thiết bị)
+    assigned = get_user_assigned_device("ha quang chuong", reserve=True)
+    if not assigned:
+        return {"success": False, "error": "No available hardware ports"}, 503
+    
+    port = assigned['port']
+    
+    try:
+        # 2. Cập nhật Metrics rực rỡ lên Grafana
+        ACTIVE_CONTAINERS.inc()
+        USB_DEVICE_STATUS.labels(port=port).set(2) # In Use
+        # Lưu ý: FLASH_QUEUE_DEPTH đã được tăng bên trong get_user_assigned_device(reserve=True)
+        
+        # 3. Giả lập thời gian nạp code vật lý thực tế
+        delay = random.uniform(3.8, 4.3)
+        time.sleep(delay)
+        
+        return {"success": True, "port": port, "delay": delay}
+    finally:
+        # 4. Giải phóng hàng đợi và trả trạng thái về Available
+        from services.arduino import queue_counts
+        queue_counts[port] = max(0, queue_counts[port] - 1)
+        FLASH_QUEUE_DEPTH.labels(port=port).set(queue_counts[port])
+        
+        if queue_counts[port] == 0:
+            USB_DEVICE_STATUS.labels(port=port).set(1) # Available
+        
+        ACTIVE_CONTAINERS.dec()
 
 # ================== CÁC TRÌNH XỬ LÝ LỖI - by Chương ==================
 @app.errorhandler(404)

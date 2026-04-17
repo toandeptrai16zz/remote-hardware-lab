@@ -12,6 +12,7 @@ import secrets
 from utils import make_safe_name, find_free_port
 from config import get_db_connection, DEFAULT_ARDUINO_LIBRARIES
 from services.logger import log_action
+from utils.metrics import ACTIVE_CONTAINERS
 
 logger = logging.getLogger(__name__)
 
@@ -269,7 +270,7 @@ exec /usr/sbin/sshd -D
         "--group-add", "dialout", 
         "--entrypoint", "/bin/bash"
     ]
-    # [RESTORED]: Add --device mappings to enforce physical hardware Bottleneck
+    # [RESTORED]: Xử lý nút thắt cổ chai vatas lý
     for port in required_ports:
         if os.path.exists(port):
             docker_command.extend(["--device", f"{port}:{port}"])
@@ -283,6 +284,9 @@ exec /usr/sbin/sshd -D
         
         if os.path.exists(setup_script_path):
             os.remove(setup_script_path)
+            
+        # Update metric
+        ACTIVE_CONTAINERS.inc()
              
     except Exception as e:
         logger.error(f"Error starting container: {e}")
@@ -318,7 +322,7 @@ def ensure_user_container_and_setup(username):
     return ssh_port
 
 def setup_container_permissions(cname, username):
-    """Setup serial device permissions in container"""
+    """Cài đặt serial trong container"""
     try:
         cmd = ["docker", "exec", cname, "sh", "-c", "chmod 666 /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || true"]
         subprocess.run(cmd, check=False, timeout=5)

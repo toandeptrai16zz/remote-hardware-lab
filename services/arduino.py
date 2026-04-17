@@ -14,6 +14,7 @@ import fcntl
 import time
 from collections import defaultdict
 from contextlib import contextmanager
+from utils.metrics import FLASH_QUEUE_DEPTH, USB_DEVICE_STATUS
 from utils import make_safe_name
 from config import get_db_connection
 from services.logger import log_action
@@ -143,6 +144,7 @@ def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio
             return
 
     queue_counts[port] += 1
+    FLASH_QUEUE_DEPTH.labels(port=port).set(queue_counts[port])
     try:
         safe_username = make_safe_name(username)
         cname = f"{safe_username}-dev"
@@ -231,6 +233,7 @@ def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio
             socketio.emit('upload_status', {'status': 'error', 'message': f'❌ Lỗi hệ thống: {str(e)}'}, namespace='/upload_status', room=sid)
     finally:
         queue_counts[port] = max(0, queue_counts[port] - 1)
+        FLASH_QUEUE_DEPTH.labels(port=port).set(queue_counts[port])
         print(f"DEBUG: [FLASH] Worker finished for {username}. Queue for {port} now: {queue_counts[port]}")
 
 # ==============================================================================
@@ -272,7 +275,10 @@ def get_serial_ports(username):
             """
             cur.execute(query, (username,))
             for row in cur.fetchall():
-                db_devices[row['port']] = row
+                address = row['port']
+                db_devices[address] = row
+                # Update USB status metric (1=available as it is in DB and not disconnected)
+                USB_DEVICE_STATUS.labels(port=address).set(1)
             cur.close()
             db.close()
 

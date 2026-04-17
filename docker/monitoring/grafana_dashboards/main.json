@@ -1,0 +1,91 @@
+{
+  "id": null,
+  "title": "EPU Tech IoT Lab Monitoring",
+  "tags": ["iot", "lab"],
+  "timezone": "browser",
+  "schemaVersion": 21,
+  "panels": [
+    {
+      "title": "Số lượng Container đang chạy",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "active_containers_total", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Độ sâu hàng đợi nạp code (Flash Queue)",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "flash_queue_depth", "legendFormat": "Cổng: {{port}}", "refId": "A" }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "displayMode": "gradient",
+        "showUnfilled": true
+      }
+    },
+    {
+      "title": "Thời gian phản hồi API (P95 Latency)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(flask_http_request_duration_seconds_bucket[5m])) by (le))", "refId": "A" }
+      ]
+    },
+    {
+      "title": "Trạng thái thiết bị USB vật lý",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "usb_device_status", "legendFormat": "{{port}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "Offline", "color": "dark-red" }, "1": { "text": "Available", "color": "green" }, "2": { "text": "In Use", "color": "orange" } } }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Tỉ lệ Phân bổ Tải (Cân bằng tải giữa các cổng)",
+      "type": "bargauge",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "flash_queue_depth", "legendFormat": "Cổng: {{port}}", "refId": "A" }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "orange", "value": 10 }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "refresh": "5s"
+}
