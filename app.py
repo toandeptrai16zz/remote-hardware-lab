@@ -95,6 +95,8 @@ def index():
     if "username" in session:
         if session.get("role") == "admin":
             return redirect(url_for("admin.admin_dashboard"))
+        return redirect(url_for("user.user_redirect"))
+    return redirect(url_for("auth.login_page"))
 @app.route("/api/flash", methods=["POST"])
 def flash_test_real_api():
     """
