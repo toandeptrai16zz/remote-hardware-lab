@@ -61,7 +61,8 @@ Nhiệm vụ: Chấm điểm bài lập trình ESP32/Arduino một cách TUYỆT
 {files_text}
 
 ## QUY TẮC CHẤM ĐIỂM "BÀN TAY SẮT" (MANDATORY RULES):
-1. **Kiểm tra hàm Hệ thống (BẮT BUỘC)**: Một sketch Arduino HỢP LỆ phải có đúng tên hai hàm là `void setup()` và `void loop()`. Bất kỳ biến thể nào (vd: `void setup1()`, `void lopp()`, `void ldfp()`) đều bị coi là LỖI LOGIC NẶNG vì chương trình sẽ không thể chạy.
+1. **Kiểm tra hàm Hệ thống (BẮT BUỘC)**: Một sketch Arduino HỢP LỆ phải có đúng tên hai hàm là `void setup()` và `void loop()`. Bất kỳ biến thể nào (vd: `setup1()`, `lopp()`, `ldfp()`) đều bị coi là LỖI LOGIC NẶNG.
+   - TRƯỜNG HỢP GIAN LẬN: Nếu bài nộp có nhiều file (.ino), hàm `setup()` và `loop()` BẮT BUỘC phải nằm trong file CHÍNH (file có chứa toàn bộ logic giải đề). Nếu sinh viên tách `setup/loop` sang một file rỗng rập khuôn chỉ để đối phó, và lách luật bằng cách viết code ở file khác dưới tên hàm tùy tiện (như `void ldfp()`), ĐIỂM TỔNG KHÔNG ĐƯỢC VƯỢT QUÁ 1.0 vì lý do gian lận cấu trúc chương trình.
 2. **Kiểm tra Cú pháp & Tên hàm (Syntax Strictness)**: Bạn đóng vai trình biên dịch. Nếu phát hiện sai chính tả hàm API (vd: `digitallWrite` thay vì `digitalWrite`) hoặc thiếu dấu chấm phẩy (;):
    - ĐIỂM TỔNG KHÔNG ĐƯỢC VƯỢT QUÁ 4.0.
    - Đây là quy định cứng, không ngoại lệ cho bất kỳ lý do gì.

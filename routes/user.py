@@ -677,7 +677,18 @@ def user_api_submit_mission(mission_id):
         import stat as stat_mod
         client = get_ssh_client(username)
         sftp = client.open_sftp()
+        from utils.helpers import slugify_vn
+        mission_slug = slugify_vn(mission['name'])
+        if not mission_slug: mission_slug = f"mission_{mission_id}"
+        mission_dir = f"/home/{safe_username}/{mission_slug}"
         home_dir = f"/home/{safe_username}"
+        
+        # Đảm bảo thư mục bài thi tồn tại, nếu không có thì file nộp sẽ là rỗng
+        try:
+            sftp.stat(mission_dir)
+        except FileNotFoundError:
+            files_snapshot.append({'name': 'error.txt', 'path': '/', 'content': 'Thư mục bài thi không tồn tại. Sinh viên chưa mở IDE hoặc đã cố tình xóa thư mục.', 'size': 0})
+        
         def collect(path, depth=0):
             if depth > 4: return
             try:
@@ -707,7 +718,8 @@ def user_api_submit_mission(mission_id):
                             })
                         except: pass
             except: pass
-        collect(home_dir)
+        if len(files_snapshot) == 0:
+            collect(mission_dir)
         sftp.close(); client.close()
     except Exception as e:
         files_snapshot = [{'name': 'error.txt', 'path': '/', 'content': f'Lỗi thu thập file: {e}', 'size': 0}]
