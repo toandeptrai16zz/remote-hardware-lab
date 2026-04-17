@@ -9,11 +9,11 @@ from services import get_ssh_client, log_action
 logger = logging.getLogger(__name__)
 
 def register_terminal_handlers(socketio):
-    """Register terminal namespace handlers"""
+    """Đăng ký các trình xử lý namespace terminal"""
     
     @socketio.on('connect', namespace='/terminal')
     def terminal_connect():
-        """Handle terminal connection"""
+        """Xử lý kết nối terminal"""
         if 'username' not in session:
             return False
 
@@ -24,13 +24,13 @@ def register_terminal_handlers(socketio):
             client = get_ssh_client(username)
             chan = client.invoke_shell(term='xterm-color')
             
-            # Store in session
+            # Lưu vào session
             session['ssh_client'] = client
             session['ssh_chan'] = chan
             log_action(username, "Terminal: User connected")
 
             def forward_output():
-                """Forward output from container to browser"""
+                """Chuyển tiếp output từ container đến trình duyệt"""
                 try:
                     while chan.active:
                         if chan.recv_ready():
@@ -56,7 +56,7 @@ def register_terminal_handlers(socketio):
 
     @socketio.on('input', namespace='/terminal')
     def terminal_input(data):
-        """Handle terminal input"""
+        """Xử lý đầu vào terminal"""
         if 'ssh_chan' in session and session['ssh_chan'].active:
             try:
                 if isinstance(data, str):
@@ -69,10 +69,10 @@ def register_terminal_handlers(socketio):
 
     @socketio.on('disconnect', namespace='/terminal')
     def terminal_disconnect():
-        """Handle terminal disconnection"""
+        """Xử lý ngắt kết nối terminal"""
         username = session.get("username", "unknown")
         
-        # Close SSH channel
+        # Đóng kênh SSH
         if 'ssh_chan' in session:
             try:
                 if session['ssh_chan'].active:
@@ -82,7 +82,7 @@ def register_terminal_handlers(socketio):
             finally:
                 session.pop('ssh_chan', None)
         
-        # Close SSH client
+        # Close SSH client SSH
         if 'ssh_client' in session:
             try:
                 session['ssh_client'].close()

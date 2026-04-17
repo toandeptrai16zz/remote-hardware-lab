@@ -101,7 +101,7 @@
     }
 
     /**
-     * Escape HTML to prevent XSS
+     * Chuyển đổi ký tự đặc biệt (Escape) để ngăn chặn tấn công XSS ── by Chương
      */
     function escapeHtml(text) {
         const div = document.createElement('div');
@@ -110,7 +110,7 @@
     }
 
     /**
-     * Fetch data and populate select element
+     * Tải dữ liệu và đổ vào thẻ select ── by Chương
      */
     async function fetchAndPopulate(url, selectElement, valueField, textField) {
         try {
@@ -137,10 +137,10 @@
                 throw new Error('Invalid response format: expected array');
             }
 
-            // Clear existing options
+            // Xóa các tùy chọn cũ
             selectElement.innerHTML = '';
 
-            // Populate options
+            // Đổ dữ liệu vào các tùy chọn (options)
             data.forEach(item => {
                 if (item[valueField] && item[textField]) {
                     const option = new Option(
@@ -151,7 +151,7 @@
                 }
             });
 
-            // Trigger change to update Select2
+            // Kích hoạt sự kiện thay đổi để cập nhật giao diện Select2 (Trigger)
             $(selectElement).trigger('change');
 
             return true;
@@ -172,10 +172,10 @@
     }
 
     /**
-     * Initialize Select2 components
+     * Khởi tạo các thành phần Select2 ── by Chương
      */
     function initializeSelect2() {
-        // Users select
+        // Ô chọn danh sách sinh viên (User Select)
         $(elements.usersSelect).select2({
             theme: CONFIG.SELECT2.THEME,
             width: CONFIG.SELECT2.WIDTH,
@@ -189,12 +189,12 @@
             }
         });
 
-        // Event listeners for validation
+        // Lắng nghe sự kiện để kiểm tra tính hợp lệ (Validation)
         $(elements.usersSelect).on('change', validateUsers);
     }
 
     /**
-     * Validate mission name
+     * Kiểm tra tính hợp lệ của tên bài thi (Mission Name) ── by Chương
      */
     function validateMissionName() {
         const value = elements.missionName.value.trim();
@@ -224,7 +224,7 @@
     }
 
     /**
-     * Validate users selection
+     * Kiểm tra tính hợp lệ của danh sách sinh viên được chọn ── by Chương
      */
     function validateUsers() {
         const selectedUsers = $(elements.usersSelect).val() || [];
@@ -238,14 +238,14 @@
     }
 
     /**
-     * Update field validation UI
+     * Cập nhật giao diện thông báo lỗi (Validation UI) ── by Chương
      */
     function updateFieldValidation(fieldElement, isValid, errorMessage, errorElement, indicatorElement = null) {
-        // Update field styling
+        // Cập nhật kiểu dáng cho ô nhập liệu (Field Styling)
         fieldElement.classList.toggle('form-control-error', !isValid);
         fieldElement.classList.toggle('form-control-success', isValid);
 
-        // Update error message
+        // Cập nhật nội dung thông báo lỗi (Error Message)
         if (errorElement) {
             if (isValid) {
                 errorElement.style.display = 'none';
@@ -256,7 +256,7 @@
             }
         }
 
-        // Update validation indicator
+        // Cập nhật biểu tượng trạng thái (Check/Times Indicator)
         if (indicatorElement) {
             indicatorElement.className = 'validation-indicator';
             if (isValid) {
@@ -270,12 +270,12 @@
             }
         }
 
-        // Update submit button state
+        // Cập nhật trạng thái nút gửi form (Submit Button State)
         updateSubmitButton();
     }
 
     /**
-     * Update submit button state
+     * Kiểm tra toàn bộ form để bật/tắt nút gửi ── by Chương
      */
     function updateSubmitButton() {
         const isFormValid = Object.values(state.validation).every(valid => valid);
@@ -283,7 +283,7 @@
     }
 
     /**
-     * Set form loading state
+     * Thiết lập trạng thái đang xử lý (Loading) cho form ── by Chương
      */
     function setFormLoading(isLoading) {
         state.isSubmitting = isLoading;
@@ -291,7 +291,7 @@
         elements.submitBtn.classList.toggle('loading', isLoading);
         elements.submitBtn.disabled = isLoading;
         
-        // Disable form inputs
+        // Vô hiệu hóa các ô nhập liệu khi đang gửi
         const inputs = elements.form.querySelectorAll('input, select, button');
         inputs.forEach(input => {
             input.disabled = isLoading;
@@ -305,14 +305,14 @@
     }
 
     /**
-     * Handle form submission
+     * Xử lý sự kiện gửi form (Submit) ── by Chương
      */
     async function handleSubmit(event) {
         event.preventDefault();
         
         if (state.isSubmitting) return;
 
-        // Validate all fields
+        // Kiểm tra tính hợp lệ của tất cả các trường trước khi gửi (Validation)
         const isMissionNameValid = validateMissionName();
         const isUsersValid = validateUsers();
 
@@ -334,7 +334,7 @@
                 user_ids: ($(elements.usersSelect).val() || []).map(Number)
             };
 
-            // Validate data one more time
+            // Kiểm tra dữ liệu bài thi lần cuối trước khi nạp (Validate Data)
             if (!formData.mission_name || formData.user_ids.length === 0 || false) {
                 throw new Error('Dữ liệu form không hợp lệ');
             }
@@ -364,10 +364,10 @@
                 throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
             }
 
-            // Success
+            // Xử lý khi thành công (Success)
             showNotification(result.message || 'Mission đã được tạo thành công!', 'success');
             
-            // Reset form
+            // Đưa form về trạng thái ban đầu (Reset)
             resetForm();
             // Tải lại bảng để xem bài mới giao
             if (typeof loadMissionsTable === 'function') {
@@ -393,27 +393,27 @@
     }
 
     /**
-     * Reset form to initial state
+     * Đưa form về trạng thái ban đầu (Reset Form) ── by Chương
      */
     function resetForm() {
-        // Reset form fields
+        // Xóa trắng các trường nhập liệu
         elements.form.reset();
         
-        // Reset form fields
+        // Xóa trắng các trường nhập liệu
         elements.form.reset();
         window.editingMissionId = null;
         document.getElementById('submitBtn').innerHTML = `<i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Giao Mission`;
         
-        // Clear Select2 selections
+        // Xóa các lựa chọn trong Select2 (Clear selections)
         $(elements.usersSelect).val(null).trigger('change');
         
-        // Reset validation state
+        // Khôi phục trạng thái kiểm tra lỗi ban đầu (Reset validation)
         state.validation = {
             missionName: false,
             users: false
         };
         
-        // Clear validation UI
+        // Xóa bỏ các cảnh báo lỗi trên giao diện (Clear Validation UI)
         const fields = [
             { element: elements.missionName, error: elements.missionNameError, indicator: elements.missionNameIndicator },
             { element: elements.usersSelect, error: elements.usersSelectError }
@@ -435,7 +435,7 @@
     }
 
     /**
-     * Load initial data
+     * Tải dữ liệu ban đầu từ máy chủ (Users list...) ── by Chương
      */
     async function loadInitialData() {
         const loadingPromises = [
@@ -458,17 +458,17 @@
     }
 
     /**
-     * Setup event listeners
+     * Cài đặt các trình lắng nghe sự kiện (Event Listeners) ── by Chương
      */
     function setupEventListeners() {
-        // Form submission
+        // Lắng nghe sự kiện nộp bài thi (Form Submit)
         elements.form.addEventListener('submit', handleSubmit);
         
-        // Mission name validation
+        // Kiểm tra tên bài thi khi người dùng nhập (Validation)
         elements.missionName.addEventListener('input', validateMissionName);
         elements.missionName.addEventListener('blur', validateMissionName);
         
-        // Prevent form submission on Enter in text fields
+        // Ngăn chặn nộp form tự động khi nhấn Enter trong ô văn bản
         elements.missionName.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -476,12 +476,12 @@
             }
         });
 
-        // Focus management for better UX
+        // Quản lý tiêu điểm (Focus) để cải thiện trải nghiệm người dùng
         elements.missionName.addEventListener('focus', () => {
             elements.missionName.select();
         });
 
-        // Handle page unload
+        // Cảnh báo khi người dùng thoát trang mà chưa nạp bài (Page Unload)
         window.addEventListener('beforeunload', (event) => {
             if (state.isSubmitting) {
                 event.preventDefault();
@@ -492,13 +492,13 @@
     }
 
     /**
-     * Initialize application
+     * Khởi tạo ứng dụng quản lý bài thi (Initialize) ── by Chương
      */
     async function initialize() {
         if (state.isInitialized) return;
         
         try {
-            // Check if all required elements exist
+            // Kiểm tra sự tồn tại của các thành phần DOM bắt buộc
             const requiredElements = Object.entries(elements);
             const missingElements = requiredElements.filter(([name, element]) => !element);
             
@@ -508,18 +508,18 @@
                 return;
             }
 
-            // Initialize Select2
+            // Khởi tạo thành phần chọn đa năng (Select2)
             initializeSelect2();
             
-            // Setup event listeners
+            // Cài đặt xử lý sự kiện (Event Listeners)
             setupEventListeners();
             
-            // Load initial data
+            // Bắt đầu tải dữ liệu ban đầu từ Server
             await loadInitialData();
             
             state.isInitialized = true;
             
-            // Focus on first input
+            // Tự động nhảy vào ô nhập liệu tên bài thi (First Focus)
             elements.missionName.focus();
             
             console.log('Mission assignment page initialized successfully');
@@ -530,8 +530,7 @@
         }
     }
 
-    
-    // Mission Type listener for duration defaults
+    // Theo dõi kiểu bài thi để đặt thời lượng mặc định ── by Chương
     const startInput = document.getElementById('startTime');
     const endInput = document.getElementById('endTime');
     const durationInput = document.getElementById('durationMinutes');
@@ -558,7 +557,7 @@
         calculateEndTime();
     });
 
-    // Populate missions table
+    // Đổ dữ liệu bài thi vào bảng quản lý ── by Chương
     async function loadMissionsTable() {
         const tbody = document.querySelector('#missionsTable tbody');
         try {
@@ -647,7 +646,7 @@
         }
     }
 
-    // Export Excel function
+    // Hàm xuất kết quả bài thi ra file Excel (Excel Export) ── by Chương
     window.exportMission = function(id, name) {
         showNotification(`Đang chuẩn bị xuất file điểm cho bài thi ${name}...`, 'info');
         window.location.href = `/admin/api/missions/${id}/export`;
@@ -663,7 +662,7 @@
         document.getElementById('endTime').value = m.end_time ? m.end_time.slice(0,16) : '';
         document.getElementById('missionDescription').value = m.description || '';
         document.getElementById('submitBtn').innerHTML = '<i class="fa-solid fa-save"></i> Cập nhật Mission';
-        // Mock valid
+        // Giả lập trạng thái hợp lệ khi chỉnh sửa (Mock Valid)
         state.validation = { missionName: true, users: true };
         document.getElementById('missionName').classList.add('form-control-success');
         updateSubmitButton();
@@ -697,7 +696,7 @@
         }
     };
 
-    // Reload table after init + auto-refresh mỗi 15 giây
+    // Tự động làm mới bảng sau mỗi 15 giây (Auto-refresh) ── by Chương
     const originalInit = initialize;
     initialize = async function() {
         await originalInit();
@@ -707,14 +706,14 @@
     };
 
 
-    // Initialize when DOM is ready
+    // Khởi chạy khi tài liệu (DOM) đã sẵn sàng ── by Chương
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initialize);
     } else {
         initialize();
     }
 
-    // Expose public API for debugging (only in development)
+    // Công khai API để kiểm thử logic (Chỉ dùng trong môi trường Dev) ── by Chương
     if (window.location.hostname === 'localhost' || window.location.hostname.includes('dev')) {
         window.MissionAssignment = {
             state,

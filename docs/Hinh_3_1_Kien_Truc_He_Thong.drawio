@@ -1,0 +1,242 @@
+<mxfile host="app.diagrams.net" modified="2025-04-17T02:26:00.000Z" agent="draw.io" version="24.0.0">
+  <diagram name="Sequence Diagram" id="seq">
+    <mxGraphModel dx="1400" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ===== CÁC CỘT (LIFELINE) ===== -->
+        <!-- x positions: 120, 330, 540, 750, 960 -->
+
+        <!-- Cột 1: Sinh viên / Browser -->
+        <mxCell id="h1a" value="&lt;b&gt;Sinh viên&lt;/b&gt;&lt;br&gt;(Browser)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1" value="" style="endArrow=none;dashed=0;html=1;strokeColor=#82b366;strokeWidth=3;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="120" y="80" as="sourcePoint"/>
+            <mxPoint x="120" y="700" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Cột 2: Flask Server -->
+        <mxCell id="h2a" value="&lt;b&gt;Flask&lt;/b&gt;&lt;br&gt;Server" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="270" y="30" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="l2" value="" style="endArrow=none;dashed=0;html=1;strokeColor=#b85450;strokeWidth=3;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="330" y="80" as="sourcePoint"/>
+            <mxPoint x="330" y="700" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Cột 3: Docker Container -->
+        <mxCell id="h3a" value="&lt;b&gt;Docker&lt;/b&gt;&lt;br&gt;Container" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="480" y="30" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="l3" value="" style="endArrow=none;dashed=0;html=1;strokeColor=#6c8ebf;strokeWidth=3;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="540" y="80" as="sourcePoint"/>
+            <mxPoint x="540" y="700" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Cột 4: Load Balancer -->
+        <mxCell id="h4a" value="&lt;b&gt;Load&lt;/b&gt;&lt;br&gt;Balancer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="690" y="30" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="l4" value="" style="endArrow=none;dashed=0;html=1;strokeColor=#d79b00;strokeWidth=3;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="750" y="80" as="sourcePoint"/>
+            <mxPoint x="750" y="700" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Cột 5: Arduino Board -->
+        <mxCell id="h5a" value="&lt;b&gt;Arduino&lt;/b&gt;&lt;br&gt;Board" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="900" y="30" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="l5" value="" style="endArrow=none;dashed=0;html=1;strokeColor=#d6b656;strokeWidth=3;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="960" y="80" as="sourcePoint"/>
+            <mxPoint x="960" y="700" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ===== LUỒNG 1: NẠP CODE (y=100 → 500) ===== -->
+        <mxCell id="flow1_bg" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF9E6;strokeColor=#d6b656;opacity=30;" vertex="1" parent="1">
+          <mxGeometry x="30" y="95" width="1030" height="340" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow1_title" value="&lt;b style='font-size:13px'&gt;Luồng 1: Nạp Code từ Web → Phần cứng&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="300" y="98" width="400" height="25" as="geometry"/>
+        </mxCell>
+
+        <!-- Bước 1: SV → Flask -->
+        <mxCell id="n1" value="&lt;b style='color:#b85450'&gt;1&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="200" y="125" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="s1" value="" style="endArrow=classic;html=1;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="120" y="140" as="sourcePoint"/>
+            <mxPoint x="330" y="140" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1t" value="POST /api/flash&lt;br&gt;{sketch_path, board_type}" style="text;html=1;align=center;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="145" width="190" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Bước 2: Flask → Docker (biên dịch) -->
+        <mxCell id="n2" value="&lt;b style='color:#6c8ebf'&gt;2&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="415" y="185" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="s2" value="" style="endArrow=classic;html=1;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="330" y="200" as="sourcePoint"/>
+            <mxPoint x="540" y="200" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s2t" value="arduino-cli compile&lt;br&gt;--fqbn arduino:avr:uno" style="text;html=1;align=center;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="340" y="205" width="190" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Bước 3: Docker → Flask (trả .hex) -->
+        <mxCell id="n3" value="&lt;b style='color:#6c8ebf'&gt;3&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="415" y="240" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="s3" value="" style="endArrow=classic;html=1;dashed=1;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="540" y="255" as="sourcePoint"/>
+            <mxPoint x="330" y="255" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s3t" value="Trả file .hex biên dịch OK&lt;br&gt;(hoặc lỗi compile)" style="text;html=1;align=center;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="340" y="258" width="190" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Bước 4: Flask → LB (tìm board rảnh) -->
+        <mxCell id="n4" value="&lt;b style='color:#d79b00'&gt;4&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="520" y="295" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="s4" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#d79b00;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="330" y="310" as="sourcePoint"/>
+            <mxPoint x="750" y="310" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s4t" value="get_user_assigned_device()&lt;br&gt;Smart Routing: tìm min(queue_counts)&lt;br&gt;random.choice() → reserve port" style="text;html=1;align=center;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="380" y="315" width="320" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Bước 5: LB → Arduino (nạp code, MŨI TÊN ĐỎ) -->
+        <mxCell id="n5" value="&lt;b style='color:#FF0000'&gt;5&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FF6666;strokeColor=#FF0000;fontColor=#FFFFFF;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="830" y="360" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="s5" value="" style="endArrow=classic;html=1;strokeWidth=3;strokeColor=#FF0000;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="750" y="375" as="sourcePoint"/>
+            <mxPoint x="960" y="375" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s5t" value="arduino-cli upload&lt;br&gt;--port /dev/ttyUSB0&lt;br&gt;fcntl.flock() khóa cổng" style="text;html=1;align=center;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="770" y="380" width="170" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="s5note" value="⚡ Nạp code&lt;br&gt;xuống board thật" style="text;html=1;align=left;fontSize=10;fillColor=none;strokeColor=none;fontStyle=1;fontColor=#FF0000;" vertex="1" parent="1">
+          <mxGeometry x="970" y="365" width="100" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Bước 6: Arduino → Flask (kết quả, nét đứt quay lại) -->
+        <mxCell id="n6" value="&lt;b&gt;6&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="520" y="420" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="s6" value="" style="endArrow=classic;html=1;dashed=1;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="960" y="435" as="sourcePoint"/>
+            <mxPoint x="120" y="435" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s6t" value="WebSocket emit: ✅ Nạp thành công! / ❌ Lỗi upload" style="text;html=1;align=center;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="250" y="438" width="380" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== LUỒNG 2: AI CHẤM ĐIỂM (y=500 → 700) ===== -->
+        <mxCell id="flow2_bg" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#6c8ebf;opacity=30;" vertex="1" parent="1">
+          <mxGeometry x="30" y="475" width="1030" height="220" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow2_title" value="&lt;b style='font-size:13px'&gt;Luồng 2: AI Chấm điểm tự động&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="300" y="478" width="400" height="25" as="geometry"/>
+        </mxCell>
+
+        <!-- Cột 6: AI Grader (thêm lifeline mới bên phải) -->
+        <mxCell id="h6a" value="&lt;b&gt;AI Grader&lt;/b&gt;&lt;br&gt;Gemini/LLaMA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="690" y="505" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="l6" value="" style="endArrow=none;dashed=0;html=1;strokeColor=#9673a6;strokeWidth=3;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="750" y="555" as="sourcePoint"/>
+            <mxPoint x="750" y="695" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Bước 7: SV → Flask (nộp bài) -->
+        <mxCell id="n7" value="&lt;b style='color:#b85450'&gt;1&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="200" y="565" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="s7" value="" style="endArrow=classic;html=1;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="120" y="580" as="sourcePoint"/>
+            <mxPoint x="330" y="580" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s7t" value="POST /api/submit-exam&lt;br&gt;{code, exercise_id}" style="text;html=1;align=center;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="585" width="190" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Bước 8: Flask → AI Grader -->
+        <mxCell id="n8" value="&lt;b style='color:#9673a6'&gt;2&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="520" y="615" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="s8" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#9673a6;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="330" y="630" as="sourcePoint"/>
+            <mxPoint x="750" y="630" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s8t" value="Gửi code + Prompt ĐTVT&lt;br&gt;→ Gemini API (hoặc LLaMA Fallback)" style="text;html=1;align=center;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="370" y="633" width="320" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Bước 9: AI → SV (trả điểm) -->
+        <mxCell id="n9" value="&lt;b style='color:#9673a6'&gt;3&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="520" y="665" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="s9" value="" style="endArrow=classic;html=1;dashed=1;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="750" y="680" as="sourcePoint"/>
+            <mxPoint x="120" y="680" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s9t" value="Trả điểm (8/10) + Nhận xét AI chi tiết → Hiển thị SweetAlert2 popup" style="text;html=1;align=center;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="200" y="683" width="470" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="s9note" value="🎯 Tự động&lt;br&gt;chấm điểm" style="text;html=1;align=left;fontSize=10;fillColor=none;strokeColor=none;fontStyle=1;fontColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="20" y="670" width="90" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== FOOTER: Lặp lại tên cột ===== -->
+        <mxCell id="h1b" value="&lt;b&gt;Sinh viên&lt;/b&gt;&lt;br&gt;(Browser)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="710" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="h2b" value="&lt;b&gt;Flask&lt;/b&gt;&lt;br&gt;Server" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="270" y="710" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="h3b" value="&lt;b&gt;Docker&lt;/b&gt;&lt;br&gt;Container" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="480" y="710" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="h5b" value="&lt;b&gt;Arduino&lt;/b&gt;&lt;br&gt;Board" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="900" y="710" width="120" height="50" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

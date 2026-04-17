@@ -187,9 +187,9 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
         if not success_api:
             return {'success': False, 'error': f'Không thể gọi AI API. Lỗi gần nhất: {last_error}'}
             
-        logger.info(f"AI grader raw response (first 200): {raw[:200]}")
-
-        # Strip markdown code fences if present
+        logger.info(f"Phản hồi thô từ AI (200 ký tự đầu): {raw[:200]}")
+ 
+        # Loại bỏ các dấu rào markdown code nếu có
         if raw.startswith("```"):
             parts = raw.split("```")
             if len(parts) >= 3:
@@ -197,21 +197,21 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
                 if raw.startswith("json"):
                     raw = raw[4:]
             raw = raw.strip()
-
+ 
         parsed = json.loads(raw)
-
-        # Validate and clamp
+ 
+        # Kiểm tra và giới hạn điểm số trong khoảng 0-10
         criteria = parsed.get('criteria', [])
         for c in criteria:
             c['score'] = max(0, min(10, float(c.get('score', 0))))
-
-        # Recalculate total as average of criteria scores
+ 
+        # Tính toán lại tổng điểm dựa trên trung bình cộng các tiêu chí
         if criteria:
             total = sum(c['score'] for c in criteria) / len(criteria)
             score = round(total, 1)
         else:
             score = max(0.0, min(10.0, float(parsed.get('score', 0))))
-
+ 
         result = {
             'success': True,
             'score': score,
@@ -219,8 +219,8 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
             'criteria': criteria
         }
         
-        # --- DATA COLLECTION FOR FUTURE TRAINING ---
-        # Save this interaction to a JSONL file
+        # --- THU THẬP DỮ LIỆU ĐỂ TRAINING TRONG TƯƠNG LAI ---
+        # Lưu lại tương tác này vào file JSONL
         try:
             dataset_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
             os.makedirs(dataset_dir, exist_ok=True)
@@ -237,19 +237,19 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
             with open(dataset_path, 'a', encoding='utf-8') as f:
                 f.write(json.dumps(training_record, ensure_ascii=False) + '\n')
                 
-            logger.info(f"Saved training data record to {dataset_path}")
+            logger.info(f"Đã lưu bản ghi dữ liệu training vào {dataset_path}")
         except Exception as e:
-            logger.error(f"Failed to save training data: {e}")
+            logger.error(f"Không thể lưu dữ liệu training: {e}")
         # -------------------------------------------
-
+ 
         return result
-
+ 
     except json.JSONDecodeError as e:
-        logger.error(f"AI grader JSON parse error: {e}. Raw: {raw[:300] if 'raw' in dir() else 'N/A'}")
+        logger.error(f"Lỗi phân tách JSON từ AI: {e}. Raw: {raw[:300] if 'raw' in dir() else 'N/A'}")
         return {'success': False, 'error': 'AI trả về định dạng không hợp lệ. Vui lòng thử lại.'}
     except ImportError:
-        logger.error("google-genai package chưa được cài đặt")
+        logger.error("Gói google-genai chưa được cài đặt")
         return {'success': False, 'error': 'Thư viện AI chưa được cài đặt. Chạy: pip install google-genai'}
     except Exception as e:
-        logger.error(f"AI grader unexpected error: {e}")
+        logger.error(f"Lỗi không xác định từ AI Grader: {e}")
         return {'success': False, 'error': f'Lỗi chấm điểm: {str(e)}'}

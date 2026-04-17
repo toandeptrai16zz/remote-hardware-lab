@@ -1,5 +1,5 @@
 """
-Logger service for tracking user actions
+Dịch vụ Logger để theo dõi hành động của người dùng
 """
 import json
 import logging
@@ -9,19 +9,19 @@ from config import get_db_connection
 logger = logging.getLogger(__name__)
 
 def log_action(username, action, success=True, details=None):
-    """Log user action to database"""
+    """Ghi lại hành động của người dùng vào cơ sở dữ liệu"""
     try:
         db = get_db_connection()
         if not db: 
             return
         cur = db.cursor()
         
-        # Check if we're in a request context
+        # Kiểm tra xem chúng ta có đang trong ngữ cảnh request (request context) hay không
         if has_request_context():
             ip_address = request.remote_addr
             user_agent = request.user_agent.string if request.user_agent else "Unknown"
         else:
-            # Running in background task
+            # Đang chạy trong tiến trình nền (background task)
             ip_address = "System/Background"
             user_agent = "Server Worker"
 
@@ -33,5 +33,5 @@ def log_action(username, action, success=True, details=None):
         cur.close()
         db.close()
     except Exception as e:
-        # Use print instead of logger to avoid recursion
+        # Sử dụng print thay vì logger để tránh lỗi đệ quy (vòng lặp vô hạn)
         print(f"LOG ACTION ERROR: {e}")

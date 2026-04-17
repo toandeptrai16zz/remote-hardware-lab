@@ -127,7 +127,7 @@
     box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3); 
   }
 
-  /* Modal Styles */
+  /* Style cho các cửa sổ Modal */
   .add-user-modal .modal-content { 
     border-radius: 20px; 
     border: none; 
@@ -196,7 +196,7 @@
     padding: 1rem 1.5rem;
   }
 
-  /* Button Gradient Colors */
+  /* Màu sắc Gradient cho các nút nhấn */
   .btn-success { background: var(--success-gradient) !important; border: none; }
   .btn-warning { background: var(--warning-gradient) !important; border: none; }
   .btn-danger { background: var(--danger-gradient) !important; border: none; }
@@ -207,7 +207,7 @@
     box-shadow: 0 8px 20px rgba(0,0,0,0.3);
   }
 
-  /* Navigation and Pagination */
+  /* Điều hướng và Phân trang (Navigation & Pagination) */
   .nav-tabs { 
     border-bottom: 2px solid var(--dark-border); 
     margin-bottom: 2rem; 
@@ -244,7 +244,7 @@
     color: rgba(255,255,255,0.3); 
   }
 
-  /* Responsive Design */
+  /* Thiết kế tương thích (Responsive Design) */
   @media (max-width: 768px) {
     .btn-group {
       display: flex;

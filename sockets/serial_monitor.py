@@ -91,7 +91,7 @@ def register_serial_handlers(socketio):
     
     @socketio.on('start_monitor', namespace='/serial')
     def start_serial_monitor(data):
-        """Start serial monitor"""
+        """Bắt đầu Serrial"""
         username = session.get("username")
         if not username: 
             return
@@ -104,7 +104,7 @@ def register_serial_handlers(socketio):
             emit('serial_error', {'error': 'Port is required'})
             return
             
-        # Clean up old session
+        # Xóa các session cũ
         stop_existing_monitor(sid)
         
         try:

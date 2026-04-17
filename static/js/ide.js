@@ -28,14 +28,22 @@ let _examModeSlug = null;   // slug của folder bài thi đang active (null = k
 let _prevExamSlug = null;   // slug trước đó, dùng để detect thay đổi trạng thái
 let _allMissionSlugs = [];  // danh sách slug của tất cả các bài tập (để ẩn khi không thi)
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     setupEditor();
     setupTerminal();
     setupResizer();
     setupHorizontalResizer();
     setupEventListeners();
     setupFileCreationModal();
-    refreshRootFiles();
+    
+    // Đồng bộ trạng thái bài thi trước để xác định Exam Mode ── by Chương
+    await syncMissionsToIDE();
+    
+    // Chỉ tải lại root files nếu không có bài thi (vì nếu có, syncMissionsToIDE đã tự tải)
+    if (!_ideActiveMission) {
+        refreshRootFiles();
+    }
+    
     loadIDEState();
     connectTerminalSocket();
     connectUploadSocket();
@@ -115,31 +123,31 @@ async function refreshSerialPorts() {
 }
 
 // =================================================================
-// FILE CREATION MODAL
+// CỬA SỔ TẠO FILE MỚI (FILE CREATION MODAL) ── by Chương
 // =================================================================
 function setupFileCreationModal() {
-    // Close modal on escape key
+    // Đóng cửa sổ khi nhấn phím Escape
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && DOM.fileCreationModal.style.display !== 'none') {
             closeFileCreationModal();
         }
     });
 
-    // Close modal on backdrop click
+    // Đóng cửa sổ khi click vào vùng phủ bên ngoài (backdrop)
     DOM.fileCreationModal.addEventListener('click', (e) => {
         if (e.target === DOM.fileCreationModal) {
             closeFileCreationModal();
         }
     });
 
-    // Handle enter key in input
+    // Xử lý khi nhấn phím Enter trong ô nhập liệu
     DOM.fileNameInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             confirmFileCreation();
         }
     });
 
-    // Auto-focus input when modal opens
+    // Tự động tập trung (focus) vào ô nhập liệu khi cửa sổ mở ra
     DOM.fileCreationModal.addEventListener('animationend', () => {
         if (DOM.fileCreationModal.style.display !== 'none') {
             DOM.fileNameInput.focus();
@@ -171,17 +179,17 @@ function connectUploadSocket() {
         }
         terminal.scrollToBottom();
 
-        // [FEATURE/HARDWARE-FLASH] AUTO-TRIGGER AI GRADER AFTER PHYSICAL UPLOAD SUCCESS
+        // [TÍNH NĂNG/NẠP PHẦN CỨNG] TỰ ĐỘNG KÍCH HOẠT AI CHẤM ĐIỂM SAU KHI NẠP THÀNH CÔNG ── by Chương
         if (data.status === 'success' && _ideActiveMission) {
             terminal.write(`\x1b[1;36m[AI SYSTEM] Hệ thống đang tự động gửi mã nguồn gốc lên AI Server... Vui lòng chờ kết quả!\x1b[0m\r\n`);
-            // Trigger auto-submit without prompt
+            // Tự động nộp bài mà không cần yêu cầu xác nhận
             fetch(`/user/api/missions/${_ideActiveMission.id}/submit`, { method: 'POST' })
                 .then(res => res.json())
                 .then(resData => {
                     if (resData.success || (resData.error && resData.error.includes('already submitted'))) {
-                        // Call the manual submit active mission function to just pop up the loading/polling screen
-                        // We can reuse the UI from submitActiveMission but bypass the prompt. 
-                        // To do this simply, we will just call a quick poll here directly!
+                        // Gọi hàm nộp bài thủ công để hiển thị màn hình chờ/polling
+                        // Tái sử dụng giao diện từ submitActiveMission nhưng bỏ qua bước xác nhận.
+                        // Để xử lý đơn giản, chúng ta sẽ gọi vòng lặp kiểm tra (poll) trực tiếp tại đây!
                         let pollCount = 0;
                         const pollInterval = setInterval(async () => {
                             pollCount++;
@@ -256,7 +264,7 @@ async function confirmFileCreation() {
         return;
     }
 
-    // Validate filename
+    // Kiểm tra đặt tên file
     if (!/^[^<>:"/\\|?*]+$/.test(rawName)) {
         showNotification('Tên file/thư mục chứa ký tự không hợp lệ', 'error');
         return;
@@ -267,7 +275,7 @@ async function confirmFileCreation() {
         finalName += '.ino';
     }
 
-    // Disable button and show loading
+    // Tát nút tạo file
     DOM.createFileBtn.disabled = true;
     DOM.createFileBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo...';
 
@@ -290,7 +298,7 @@ async function confirmFileCreation() {
 }
 
 // =================================================================
-// IDE State Management
+// Quản lý trạng thái IDE ── by Chương
 // =================================================================
 function saveIDEState() {
     try {
@@ -397,7 +405,7 @@ function setupTerminal() {
     terminal.loadAddon(webLinksAddon);
     terminal.open(document.getElementById('terminal'));
 
-    // Enhanced scrolling configuration
+    // Cấu hình cuộn (scrolling) nâng cao
     const viewport = terminal.element.querySelector('.xterm-viewport');
     if (viewport) {
         viewport.style.overflowY = 'auto';
@@ -405,7 +413,7 @@ function setupTerminal() {
         viewport.style.scrollbarWidth = 'thin';
     }
 
-    // Enhanced mouse wheel scrolling with better sensitivity
+    // Cấu hình cuộn chuột với độ nhạy tốt hơn (Enhanced)
     const screen = terminal.element.querySelector('.xterm-screen');
     if (screen) {
         screen.addEventListener('wheel', (e) => {
@@ -415,7 +423,7 @@ function setupTerminal() {
         }, { passive: false });
     }
 
-    // Better terminal interaction
+    // Cải thiện tương tác với Terminal (Interaction)
     terminal.onSelectionChange(() => {
         const selection = terminal.getSelection();
         if (selection) {
@@ -425,7 +433,7 @@ function setupTerminal() {
         }
     });
 
-    // Auto-fit when terminal is resized
+    // Tự động căn chỉnh kích thước khi Terminal thay đổi (Auto-fit)
     terminal.onResize(() => {
         if (fitAddon) {
             fitAddon.fit();
@@ -542,7 +550,7 @@ function setupHorizontalResizer() {
     const handleMouseUp = () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
-        // Use requestAnimationFrame for better timing
+        // Sử dụng requestAnimationFrame để đồng bộ tối ưu hơn
         requestAnimationFrame(() => {
             editor.resize();
             if (fitAddon) {
@@ -587,13 +595,13 @@ function toggleTerminal() {
     const isHidden = DOM.mainPanel.classList.contains('terminal-hidden');
     DOM.mainPanel.classList.toggle('terminal-hidden');
 
-    // Use requestAnimationFrame for better timing
+    // Sử dụng requestAnimationFrame để đồng bộ tối ưu hơn
     requestAnimationFrame(() => {
         editor.resize();
         if (fitAddon) {
             fitAddon.fit();
         }
-        // Force terminal to recalculate its size
+        // Ép Terminal tính toán lại kích thước hiển thị
         if (!isHidden) {
             terminal.refresh(0, terminal.rows - 1);
         }
@@ -667,41 +675,41 @@ function minimizeSerialWindow() {
     const serialWindow = document.getElementById('serial-monitor-window');
     serialWindow.style.display = 'none';
 }
-// ==================== SERIAL MONITOR SOCKET.IO LOGIC ====================
+// ==================== LOGIC SOCKET.IO CỦA SERIAL MONITOR ── by Chương ====================
 
 function initSerialSocket() {
     if (!socketSerial) {
         socketSerial = io.connect(location.protocol + '//' + document.domain + ':' + location.port + '/serial');
 
-        socketSerial.on('status', function(msg) {
+        socketSerial.on('status', function (msg) {
             const statusEl = document.getElementById('serial-status');
             if (statusEl) statusEl.textContent = msg.message;
         });
 
-        socketSerial.on('serial_data', function(msg) {
+        socketSerial.on('serial_data', function (msg) {
             const outputEl = document.getElementById('serial-output');
             if (!outputEl) return;
-            
-            // Append data and autoscroll if at bottom
+
+            // Thêm dữ liệu và tự động cuộn nếu đang ở dưới cùng (Autoscroll)
             const isAtBottom = outputEl.scrollHeight - outputEl.scrollTop <= outputEl.clientHeight + 20;
-            
+
             // Xử lý xuống dòng cho chuẩn
             const text = msg.data.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             const span = document.createElement('span');
             span.textContent = text;
             outputEl.appendChild(span);
-            
+
             // Giữ cho DOM nhẹ nhàng - xóa các dòng cũ nhất nếu quá 300 thẻ span
             while (outputEl.childNodes.length > 300) {
                 outputEl.removeChild(outputEl.firstChild);
             }
-            
+
             if (isAtBottom) {
                 outputEl.scrollTop = outputEl.scrollHeight;
             }
         });
 
-        socketSerial.on('serial_error', function(msg) {
+        socketSerial.on('serial_error', function (msg) {
             showNotification(`Serial Error: ${msg.error}`, 'error');
             const btn = document.getElementById('connect-serial-btn');
             if (btn) {
@@ -714,7 +722,7 @@ function initSerialSocket() {
         });
 
         // [GRACEFUL SYNC]: Lắng nghe lệnh từ Backend để nhường port cho mạch nạp
-        socketSerial.on('system_kick_serial', function(msg) {
+        socketSerial.on('system_kick_serial', function (msg) {
             console.log('System requested serial disconnect for port:', msg.port);
             const portSelect = document.getElementById('serial-port-select');
             // Nếu port trùng khớp thì mới đá ra
@@ -731,7 +739,7 @@ function toggleSerialConnection() {
     const portSelect = document.getElementById('serial-port-select');
     const baudSelect = document.getElementById('baud-rate-select');
     const statusEl = document.getElementById('serial-status');
-    
+
     if (!portSelect || !portSelect.value) {
         showNotification('Vui lòng chọn cổng COM', 'warning');
         return;
@@ -747,7 +755,7 @@ function toggleSerialConnection() {
         btn.classList.remove('btn-primary');
         btn.classList.add('btn-danger');
         if (statusEl) statusEl.textContent = 'Connecting...';
-        
+
         socketSerial.emit('start_monitor', {
             port: portSelect.value,
             baud_rate: baudSelect.value
@@ -758,7 +766,7 @@ function toggleSerialConnection() {
         btn.classList.remove('btn-danger');
         btn.classList.add('btn-primary');
         if (statusEl) statusEl.textContent = 'Disconnected';
-        
+
         socketSerial.emit('stop_monitor');
     }
 }
@@ -772,7 +780,7 @@ function sendSerialData() {
     const inputEl = document.getElementById('serial-input');
     if (!inputEl) return;
     const text = inputEl.value;
-    
+
     if (socketSerial && socketSerial.connected) {
         // Luôn đính kèm kít tự kết thúc chuỗi \r\n (CRLF) khi gửi cho board mạch thực tế
         socketSerial.emit('send_data', { data: text + '\r\n' });
@@ -865,7 +873,7 @@ function copyFromTerminal() {
                 showNotification('Copy failed. Please use Ctrl+Shift+C', 'error');
             });
     } else {
-        // fallback if browser doesn't support navigator.clipboard
+        // Phương án dự phòng nếu trình duyệt không hỗ trợ navigator.clipboard (Fallback)
         try {
             const textarea = document.createElement('textarea');
             textarea.value = selection;
@@ -906,7 +914,7 @@ function scrollToBottom() {
     }
 }
 
-// New function for copying from Serial Monitor
+// Hàm sao chép từ Serial Monitor ── by Chương
 function copyFromSerialOutput() {
     const serialOutput = document.getElementById('serial-output');
     if (!serialOutput) return;
@@ -917,7 +925,7 @@ function copyFromSerialOutput() {
     if (selection.toString()) {
         textToCopy = selection.toString();
     } else {
-        // If nothing selected, copy all text
+        // Nếu không có gì được chọn, sao chép toàn bộ văn bản
         textToCopy = serialOutput.textContent;
     }
 
@@ -953,16 +961,37 @@ function fallbackCopy(text) {
     }
 }
 
-async function apiCall(endpoint, options = {}) {
-    try {
-        const response = await fetch(endpoint, options);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        if (data.error) throw new Error(data.error);
-        return data;
-    } catch (error) {
-        showNotification(`API Error: ${error.message}`, 'error');
-        throw error;
+async function apiCall(endpoint, options = {}, retries = 4, delay = 1500) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(endpoint, options);
+            if (!response.ok) {
+                // Xử lý Retry với các lỗi mạng hoặc lỗi khởi động 500/502/504
+                if ((response.status >= 500 && response.status <= 504) && i < retries - 1) {
+                    console.warn(`[API] Lỗi ${response.status} tại ${endpoint}. Đang thử lại sau ${delay}ms... (Lần ${i+1}/${retries})`);
+                    await new Promise(res => setTimeout(res, delay));
+                    continue;
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.error) {
+                // Các lỗi logic từ Server (ví dụ: Session Timeout, Unauthorized)
+                throw new Error(data.error);
+            }
+            return data;
+        } catch (error) {
+            // Retry nếu lỗi Fetch (Mất kết nối mạng tạm thời)
+            if (i < retries - 1 && (error.message.includes('Failed to fetch') || error.message.includes('Network Error'))) {
+                console.warn(`[API] Lỗi mạng tại ${endpoint}. Đang thử lại sau ${delay}ms... (Lần ${i+1}/${retries})`);
+                await new Promise(res => setTimeout(res, delay));
+                continue;
+            }
+            if (i === retries - 1) {
+                showNotification(`Lỗi API: ${error.message}`, 'error');
+                throw error;
+            }
+        }
     }
 }
 
@@ -1330,7 +1359,7 @@ async function openFile(fullPath, shortName, autoSwitch = true) {
     let cleanPath = fullPath.startsWith('/') ? fullPath.substring(1) : fullPath;
     const pathParts = cleanPath.split('/');
     const parentPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : '.';
-    
+
     try {
         const data = await apiCall(`/user/${username}/editor/load`, {
             method: 'POST',
@@ -1395,7 +1424,7 @@ function closeTab(e, fullPathKey, force = false) {
     e.stopPropagation();
     const fileData = openFiles.get(fullPathKey);
     if (!force && fileData && !fileData.saved) {
-        // Show custom modal instead of confirm()
+        // Hiển thị Modal tùy chỉnh thay vì dùng hàm confirm() mặc định
         showUnsavedChangesModal(fullPathKey);
         return;
     }
@@ -1692,7 +1721,7 @@ let _ideActiveMission = null;
 // Hàm slugify giống backend Python để tính tên folder bài thi
 function slugifyVN(text) {
     if (!text) return '';
-    const MAP = {'à':'a','á':'a','ả':'a','ã':'a','ạ':'a','ă':'a','ắ':'a','ằ':'a','ẳ':'a','ẵ':'a','ặ':'a','â':'a','ấ':'a','ầ':'a','ẩ':'a','ẫ':'a','ậ':'a','è':'e','é':'e','ẻ':'e','ẽ':'e','ẹ':'e','ê':'e','ế':'e','ề':'e','ể':'e','ễ':'e','ệ':'e','ì':'i','í':'i','ỉ':'i','ĩ':'i','ị':'i','ò':'o','ó':'o','ỏ':'o','õ':'o','ọ':'o','ô':'o','ố':'o','ồ':'o','ổ':'o','ỗ':'o','ộ':'o','ơ':'o','ớ':'o','ờ':'o','ở':'o','ỡ':'o','ợ':'o','ù':'u','ú':'u','ủ':'u','ũ':'u','ụ':'u','ư':'u','ứ':'u','ừ':'u','ử':'u','ữ':'u','ự':'u','ỳ':'y','ý':'y','ỷ':'y','ỹ':'y','ỵ':'y','đ':'d','À':'A','Á':'A','Ả':'A','Ã':'A','Ạ':'A','Ă':'A','Ắ':'A','Ằ':'A','Ẳ':'A','Ẵ':'A','Ặ':'A','Â':'A','Ấ':'A','Ầ':'A','Ẩ':'A','Ẫ':'A','Ậ':'A','È':'E','É':'E','Ẻ':'E','Ẽ':'E','Ẹ':'E','Ê':'E','Ế':'E','Ề':'E','Ể':'E','Ễ':'E','Ệ':'E','Ì':'I','Í':'I','Ỉ':'I','Ĩ':'I','Ị':'I','Ò':'O','Ó':'O','Ỏ':'O','Õ':'O','Ọ':'O','Ô':'O','Ố':'O','Ồ':'O','Ổ':'O','Ỗ':'O','Ộ':'O','Ơ':'O','Ớ':'O','Ờ':'O','Ở':'O','Ỡ':'O','Ợ':'O','Ù':'U','Ú':'U','Ủ':'U','Ũ':'U','Ụ':'U','Ư':'U','Ứ':'U','Ừ':'U','Ử':'U','Ữ':'U','Ự':'U','Ỳ':'Y','Ý':'Y','Ỷ':'Y','Ỹ':'Y','Ỵ':'Y','Đ':'D'};
+    const MAP = { 'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a', 'ă': 'a', 'ắ': 'a', 'ằ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a', 'â': 'a', 'ấ': 'a', 'ầ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a', 'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e', 'ê': 'e', 'ế': 'e', 'ề': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e', 'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i', 'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o', 'ô': 'o', 'ố': 'o', 'ồ': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o', 'ơ': 'o', 'ớ': 'o', 'ờ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o', 'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u', 'ư': 'u', 'ứ': 'u', 'ừ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u', 'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y', 'đ': 'd', 'À': 'A', 'Á': 'A', 'Ả': 'A', 'Ã': 'A', 'Ạ': 'A', 'Ă': 'A', 'Ắ': 'A', 'Ằ': 'A', 'Ẳ': 'A', 'Ẵ': 'A', 'Ặ': 'A', 'Â': 'A', 'Ấ': 'A', 'Ầ': 'A', 'Ẩ': 'A', 'Ẫ': 'A', 'Ậ': 'A', 'È': 'E', 'É': 'E', 'Ẻ': 'E', 'Ẽ': 'E', 'Ẹ': 'E', 'Ê': 'E', 'Ế': 'E', 'Ề': 'E', 'Ể': 'E', 'Ễ': 'E', 'Ệ': 'E', 'Ì': 'I', 'Í': 'I', 'Ỉ': 'I', 'Ĩ': 'I', 'Ị': 'I', 'Ò': 'O', 'Ó': 'O', 'Ỏ': 'O', 'Õ': 'O', 'Ọ': 'O', 'Ô': 'O', 'Ố': 'O', 'Ồ': 'O', 'Ổ': 'O', 'Ỗ': 'O', 'Ộ': 'O', 'Ơ': 'O', 'Ớ': 'O', 'Ờ': 'O', 'Ở': 'O', 'Ỡ': 'O', 'Ợ': 'O', 'Ù': 'U', 'Ú': 'U', 'Ủ': 'U', 'Ũ': 'U', 'Ụ': 'U', 'Ư': 'U', 'Ứ': 'U', 'Ừ': 'U', 'Ử': 'U', 'Ữ': 'U', 'Ự': 'U', 'Ỳ': 'Y', 'Ý': 'Y', 'Ỷ': 'Y', 'Ỹ': 'Y', 'Ỵ': 'Y', 'Đ': 'D' };
     let res = '';
     for (const ch of text) res += MAP[ch] || ch;
     res = res.replace(/[^\w\s-]/g, '').trim().toLowerCase();
@@ -1704,7 +1733,7 @@ async function syncMissionsToIDE() {
     try {
         const res = await fetch('/user/api/my-missions');
         const missions = await res.json();
-        
+
         // Cập nhật danh sách slug tất cả bài tập để ẩn ở mode bình thường
         _allMissionSlugs = missions.map(m => slugifyVN(m.name) || `mission_${m.id}`);
 
@@ -1762,11 +1791,11 @@ async function syncMissionsToIDE() {
                     saveCurrentFile().then(() => {
                         const tabs = Array.from(openFiles.keys());
                         tabs.forEach(t => performCloseTab(t));
-                        
+
                         // Tự động mở file bài thi chính (đường dẫn tương đối)
                         const missionIno = `${newSlug}/${newSlug}.ino`;
                         openFile(missionIno);
-                        
+
                         refreshRootFiles();
                         showNotification("Đã bắt đầu bài thi. Các tab cá nhân đã tạm ẩn.", "info");
                     });
@@ -1785,7 +1814,7 @@ async function syncMissionsToIDE() {
                 _prevExamSlug = _examModeSlug;
                 const oldSlug = _examModeSlug;
                 _examModeSlug = null;
-                
+
                 // Đóng tất cả tab thuộc về bài thi vừa xong
                 const tabs = Array.from(openFiles.keys());
                 tabs.forEach(path => {
@@ -1793,7 +1822,7 @@ async function syncMissionsToIDE() {
                         performCloseTab(path);
                     }
                 });
-                
+
                 refreshRootFiles();
                 showNotification("Bài thi kết thúc. Đã khôi phục không gian học tập.", "info");
             }

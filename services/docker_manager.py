@@ -1,6 +1,6 @@
 """
 Docker Container Management Service
-UPDATED: Strict Device Mounting via Subprocess (No /dev:/dev) + Fix Full Arduino Libs
+UPDATED: Strict Device Mounting via Subprocess (No /dev:/dev) + Fix Full  thư viện Arduino
 """
 import os
 import subprocess
@@ -43,7 +43,7 @@ def get_assigned_ports(username):
         return []
 
 def docker_status(cname):
-    """Check Docker container status"""
+    """Kiểm tra trạng thái container Docker"""
     try:
         r = subprocess.run(
             ["docker", "inspect", "-f", "{{.State.Status}}", cname], 
@@ -74,7 +74,7 @@ def get_container_devices(cname):
         return set()
 
 def ensure_user_container(username):
-    """Ensure user container exists, is running, AND HAS CORRECT DEVICES"""
+    """Đảm bảo container người dùng tồn tại, đang chạy và có đúng thiết bị"""
     safe_username = make_safe_name(username)
     cname = f"{safe_username}-dev"
     image = "my-dev-env:v2"
@@ -255,9 +255,11 @@ exec /usr/sbin/sshd -D
         "docker", "run", "-d", 
         "--name", cname, 
         "--restart", "unless-stopped",
-        # [SECURITY HARDENING] Loại bỏ --privileged, thay bằng quyền tối thiểu
-        "--cap-drop=ALL",
-        "--security-opt", "no-new-privileges:true",
+        # [SECURITY] Cân bằng giữa bảo mật và tính ổn định
+        # Không dùng --cap-drop=ALL vì làm hỏng chpasswd, useradd và sshd
+        "--cap-drop=SYS_ADMIN",
+        "--cap-drop=SYS_RAWIO",
+        "--cap-drop=MKNOD",
         "-p", f"{ssh_port}:22", 
         "-e", f"USERNAME={safe_username}",
         "-e", f"CONTAINER_PASSWORD={container_password}",

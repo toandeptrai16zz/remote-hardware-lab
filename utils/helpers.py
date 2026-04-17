@@ -1,5 +1,5 @@
 """
-Helper utility functions
+Các hàm tiện ích hỗ trợ
 """
 import os
 import re
@@ -7,21 +7,21 @@ import socket
 import random
 
 def make_safe_name(input_string):
-    """Convert username to safe format (remove special characters)"""
+    """Chuyển đổi tên đăng nhập sang định dạng an toàn (loại bỏ ký tự đặc biệt)"""
     if not input_string:
         return ""
     return re.sub(r'[^a-zA-Z0-9_-]', '_', input_string)
 
 def is_safe_path(basedir, path):
-    """Check if path is safe (prevent directory traversal attacks)"""
-    # Remove leading slash from input
+    """Kiểm tra đường dẫn có an toàn không (ngăn chặn tấn công directory traversal)"""
+    # Loại bỏ dấu gạch chéo ở đầu đường dẫn nhập vào
     if path.startswith('/'): 
         path = path.lstrip('/')
     target = os.path.abspath(os.path.join(basedir, path))
     return target.startswith(os.path.abspath(basedir))
 
 def find_free_port(start=2200, end=2299):
-    """Find an available port in the given range"""
+    """Tìm một cổng (port) trống trong phạm vi cho trước"""
     for _ in range(100):
         port = random.randint(start, end)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -31,12 +31,12 @@ def find_free_port(start=2200, end=2299):
 
 def slugify_vn(text):
     """
-    Convert Vietnamese string to safe slug (no accents, no special chars)
+    Chuyển đổi chuỗi tiếng Việt thành slug an toàn (không dấu, không ký tự đặc biệt)
     """
     if not text:
         return ""
     
-    # Mapping for Vietnamese characters to ASCII
+    # Bản đồ ánh xạ các ký tự tiếng Việt sang ASCII
     MAP = {
         'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a', 
         'ă': 'a', 'ắ': 'a', 'ằ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a', 

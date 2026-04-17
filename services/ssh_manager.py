@@ -11,15 +11,16 @@ logger = logging.getLogger(__name__)
 
 def get_ssh_client(username_raw):
     """Get SSH client connection for a user's container"""
-    # Get port using original username from DB
+    # Get port + password using original username from DB
     db = get_db_connection()
     cur = db.cursor(dictionary=True)
-    cur.execute("SELECT ssh_port FROM users WHERE username=%s", (username_raw,))
+    cur.execute("SELECT ssh_port, container_password FROM users WHERE username=%s", (username_raw,))
     user_data = cur.fetchone()
     cur.close()
     db.close()
 
     ssh_port = user_data.get("ssh_port") if user_data else None
+    ssh_password = user_data.get("container_password", "password123") if user_data else "password123"
     
     if not ssh_port:
         logger.error(f"DB search failed for port with username: '{username_raw}'")
@@ -36,7 +37,7 @@ def get_ssh_client(username_raw):
                 '127.0.0.1', 
                 port=int(ssh_port), 
                 username=safe_username, 
-                password='password123', 
+                password=ssh_password, 
                 timeout=10,
                 banner_timeout=30,
                 allow_agent=False,

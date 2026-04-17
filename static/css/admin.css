@@ -1,12 +1,12 @@
 :root {
-    /* Color palette */
+    /* Bảng màu chính */
     --primary-gradient: linear-gradient(135deg, #667eea, #764ba2);
     --success-gradient: linear-gradient(135deg, #11998e, #38ef7d);
     --warning-gradient: linear-gradient(135deg, #ff9a56, #fad0c4);
     --danger-gradient: linear-gradient(135deg, #ff6b6b, #ee5a24);
     --info-gradient: var(--primary-gradient);
     
-    /* Design tokens */
+    /* Các giá trị thiết kế (Design tokens) */
     --border-radius-lg: 16px;
     --border-radius-md: 12px;
     --border-radius-sm: 8px;
@@ -20,7 +20,7 @@
     --glass-overlay: rgba(255, 255, 255, 0.1);
   }
 
-  /* Stats cards optimization */
+  /* Tối ưu hóa các thẻ thống kê (Stats cards) */
   .stats-card {
     background: var(--card-gradient, var(--primary-gradient));
     border: none;
@@ -44,7 +44,7 @@
     box-shadow: var(--shadow-hover);
   }
 
-  /* Card variant classes */
+  /* Các lớp biến thể của thẻ (Card variants) */
   .stats-card.primary { --card-gradient: var(--primary-gradient); }
   .stats-card.success { --card-gradient: var(--success-gradient); }
   .stats-card.warning { --card-gradient: var(--warning-gradient); }
@@ -69,7 +69,7 @@
     transform: scale(1.05);
   }
 
-  /* Admin header optimization */
+  /* Tối ưu hóa tiêu đề trang quản trị (Admin header) */
   .admin-header {
     background: var(--primary-gradient);
     color: white;
@@ -93,7 +93,7 @@
     font-weight: 600;
   }
 
-  /* System status component */
+  /* Thành phần hiển thị trạng thái hệ thống */
   .system-status {
     display: flex;
     align-items: center;
@@ -114,7 +114,7 @@
     50% { opacity: 0.5; }
   }
 
-  /* Table optimization */
+  /* Tối ưu hóa bảng dữ liệu */
   .log-table {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: var(--backdrop-blur);
@@ -143,7 +143,7 @@
     transform: translateX(4px);
   }
 
-  /* Action badges optimization */
+  /* Tối ưu hóa huy hiệu hành động (Action badges) */
   .action-badge {
     padding: 0.25rem 0.75rem;
     border-radius: var(--border-radius-pill);
@@ -161,7 +161,7 @@
   .action-register { background: linear-gradient(45deg, #007bff, #0056b3); color: white; }
   .action-admin { background: var(--danger-gradient); color: white; }
 
-  /* Button optimization */
+  /* Tối ưu hóa các nút nhấn */
   .refresh-btn {
     background: var(--primary-gradient);
     border: none;
@@ -192,7 +192,7 @@
     pointer-events: none;
   }
 
-  /* Utility classes */
+  /* Các lớp tiện ích */
   .card-clickable {
     cursor: pointer;
     transition: var(--transition-base);
@@ -202,7 +202,7 @@
     text-decoration: none;
   }
 
-  /* Responsive optimization */
+  /* Tối ưu hóa hiển thị phản hồi (Responsive) */
   @media (max-width: 768px) {
     .admin-header .d-flex {
       flex-direction: column;
@@ -234,7 +234,7 @@
     }
   }
 
-  /* Animation optimization */
+  /* Tối ưu hóa hiệu ứng chuyển động (Animation) */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -245,7 +245,7 @@
     }
   }
 
-  /* Loading states */
+  /* Các trạng thái đang tải (Loading states) */
   .loading {
     position: relative;
     overflow: hidden;

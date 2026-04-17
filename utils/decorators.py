@@ -1,5 +1,5 @@
 """
-Decorator functions for route protection and validation
+Các hàm Decorator để bảo vệ và xác thực các route
 """
 import time
 from functools import wraps
@@ -7,7 +7,7 @@ from flask import session, redirect, url_for, flash, request, jsonify
 from config import SECURITY_CONFIG
 
 def require_auth(role=None):
-    """Decorator to require authentication and optionally a specific role"""
+    """Decorator yêu cầu xác thực và tùy chọn yêu cầu một vai trò (role) cụ thể"""
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
@@ -39,8 +39,8 @@ def require_auth(role=None):
     return decorator
 
 def require_rate_limit(max_requests=10, window_seconds=60):
-    """Decorator for rate limiting - chặn brute-force attacks.
-    Mặc định: 10 request/phút/IP.
+    """Decorator để giới hạn tần suất yêu cầu (rate limiting) - chặn các cuộc tấn công brute-force.
+    Mặc định: 10 yêu cầu/phút trên mỗi IP.
     """
     from collections import defaultdict
     _rate_store = defaultdict(list)
@@ -51,7 +51,7 @@ def require_rate_limit(max_requests=10, window_seconds=60):
             ip = request.remote_addr or 'unknown'
             now = time.time()
             
-            # Dọn dẹp request cũ ngoài cửa sổ thời gian
+            # Dọn dẹp các bản ghi yêu cầu cũ nằm ngoài cửa sổ thời gian
             _rate_store[ip] = [t for t in _rate_store[ip] if now - t < window_seconds]
             
             if len(_rate_store[ip]) >= max_requests:
@@ -63,7 +63,7 @@ def require_rate_limit(max_requests=10, window_seconds=60):
     return decorator
 
 def require_internal_secret(f):
-    """Decorator to validate internal API secret for hardware events"""
+    """Decorator để xác thực mã bí mật (secret key) cho các sự kiện phần cứng từ API nội bộ"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         from config import INTERNAL_API_SECRET

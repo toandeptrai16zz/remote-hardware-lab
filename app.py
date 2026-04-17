@@ -21,15 +21,15 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 env_path = os.path.join(basedir, '.env')
 load_dotenv(env_path)
 
-# Import các cấu hình - by Chương
+# Khởi tạo DB - by Chương
 from config import init_db
 
-# Gọi các module điều hướng - by Chương
+# Import các Blueprints điều hướng - by Chương
 from routes.auth import auth_bp
 from routes.admin import admin_bp
 from routes.user import user_bp
 
-# Gọi xử lý Socket - by Chương
+# Import trình xử lý Socket.IO - by Chương
 from sockets import (
     register_terminal_handlers,
     register_serial_handlers,
@@ -57,39 +57,39 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# ================== KHỞI TẠO APP - by Chương ==================
+# ================== KHỞI TẠO ỨNG DỤNG FLASK - by Chương ==================
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(24))
 
-# ================== [SECURITY HARDENING] SESSION & COOKIE ==================
+# ================== [BẢO MẬT] CẤU HÌNH SESSION & COOKIE ==================
 from datetime import timedelta
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)
-app.config['SESSION_COOKIE_HTTPONLY'] = True      # Chặn JS đọc Cookie (Anti-XSS)
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'     # Chặn CSRF qua cross-site request
-app.config['SESSION_COOKIE_SECURE'] = False        # True nếu dùng HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True      # Chặn JavaScript truy cập Cookie (Chống XSS)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'     # Ngăn chặn tấn công CSRF
+app.config['SESSION_COOKIE_SECURE'] = False        # Đặt thành True nếu triển khai trên HTTPS
 
-# Cọc endpoint /metrics phục vụ cho hệ thống giám sát Monitoring Kubernetes
+# Tích hợp endpoint /metrics phục vụ cho hệ thống giám sát Prometheus/Grafana
 app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
     '/metrics': make_wsgi_app()
 })
 
-# Khởi chạy SocketIO - by Chương
+# Khởi chạy SocketIO với chế độ eventlet - by Chương
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# ================== ĐĂNG KÝ BLUEPRINTS - by Chương ==================
+# ================== ĐĂNG KÝ CÁC BLUEPRINTS - by Chương ==================
 app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(user_bp)
 
-# ================== ĐĂNG KÝ SOCKET.IO HANDLERS - by Chương ==================
+# ================== ĐĂNG KÝ CÁC TRÌNH XỬ LÝ SOCKET.IO - by Chương ==================
 register_terminal_handlers(socketio)
 register_serial_handlers(socketio)
 register_upload_status_handlers(socketio)
 
-# ================== ĐIỀU HƯỚNG CHÍNH - by Chương ==================
+# ================== ĐỊNH TUYẾN TRANG CHỦ - by Chương ==================
 @app.route("/")
 def index():
-    """Main index route - redirect based on user role"""
+    """Trang chủ điều hướng - chuyển hướng dựa trên vai trò của người dùng"""
     if "username" in session:
         if session.get("role") == "admin":
             return redirect(url_for("admin.admin_dashboard"))
@@ -97,65 +97,65 @@ def index():
             return redirect(url_for("user.user_redirect"))
     return redirect(url_for("auth.login_page"))
 
-# ================== XỬ LÝ LỖI - by Chương ==================
+# ================== CÁC TRÌNH XỬ LÝ LỖI - by Chương ==================
 @app.errorhandler(404)
 def not_found(e):
-    """Handle 404 errors"""
-    return "Page not found", 404
+    """Xử lý lỗi 404 - Không tìm thấy trang"""
+    return "Không tìm thấy trang yêu cầu (404)", 404
 
 @app.errorhandler(500)
 def internal_error(e):
-    """Handle 500 errors"""
-    logger.error(f"Internal error: {e}")
-    return "Internal server error", 500
+    """Xử lý lỗi 500 - Lỗi máy chủ nội bộ"""
+    logger.error(f"Lỗi hệ thống: {e}")
+    return "Lỗi máy chủ nội bộ (500)", 500
 
-# ================== DỊCH VỤ NGẦM - by Chương ==================
+# ================== DỌN DẸP KHI THOÁT - by Chương ==================
 background_services = None
 
 def cleanup_on_exit(signum=None, frame=None):
-    """Cleanup handler for graceful shutdown"""
-    logger.info("🛑 Shutting down application...")
+    """Xử lý dọn dẹp để tắt ứng dụng một cách an toàn"""
+    logger.info("🛑 Đang tắt ứng dụng...")
 
-    # Stop background services (Disabled logic)
+    # Dừng các dịch vụ chạy nền (Logic này hiện đã được vô hiệu hóa)
     # if 'background_services' in globals() and background_services:
     #     stop_background_services()
 
-    logger.info("✅ Application shutdown complete")
+    logger.info("✅ Đã tắt ứng dụng hoàn tất")
 
 
-# Register signal handlers for graceful shutdown
-# signal.signal(signal.SIGINT, cleanup_on_exit) # Removed as signal import is gone
-# signal.signal(signal.SIGTERM, cleanup_on_exit) # Removed as signal import is gone
+# Đăng ký các trình xử lý tín hiệu để tắt ứng dụng an toàn
+# signal.signal(signal.SIGINT, cleanup_on_exit) # Đã gỡ bỏ vì import signal không còn dùng
+# signal.signal(signal.SIGTERM, cleanup_on_exit) # Đã gỡ bỏ vì import signal không còn dùng
 
-# ================== THỰC THI CHÍNH - by Chương ==================
+# ================== KHỞI CHẠY CHÍNH - by Chương ==================
 
 def print_banner():
     logger.info("=" * 60)
-    logger.info("🚀 EPU Tech IoT Lab Management System")
+    logger.info("🚀 Hệ thống Quản lý IoT Lab - EPU Tech (Virtual Platform)")
     logger.info("=" * 60)
 
 def main():
-    """Main entry point for starting the application"""
+    """Điểm vào chính để khởi động ứng dụng"""
     print_banner()
     try:
-        # Initialize database
+        # Khởi tạo cơ sở dữ liệu
         init_db()
-        # Removed USB watcher for Virtual Assessment architecture
-        logger.info("🔧 Background services tracking USB disabled for Virtual AI assessment.")
+        # Vô hiệu hóa tính năng theo dõi USB vì đã chuyển sang kiến trúc Virtual AI
+        logger.info("🔧 Các dịch vụ chạy nền theo dõi USB đã được vô hiệu hóa.")
         background_services = None
         
-        logger.info("✅ Application initialization complete")
-        logger.info("🌐 Server running on http://[::]:5000")
+        logger.info("✅ Khởi tạo ứng dụng thành công")
+        logger.info("🌐 Server đang chạy tại địa chỉ http://[::]:5000")
         logger.info("=" * 60)
         
-        # Run with SocketIO
+        # Chạy với SocketIO
         socketio.run(app, host="::", port=5000, debug=True, use_reloader=False)
         
     except KeyboardInterrupt:
-        logger.info("\n⏹️ Received keyboard interrupt")
+        logger.info("\n⏹️ Nhận tín hiệu dừng từ bàn phím")
         cleanup_on_exit()
     except Exception as e:
-        logger.error(f"❌ Fatal error: {e}")
+        logger.error(f"❌ Lỗi nghiêm trọng: {e}")
         cleanup_on_exit()
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
-// ── STATE ──────────────────────────────────────────────────
-let activeMission = null;   // mission object hiện đang thi
-let timerInterval = null;   // countdown interval
+// ── TRẠNG THÁI (STATE) ── by Chương ─────────────────────────
+let activeMission = null;   // Đối tượng bài thi hiện đang thi
+let timerInterval = null;   // Khoảng thời gian đếm ngược
 let currentUsername = window.currentUsername || "";
 
-// ── UTILS ──────────────────────────────────────────────────
+// ── CÔNG CỤ (UTILS) ── by Chương ───────────────────────────
 function escH(s) { const d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
 
 function formatDuration(ms) {
@@ -27,7 +27,7 @@ function toast(msg, type='success') {
   c.appendChild(el); setTimeout(()=>el.remove(),5000);
 }
 
-// ── LOAD MISSIONS ──────────────────────────────────────────
+// ── TẢI BÀI THI (LOAD MISSIONS) ── by Chương ───────────────
 function sectionHeader(label, color, count) {
   return `<div class="section-heading">
     <span class="dot" style="background:${color}"></span>
@@ -49,7 +49,7 @@ async function loadMyMissions() {
       return;
     }
 
-    // Group by status
+    // Phân loại theo trạng thái
     const activeGroup    = missions.filter(m => getMissionStatus(m) === 'active');
     const upcomingGroup  = missions.filter(m => getMissionStatus(m) === 'upcoming');
     const submittedGroup = missions.filter(m => getMissionStatus(m) === 'submitted');
@@ -109,7 +109,7 @@ function renderMissionCard(m) {
   };
   const cfg = statusConfig[status];
 
-  // Countdown block (only for upcoming/active)
+  // Khối đếm ngược (chỉ hiển thị cho bài sắp tới/đang diễn ra)
   let countdownBlock = '';
   if (status === 'active') {
     const msLeft = end.getTime() - Date.now();
@@ -129,7 +129,7 @@ function renderMissionCard(m) {
     </p>`;
   }
 
-  // Action button
+  // Nút hành động
   let actionBtn = '';
   if (status === 'active' && !m.submitted) {
     actionBtn = `
@@ -149,10 +149,10 @@ function renderMissionCard(m) {
     </button>`;
   }
 
-  // Description (markdown → HTML)
+  // Mô tả (chuyển đổi markdown sang HTML)
   const descHTML = m.description ? (typeof marked !== 'undefined' ? marked.parse(m.description) : escH(m.description)) : '<p style="color:var(--text-muted);font-style:italic;">Không có mô tả</p>';
 
-  // Result section
+  // Phần kết quả
   let resultSection = '';
   if (m.submission) {
     const score = m.submission.score;
@@ -210,7 +210,7 @@ function renderMissionCard(m) {
   </div>`;
 }
 
-// ── EXAM MODE ──────────────────────────────────────────────
+// ── CHẾ ĐỘ THI (EXAM MODE) ── by Chương ────────────────────
 function startExamMode(mission) {
   activeMission = mission;
   const banner = document.getElementById('examBanner');
@@ -218,7 +218,7 @@ function startExamMode(mission) {
   document.getElementById('pageWrap').classList.add('has-banner');
   document.getElementById('bannerMissionName').textContent = mission.name;
 
-  // Start timer
+  // Bắt đầu bộ đếm
   if (timerInterval) clearInterval(timerInterval);
   timerInterval = setInterval(() => tickTimer(mission), 1000);
   tickTimer(mission);
@@ -239,12 +239,12 @@ function tickTimer(mission) {
   const bannerCd = document.getElementById('bannerCountdown');
   bannerCd.textContent = display;
 
-  // Color warning
+  // Cảnh báo màu sắc
   bannerCd.classList.remove('warning','danger');
   if (remaining < 5 * 60 * 1000) bannerCd.classList.add('danger');
   else if (remaining < 15 * 60 * 1000) bannerCd.classList.add('warning');
 
-  // Update card countdown
+  // Cập nhật đếm ngược trên thẻ bài tập
   if (mission) {
     const h = Math.floor(remaining / 3600000);
     const m = Math.floor((remaining % 3600000) / 60000);
@@ -258,7 +258,7 @@ function tickTimer(mission) {
     if (sEl) sEl.textContent = pad(s);
   }
 
-  // Update submit modal time left
+  // Cập nhật thời gian còn lại trên modal nộp bài
   const stl = document.getElementById('submitTimeLeft');
   if (stl) stl.textContent = display;
 }
@@ -274,7 +274,7 @@ async function handleTimeOut(mission) {
     <div class="mt-3"><i class="fa-solid fa-circle-notch fa-spin fa-2x" style="color:#555"></i></div>
   `;
   
-  // Auto submit
+  // Tự động nộp bài (Auto submit)
   try {
     const res = await fetch(`/user/api/missions/${mission.id}/submit`, { method: 'POST' });
     const data = await res.json();
@@ -322,7 +322,7 @@ async function handleTimeOut(mission) {
   }
 }
 
-// ── START MISSION ──────────────────────────────────────────
+// ── BẮT ĐẦU BÀI THI (START MISSION) ── by Chương ───────────
 async function startMission(missionId) {
   try {
     toast('🚀 Đang khởi tạo môi trường bài thi...', 'info');
@@ -341,7 +341,7 @@ async function startMission(missionId) {
   }
 }
 
-// ── SUBMIT ──────────────────────────────────────────────────
+// ── NỘP BÀI (SUBMIT) ── by Chương ──────────────────────────
 let submitMissionId = null;
 let submitMissionName = '';
 
@@ -353,7 +353,7 @@ async function promptSubmit(missionId, missionName) {
     const rem = new Date(activeMission.end_time).getTime() - Date.now();
     document.getElementById('submitTimeLeft').textContent = formatDuration(rem);
   }
-  // Load file preview
+  // Tải xem trước danh sách file (File preview)
   const fileListEl = document.getElementById('submitFileList');
   fileListEl.innerHTML = '<p style="font-size:0.8rem;color:var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang đọc danh sách file...</p>';
   document.getElementById('submitModal').classList.add('open');
@@ -397,7 +397,7 @@ async function confirmSubmit() {
       document.getElementById('pageWrap').classList.remove('has-banner');
       activeMission = null;
       await loadMyMissions();
-      // Poll for score every 8s up to 10 times
+      // Kiểm tra điểm định kỳ mỗi 8 giây, tối đa 10 lần (Polling)
       let pollCount = 0;
       const mId = submitMissionId;
       submitMissionId = null;
@@ -424,10 +424,10 @@ async function confirmSubmit() {
   }
 }
 
-// Modal click outside close
+// Đóng modal khi click ra ngoài (Click outside)
 document.getElementById('submitModal').addEventListener('click', function(e) {
   if (e.target === this) closeSubmitModal();
 });
 
-// ── INIT ──────────────────────────────────────────────────
+// ── KHỞI TẠO (INIT) ── by Chương ───────────────────────────
 document.addEventListener('DOMContentLoaded', loadMyMissions);

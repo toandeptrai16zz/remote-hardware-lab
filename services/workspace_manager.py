@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 from utils.helpers import is_safe_path
 
 def list_workspace_files(username, safe_username, sftp, target_path="."):
-    """List files in the user's workspace directory."""
+    """Liệt kê các tệp trong thư mục workspace của người dùng."""
     try:
         base_path = os.path.join("/home", safe_username, target_path)
         files = []

@@ -1,0 +1,137 @@
+<mxfile host="app.diagrams.net" modified="2025-04-17T02:40:00.000Z" agent="draw.io" version="24.0.0">
+  <diagram name="AI Grader" id="ai">
+    <mxGraphModel dx="900" dy="1400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="800" pageHeight="1500" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- START -->
+        <mxCell id="s" value="SV nộp bài" style="ellipse;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="280" y="30" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="a1" value="" style="endArrow=classic;html=1;" edge="1" parent="1" source="s" target="b1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- B1: Nhận code -->
+        <mxCell id="b1" value="Nhận code .ino&lt;br&gt;từ sinh viên" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="265" y="120" width="150" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="a2" value="" style="endArrow=classic;html=1;" edge="1" parent="1" source="b1" target="d1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- D1: Có setup() và loop()? -->
+        <mxCell id="d1" value="Có hàm&lt;br&gt;setup() và loop()?" style="rhombus;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="270" y="200" width="140" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="a3no" value="Không" style="endArrow=classic;html=1;fontSize=10;" edge="1" parent="1" source="d1" target="cap4">
+          <mxGeometry x="-0.2" y="10" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+        <mxCell id="cap4" value="Điểm tối đa: 4/10" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="225" width="140" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a3yes" value="Có" style="endArrow=classic;html=1;fontSize=10;" edge="1" parent="1" source="d1" target="d2">
+          <mxGeometry x="-0.2" y="10" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- D2: Biên dịch được? -->
+        <mxCell id="d2" value="Code biên&lt;br&gt;dịch được?" style="rhombus;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="275" y="340" width="130" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="a4no" value="Không" style="endArrow=classic;html=1;fontSize=10;" edge="1" parent="1" source="d2" target="penalty">
+          <mxGeometry x="-0.2" y="10" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+        <mxCell id="penalty" value="Phạt nặng&lt;br&gt;lỗi cú pháp" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="360" width="120" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="a4yes" value="Có" style="endArrow=classic;html=1;fontSize=10;" edge="1" parent="1" source="d2" target="b2">
+          <mxGeometry x="-0.2" y="10" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- B2: Đánh giá logic -->
+        <mxCell id="b2" value="Đánh giá logic phần cứng&lt;br&gt;GPIO, UART/SPI/I2C" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="255" y="470" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="a5" value="" style="endArrow=classic;html=1;" edge="1" parent="1" source="b2" target="b3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- B3: Đánh giá ISR -->
+        <mxCell id="b3" value="Đánh giá xử lý ngắt&lt;br&gt;attachInterrupt() vs polling" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="250" y="555" width="180" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="a6" value="" style="endArrow=classic;html=1;" edge="1" parent="1" source="b3" target="b4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- B4: Đánh giá tài nguyên -->
+        <mxCell id="b4" value="Kiểm tra quản lý tài nguyên&lt;br&gt;memory leak, delay()" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="250" y="640" width="180" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="a7" value="" style="endArrow=classic;html=1;" edge="1" parent="1" source="b4" target="b5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- B5: Gửi lên LLM -->
+        <mxCell id="b5" value="Tổng hợp prompt&lt;br&gt;gửi lên LLM" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="265" y="725" width="150" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="a8" value="" style="endArrow=classic;html=1;" edge="1" parent="1" source="b5" target="d3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- D3: Gemini phản hồi? -->
+        <mxCell id="d3" value="Gemini&lt;br&gt;phản hồi?" style="rhombus;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="280" y="810" width="120" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="a9yes" value="Có" style="endArrow=classic;html=1;fontSize=10;" edge="1" parent="1" source="d3" target="ok">
+          <mxGeometry x="-0.2" y="10" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+        <mxCell id="a9no" value="Không" style="endArrow=classic;html=1;fontSize=10;" edge="1" parent="1" source="d3" target="fb">
+          <mxGeometry x="-0.2" y="10" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- Fallback: LLaMA -->
+        <mxCell id="fb" value="Chuyển sang&lt;br&gt;LLaMA 3.3 (Groq)" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="830" width="150" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="a10" value="" style="endArrow=classic;html=1;" edge="1" parent="1" source="fb" target="ok">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- OK: Trả điểm -->
+        <mxCell id="ok" value="Trả điểm + nhận xét&lt;br&gt;cho sinh viên" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="265" y="940" width="150" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="a11" value="" style="endArrow=classic;html=1;" edge="1" parent="1" source="ok" target="end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- END -->
+        <mxCell id="end" value="Kết thúc" style="ellipse;whiteSpace=wrap;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="290" y="1020" width="100" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- cap4 và penalty cũng join vào ok -->
+        <mxCell id="j1" value="" style="endArrow=classic;html=1;" edge="1" parent="1" source="cap4" target="b5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="570" y="750"/>
+              <mxPoint x="415" y="750"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="j2" value="" style="endArrow=classic;html=1;" edge="1" parent="1" source="penalty" target="b5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="560" y="750"/>
+              <mxPoint x="415" y="750"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
