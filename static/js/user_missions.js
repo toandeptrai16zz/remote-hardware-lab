@@ -397,7 +397,7 @@ async function confirmSubmit() {
   try {
     // Yêu cầu IDE parent auto-save trước khi nộp
     if (window.parent && window.parent !== window) window.parent.postMessage({ action: 'save_before_submit' }, '*');
-    await new Promise(r => setTimeout(r, 1500)); // Chờ 1.5s cho IDE save xong
+    await new Promise(r => setTimeout(r, 3000)); // Chờ 3s cho IDE save xong
     
     const res = await fetch(`/user/api/missions/${submitMissionId}/submit`, { method: 'POST' });
     const data = await res.json();

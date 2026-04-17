@@ -35,15 +35,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupHorizontalResizer();
     setupEventListeners();
     setupFileCreationModal();
-    
+
     // Đồng bộ trạng thái bài thi trước để xác định Exam Mode ── by Chương
     await syncMissionsToIDE();
-    
+
     // Chỉ tải lại root files nếu không có bài thi (vì nếu có, syncMissionsToIDE đã tự tải)
     if (!_ideActiveMission) {
         refreshRootFiles();
     }
-    
+
     loadIDEState();
     connectTerminalSocket();
     connectUploadSocket();
@@ -968,7 +968,7 @@ async function apiCall(endpoint, options = {}, retries = 4, delay = 1500) {
             if (!response.ok) {
                 // Xử lý Retry với các lỗi mạng hoặc lỗi khởi động 500/502/504
                 if ((response.status >= 500 && response.status <= 504) && i < retries - 1) {
-                    console.warn(`[API] Lỗi ${response.status} tại ${endpoint}. Đang thử lại sau ${delay}ms... (Lần ${i+1}/${retries})`);
+                    console.warn(`[API] Lỗi ${response.status} tại ${endpoint}. Đang thử lại sau ${delay}ms... (Lần ${i + 1}/${retries})`);
                     await new Promise(res => setTimeout(res, delay));
                     continue;
                 }
@@ -983,7 +983,7 @@ async function apiCall(endpoint, options = {}, retries = 4, delay = 1500) {
         } catch (error) {
             // Retry nếu lỗi Fetch (Mất kết nối mạng tạm thời)
             if (i < retries - 1 && (error.message.includes('Failed to fetch') || error.message.includes('Network Error'))) {
-                console.warn(`[API] Lỗi mạng tại ${endpoint}. Đang thử lại sau ${delay}ms... (Lần ${i+1}/${retries})`);
+                console.warn(`[API] Lỗi mạng tại ${endpoint}. Đang thử lại sau ${delay}ms... (Lần ${i + 1}/${retries})`);
                 await new Promise(res => setTimeout(res, delay));
                 continue;
             }
@@ -1063,7 +1063,7 @@ async function loadFolderContents(path, parentElement) {
             let filtered = data.files;
             // ── EXAM MODE: Nếu đang thi, chỉ hiện folder bài thi ở root ──
             if (_examModeSlug && path === '.') {
-                console.log('[EXAM] Filtering root. _examModeSlug =', _examModeSlug, '| folders:', data.files.filter(f=>f.is_dir).map(f=>f.name));
+                console.log('[EXAM] Filtering root. _examModeSlug =', _examModeSlug, '| folders:', data.files.filter(f => f.is_dir).map(f => f.name));
                 filtered = data.files.filter(item => {
                     // Giữ lại folder trùng tên slug bài thi, ẩn hết các thứ khác
                     return item.is_dir && item.name === _examModeSlug;
@@ -1381,6 +1381,13 @@ async function openFile(fullPath, shortName, autoSwitch = true) {
 
 function switchToFile(fullPathKey) {
     if (!openFiles.has(fullPathKey)) return;
+    
+    // ── LƯU CONTENT CỦA TAB CŨ TRƯỚC KHI CHUYỂN ── by Chương
+    if (currentFile && openFiles.has(currentFile)) {
+        const oldData = openFiles.get(currentFile);
+        oldData.content = editor.getValue();
+    }
+
     currentFile = fullPathKey;
     const fileData = openFiles.get(fullPathKey);
 
@@ -1497,13 +1504,18 @@ async function saveCurrentFile() {
 
 // ── AUTO-SAVE: Lưu toàn bộ file đang mở trước khi nộp bài ── by Chương
 async function saveAllOpenFiles() {
+    // Luôn cập nhật content của file hiện tại vào cache trước khi loop
+    if (currentFile && openFiles.has(currentFile)) {
+        openFiles.get(currentFile).content = editor.getValue();
+    }
+
     const unsaved = [];
     for (const [path, data] of openFiles.entries()) {
         if (path === 'WELCOME.txt') continue;
         if (!data.saved) unsaved.push({ path, data });
     }
     if (unsaved.length === 0) return;
-    
+
     for (const { path, data } of unsaved) {
         try {
             await apiCall(`/user/${username}/editor/save`, {
@@ -1758,21 +1770,21 @@ function slugifyVN(text) {
     return res;
 }
 
-    // ── GIAO TIẾP VỚI MODAL Iframe (User Missions) ── by Chương
-    window.addEventListener('message', (event) => {
-        if (event.data && event.data.action === 'mission_started') {
-            const modalEl = document.getElementById('missionsModal');
-            if (modalEl) {
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-            }
-            syncMissionsToIDE();
-        } else if (event.data && event.data.action === 'sync_ide_only') {
-            syncMissionsToIDE();
-        } else if (event.data && event.data.action === 'save_before_submit') {
-            saveAllOpenFiles();
+// ── GIAO TIẾP VỚI MODAL Iframe (User Missions) ── by Chương
+window.addEventListener('message', (event) => {
+    if (event.data && event.data.action === 'mission_started') {
+        const modalEl = document.getElementById('missionsModal');
+        if (modalEl) {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
         }
-    });
+        syncMissionsToIDE();
+    } else if (event.data && event.data.action === 'sync_ide_only') {
+        syncMissionsToIDE();
+    } else if (event.data && event.data.action === 'save_before_submit') {
+        saveAllOpenFiles();
+    }
+});
 
 async function syncMissionsToIDE() {
     try {
@@ -1814,6 +1826,8 @@ async function syncMissionsToIDE() {
         const bar = document.getElementById('miniExamBar');
         const btnSubmit = document.getElementById('btnSubmitMission');
         if (active.length > 0) {
+            // Sắp xếp theo deadline sớm nhất để ổn định lựa chọn (không flip-flop)
+            active.sort((a, b) => new Date(a.end_time) - new Date(b.end_time));
             _ideActiveMission = active[0];
             document.getElementById('miniExamName').textContent = active[0].name;
             bar.style.display = 'inline-flex';
@@ -1832,19 +1846,23 @@ async function syncMissionsToIDE() {
                 _prevExamSlug = _examModeSlug;
                 _examModeSlug = newSlug;
 
+                // ── GỌI API /start ĐỂ TẠO FOLDER TRƯỚC ── by Chương
+                try {
+                    await fetch(`/user/api/missions/${active[0].id}/start`, { method: 'POST' });
+                } catch (e) { console.warn('[EXAM] Không thể gọi API start:', e); }
+
                 if (isEnteringFirstTime) {
                     // Đóng hết tab cũ để bảo mật bài vở cá nhân
-                    saveCurrentFile().then(() => {
-                        const tabs = Array.from(openFiles.keys());
-                        tabs.forEach(t => performCloseTab(t));
+                    await saveCurrentFile();
+                    const tabs = Array.from(openFiles.keys());
+                    tabs.forEach(t => performCloseTab(t));
 
-                        // Tự động mở file bài thi chính (đường dẫn tương đối)
-                        const missionIno = `${newSlug}/${newSlug}.ino`;
-                        openFile(missionIno);
+                    // Tự động mở file bài thi chính (đường dẫn tương đối)
+                    const missionIno = `${newSlug}/${newSlug}.ino`;
+                    openFile(missionIno);
 
-                        refreshRootFiles();
-                        showNotification("Đã bắt đầu bài thi. Các tab cá nhân đã tạm ẩn.", "info");
-                    });
+                    refreshRootFiles();
+                    showNotification("Đã bắt đầu bài thi. Các tab cá nhân đã tạm ẩn.", "info");
                 } else {
                     refreshRootFiles();
                 }
@@ -1937,7 +1955,7 @@ async function submitActiveMission() {
     try {
         // ── AUTO-SAVE trước khi nộp bài ──
         await saveAllOpenFiles();
-        
+
         const res = await fetch(`/user/api/missions/${missionId}/submit`, { method: 'POST' });
         const data = await res.json();
         if (data.success || (data.error && data.error.includes('already submitted'))) {
