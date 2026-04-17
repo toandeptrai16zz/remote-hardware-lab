@@ -1504,9 +1504,14 @@ async function saveCurrentFile() {
 
 // ── AUTO-SAVE: Lưu toàn bộ file đang mở trước khi nộp bài ── by Chương
 async function saveAllOpenFiles() {
-    // Luôn cập nhật content của file hiện tại vào cache trước khi loop
+    // 🔍 Luôn đồng bộ nội dung đang gõ của file hiện tại vào cache trước
     if (currentFile && openFiles.has(currentFile)) {
-        openFiles.get(currentFile).content = editor.getValue();
+        const fileData = openFiles.get(currentFile);
+        const editorContent = editor.getValue();
+        if (fileData.content !== editorContent) {
+            fileData.content = editorContent;
+            fileData.saved = false; // Phải đánh dấu false để vòng lặp bên dưới bắt được
+        }
     }
 
     const unsaved = [];
@@ -1514,7 +1519,10 @@ async function saveAllOpenFiles() {
         if (path === 'WELCOME.txt') continue;
         if (!data.saved) unsaved.push({ path, data });
     }
-    if (unsaved.length === 0) return;
+    if (unsaved.length === 0) {
+        console.log("[AUTO-SAVE] Không có file nào cần lưu.");
+        return;
+    }
 
     for (const { path, data } of unsaved) {
         try {
@@ -1782,7 +1790,12 @@ window.addEventListener('message', (event) => {
     } else if (event.data && event.data.action === 'sync_ide_only') {
         syncMissionsToIDE();
     } else if (event.data && event.data.action === 'save_before_submit') {
-        saveAllOpenFiles();
+        const source = event.source;
+        saveAllOpenFiles().then(() => {
+            if (source) {
+                source.postMessage({ action: 'save_done' }, '*');
+            }
+        });
     }
 });
 

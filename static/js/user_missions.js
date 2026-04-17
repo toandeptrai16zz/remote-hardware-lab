@@ -396,8 +396,26 @@ async function confirmSubmit() {
   btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang nộp...';
   try {
     // Yêu cầu IDE parent auto-save trước khi nộp
-    if (window.parent && window.parent !== window) window.parent.postMessage({ action: 'save_before_submit' }, '*');
-    await new Promise(r => setTimeout(r, 3000)); // Chờ 3s cho IDE save xong
+    let saveFinished = false;
+    const onSaveDone = (e) => {
+      if (e.data && e.data.action === 'save_done') {
+        saveFinished = true;
+        window.removeEventListener('message', onSaveDone);
+      }
+    };
+    window.addEventListener('message', onSaveDone);
+
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ action: 'save_before_submit' }, '*');
+    }
+
+    // Chờ tối đa 10s cho IDE báo lưu xong (hoặc tiếp tục nếu timeout)
+    let waitCount = 0;
+    while (!saveFinished && waitCount < 100) {
+      await new Promise(r => setTimeout(r, 100));
+      waitCount++;
+    }
+    if (!saveFinished) console.warn("[SUBMIT] Cảnh báo: IDE không phản hồi save_done sau 10s. Vẫn tiếp tục nộp...");
     
     const res = await fetch(`/user/api/missions/${submitMissionId}/submit`, { method: 'POST' });
     const data = await res.json();

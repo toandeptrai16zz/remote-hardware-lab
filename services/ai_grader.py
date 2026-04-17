@@ -188,8 +188,9 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
         if not success_api:
             return {'success': False, 'error': f'Không thể gọi AI API. Lỗi gần nhất: {last_error}'}
             
-        logger.info(f"Phản hồi thô từ AI (200 ký tự đầu): {raw[:200]}")
- 
+        raw_str = str(raw)
+        logger.info(f"Phản hồi thô từ AI (200 ký tự đầu): {raw_str[:200]}")
+
         # Loại bỏ các dấu rào markdown code nếu có
         if raw.startswith("```"):
             parts = raw.split("```")
@@ -198,51 +199,62 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
                 if raw.startswith("json"):
                     raw = raw[4:]
             raw = raw.strip()
- 
+
         parsed = json.loads(raw)
- 
+
         # Kiểm tra và giới hạn điểm số trong khoảng 0-10
         criteria = parsed.get('criteria', [])
         for c in criteria:
-            c['score'] = max(0, min(10, float(c.get('score', 0))))
- 
+            c['score'] = max(0.0, min(10.0, float(c.get('score', 0))))
+
         # Tính toán lại tổng điểm dựa trên trung bình cộng các tiêu chí
         if criteria:
-            total = sum(c['score'] for c in criteria) / len(criteria)
+            total = sum(float(c.get('score', 0)) for c in criteria) / len(criteria)
             score = round(total, 1)
         else:
             score = max(0.0, min(10.0, float(parsed.get('score', 0))))
- 
+
         result = {
             'success': True,
             'score': score,
             'feedback': parsed.get('feedback', ''),
             'criteria': criteria
         }
-        
+
         # --- THU THẬP DỮ LIỆU ĐỂ TRAINING TRONG TƯƠNG LAI ---
-        # Lưu lại tương tác này vào file JSONL
+        # Lưu lại tương tác này vào file JSONL theo định dạng Instruction-Input-Output (Alpaca style)
         try:
             dataset_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
             os.makedirs(dataset_dir, exist_ok=True)
             dataset_path = os.path.join(dataset_dir, 'ai_training_dataset.jsonl')
             
+            # Chỉ lấy nội dung code sạch của sinh viên
+            student_code = files_text.strip()
+            
             training_record = {
-                'timestamp': datetime.now().isoformat(),
-                'mission_name': mission_name,
-                'prompt': prompt,
-                'raw_response': raw,
-                'parsed_result': result
+                'instruction': f"Chấm điểm bài thi '{mission_name}'. Yêu cầu đề bài: {mission_description}",
+                'input': student_code,
+                'output': json.dumps({
+                    'score': result.get('score', 0),
+                    'feedback': result.get('feedback', ''),
+                    'criteria': result.get('criteria', [])
+                }, ensure_ascii=False),
+                'final_score': result.get('score', 0), # Trường mới giúp đại ca dễ lọc data để train
+                'metadata': {
+                    'timestamp': datetime.now().isoformat(),
+                    'mission_name': mission_name,
+                    'model_used': 'gemini' if gemini_key and success_api else ('anthropic' if success_api else 'groq')
+                }
             }
             
             with open(dataset_path, 'a', encoding='utf-8') as f:
                 f.write(json.dumps(training_record, ensure_ascii=False) + '\n')
                 
-            logger.info(f"Đã lưu bản ghi dữ liệu training vào {dataset_path}")
+            logger.info(f"Đã lưu bản ghi training chuẩn hóa (Alpaca style) vào {dataset_path}")
         except Exception as e:
             logger.error(f"Không thể lưu dữ liệu training: {e}")
         # -------------------------------------------
- 
+
         return result
  
     except json.JSONDecodeError as e:
