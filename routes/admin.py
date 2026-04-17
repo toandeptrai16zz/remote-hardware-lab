@@ -569,3 +569,27 @@ def admin_api_assign_device():
     
     log_action(session['username'], f"Cập nhật Quyền Cổng USB ID {device_id} cho {added} Sinh viên.")
     return jsonify({'success': True, 'message': f'Cập nhật thành công! Đã cấp quyền sử dụng cho {len(usernames)} sinh viên chờ hàng đợi.'})
+
+@admin_bp.route("/api/devices/<int:device_id>", methods=['DELETE'])
+@require_auth('admin')
+def admin_api_delete_device(device_id):
+    """Xóa hoàn toàn thiết bị khỏi hệ thống"""
+    db = get_db_connection()
+    cur = db.cursor()
+    
+    try:
+        # Xóa cascade: Xóa quyền trước
+        cur.execute("DELETE FROM device_assignments WHERE device_id = %s", (device_id,))
+        # Xóa thiết bị
+        cur.execute("DELETE FROM hardware_devices WHERE id = %s", (device_id,))
+        db.commit()
+        success, message = True, "Đã xóa hoàn toàn thiết bị khỏi CSDL."
+        log_action(session['username'], f"Xóa thiết bị phần cứng ID {device_id}")
+    except Exception as e:
+        db.rollback()
+        success, message = False, str(e)
+    finally:
+        cur.close()
+        db.close()
+        
+    return jsonify(success=success, message=message)

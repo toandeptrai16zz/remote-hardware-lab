@@ -186,9 +186,14 @@
                 <div style="font-size: 0.75rem; color: #aaa; margin-top: 5px;">* Có thể chọn N sinh viên chia hàng đợi</div>
             </td>
             <td>
-                <button class="btn btn-sm btn-outline-primary px-3 rounded-pill" onclick="assignDevice(${dev.id})">
-                    <i class="fa-solid fa-floppy-disk"></i> Gán
-                </button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-primary px-3 rounded-pill" onclick="assignDevice(${dev.id})">
+                        <i class="fa-solid fa-floppy-disk"></i> Gán
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger px-3 rounded-pill" onclick="deleteDevice(${dev.id}, '${dev.tag_name.replace(/'/g, "\\'")}')">
+                        <i class="fa-solid fa-trash"></i> Xóa
+                    </button>
+                </div>
             </td>
         `;
             tbody.appendChild(tr);
@@ -271,6 +276,51 @@
             }
         } catch (e) {
             Swal.fire('Lỗi', 'Gửi lệnh lưu vào CSDL thất bại.', 'error');
+        }
+    }
+
+    async function deleteDevice(deviceId, tagName) {
+        const result = await Swal.fire({
+            title: 'Xóa hoàn toàn thiết bị?',
+            html: `Hành động này sẽ xóa sạch thiết bị <b>${escapeHtml(tagName)}</b> và toàn bộ dữ liệu phân quyền liên quan.<br><br><span class="text-danger"><i class="fa-solid fa-triangle-exclamation"></i> Không thể khôi phục!</span>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#e63946',
+            cancelButtonText: 'Hủy',
+            confirmButtonText: 'Có, Xóa sạch!',
+            background: '#1a1a2e',
+            color: '#e0e0e0',
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+            const res = await fetch(`/admin/api/devices/${deviceId}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (data.success) {
+                Swal.fire({
+                    title: 'Đã xóa!',
+                    text: data.message,
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false,
+                    background: '#1a1a2e',
+                    color: '#e0e0e0',
+                });
+                await reloadDevices();
+            } else {
+                Swal.fire({
+                    title: 'Lỗi xóa thiết bị',
+                    text: data.message,
+                    icon: 'error',
+                    background: '#1a1a2e',
+                    color: '#e0e0e0',
+                });
+            }
+        } catch (e) {
+            Swal.fire('Lỗi', 'Gửi lệnh xóa thất bại.', 'error');
         }
     }
 
