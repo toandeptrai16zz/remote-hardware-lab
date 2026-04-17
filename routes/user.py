@@ -312,7 +312,10 @@ def load_file_api(username):
         else:
             status_code = result.get("status_code", 500)
             return jsonify(success=False, error=result["error"]), status_code
-    except Exception as e: 
+    except Exception as e:
+        import traceback
+        with open("/tmp/editor_load_error.log", "a") as f:
+            f.write(f"=== {username} ===\n{traceback.format_exc()}\n")
         return jsonify(success=False, error=str(e)), 500
 
 @user_bp.route('/<username>/editor/save', methods=['POST'])

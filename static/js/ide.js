@@ -1063,11 +1063,13 @@ async function loadFolderContents(path, parentElement) {
             let filtered = data.files;
             // ── EXAM MODE: Nếu đang thi, chỉ hiện folder bài thi ở root ──
             if (_examModeSlug && path === '.') {
+                console.log('[EXAM] Filtering root. _examModeSlug =', _examModeSlug, '| folders:', data.files.filter(f=>f.is_dir).map(f=>f.name));
                 filtered = data.files.filter(item => {
                     // Giữ lại folder trùng tên slug bài thi, ẩn hết các thứ khác
                     return item.is_dir && item.name === _examModeSlug;
                 });
                 if (filtered.length === 0) {
+                    console.warn('[EXAM] Slug không khớp folder nào! Fallback hiện tất cả.');
                     // Fallback: nếu không tìm thấy exact match thì hiện tất cả
                     filtered = data.files;
                 }
@@ -1823,6 +1825,7 @@ async function syncMissionsToIDE() {
 
             // ── EXAM MODE: Cô lập Explorer chỉ hiện folder bài thi ──
             const newSlug = slugifyVN(active[0].name) || `mission_${active[0].id}`;
+            console.log('[EXAM] syncMissionsToIDE: mission=', active[0].name, '| newSlug=', newSlug, '| currentSlug=', _examModeSlug);
             if (newSlug !== _examModeSlug) {
                 // Tiền xử lý khi BẮT ĐẦU VÀO THI
                 const isEnteringFirstTime = (_examModeSlug === null);
