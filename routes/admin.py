@@ -11,7 +11,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from werkzeug.security import generate_password_hash
 import mysql.connector
 from utils import require_auth, make_safe_name
-from config import get_db_connection
+from config import get_db_connection, USER_DATA_DIR
 from services import log_action
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -153,7 +153,7 @@ def delete_user(user_id):
         username_raw = user['username']
         safe_username = make_safe_name(username_raw)
         cname = f"{safe_username}-dev"
-        host_user_dir = f"/home/toan/QUAN_LY_USER/{safe_username}"
+        host_user_dir = os.path.join(USER_DATA_DIR, safe_username)
 
         from flask import current_app
         current_app.logger.info(f"Admin action: Deleting user {username_raw} (Safe name: {safe_username})")

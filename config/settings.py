@@ -9,6 +9,9 @@ basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 env_path = os.path.join(basedir, '.env')
 load_dotenv(env_path)
 
+USER_DATA_DIR = os.path.join(basedir, 'data', 'QUAN_LY_USER')
+ESP32_CORE_DIR = os.path.join(basedir, 'data', 'esp32_core')
+
 # ================== CÁC CẤU HÌNH - by Chương ==================
 SECURITY_CONFIG = {
     'MAX_LOGIN_ATTEMPTS': 5, 

@@ -27,6 +27,13 @@ def require_auth(role=None):
                 return redirect(url_for('auth.login_page'))
 
             session['last_activity'] = time.time()
+            
+            # [GC] Đánh dấu user đang hoạt động để tránh bị tắt container
+            try:
+                from services.docker_manager import update_user_activity
+                update_user_activity(session['username'])
+            except ImportError:
+                pass
 
             if role and session.get('role') != role:
                 if is_api_request:
@@ -48,16 +55,16 @@ def require_rate_limit(max_requests=10, window_seconds=60):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            ip = request.remote_addr or 'unknown'
+            identifier = session.get('username', request.remote_addr or 'unknown')
             now = time.time()
             
             # Dọn dẹp các bản ghi yêu cầu cũ nằm ngoài cửa sổ thời gian
-            _rate_store[ip] = [t for t in _rate_store[ip] if now - t < window_seconds]
+            _rate_store[identifier] = [t for t in _rate_store[identifier] if now - t < window_seconds]
             
-            if len(_rate_store[ip]) >= max_requests:
-                return jsonify(success=False, error=f'Quá nhiều yêu cầu. Vui lòng thử lại sau {window_seconds} giây.'), 429
+            if len(_rate_store[identifier]) >= max_requests:
+                return jsonify(success=False, error=f'Hệ thống: Bạn thao tác quá nhanh. Vui lòng thử lại sau {window_seconds} giây.'), 429
             
-            _rate_store[ip].append(now)
+            _rate_store[identifier].append(now)
             return f(*args, **kwargs)
         return decorated_function
     return decorator

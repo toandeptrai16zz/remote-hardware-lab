@@ -47,7 +47,8 @@ def init_db():
             id INT AUTO_INCREMENT PRIMARY KEY, 
             username VARCHAR(50) NOT NULL UNIQUE, 
             password VARCHAR(255) NOT NULL, 
-            email VARCHAR(255) NULL UNIQUE, 
+            email VARCHAR(255) NULL UNIQUE,
+            container_password VARCHAR(255) NULL,
             role ENUM('admin','user') NOT NULL DEFAULT 'user', 
             status ENUM('pending','active','blocked') NOT NULL DEFAULT 'pending', 
             ssh_port INT NULL, 
@@ -152,7 +153,7 @@ def init_db():
         hashed_password = generate_password_hash('admin123@')
         cur.execute(
             "INSERT INTO users (username, password, email, role, status) VALUES (%s, %s, %s, %s, %s)", 
-            ('admin', hashed_password, 'admin@eputech.com', 'admin', 'active')
+            ('admin', hashed_password, 'haquangchuong28@gmail.com', 'admin', 'active')
         )
         logger.info("Created default admin user")
     

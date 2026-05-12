@@ -76,3 +76,43 @@ def save_workspace_file(username, safe_username, sftp, relative_path, filename, 
     except Exception as e: 
         logger.error(f"Workspace Manager Save File Error: {e}")
         return {"success": False, "error": str(e), "status_code": 500}
+
+
+def collect_mission_files(sftp, base_path, home_dir, include_content=False):
+    """
+    Duyệt đệ quy để thu thập các file mã nguồn phục vụ việc nộp bài hoặc xem trước.
+    Ngăn chặn trùng lặp logic ở user_api_preview_files và user_api_submit_mission.
+    """
+    result_files = []
+    
+    def _collect(path, depth=0):
+        if depth > 4: return
+        try:
+            EXCLUDED_DIRS = {'libraries', 'node_modules', 'venv', '__pycache__', '.git', '.arduino15', 'Arduino'}
+            for item in sftp.listdir_attr(path):
+                if item.filename.startswith('.'): continue
+                if item.filename in EXCLUDED_DIRS: continue
+                
+                fp = f"{path}/{item.filename}"
+                if stat.S_ISDIR(item.st_mode):
+                    _collect(fp, depth + 1)
+                elif item.filename.endswith(('.ino', '.cpp', '.c', '.h', '.py')):
+                    if 'libraries/' in fp or 'node_modules/' in fp: continue
+                    
+                    file_info = {
+                        'name': item.filename,
+                        'path': fp.replace(home_dir, ''),
+                        'size': item.st_size
+                    }
+                    if include_content:
+                        with sftp.open(fp, 'r') as f:
+                            file_info['content'] = f.read(50000).decode('utf-8', errors='replace')
+                        
+                    result_files.append(file_info)
+        except Exception as e: 
+            logger.error(f"Workspace Manager Collect Files Error at {path}: {e}")
+            pass
+            
+    _collect(base_path)
+    return result_files
+

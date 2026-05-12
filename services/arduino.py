@@ -143,7 +143,7 @@ def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio
             print("DEBUG: [FLASH] Error: socketio not found in __main__")
             return
 
-    queue_counts[port] += 1
+    # Queue đã được cộng 1 ở bước reserve trước khi tạo thread
     FLASH_QUEUE_DEPTH.labels(port=port).set(queue_counts[port])
     try:
         safe_username = make_safe_name(username)
@@ -334,6 +334,9 @@ def get_user_assigned_device(username, reserve=False):
             # --- THUẬT TOÁN ĐỊNH TUYẾN THÔNG MINH (SMART ROUTING) ---
             import random
             
+            if not devices:
+                return None
+
             # 1. Tìm giá trị queue nhỏ nhất hiện tại
             min_queue = min(queue_counts[d['port']] for d in devices)
             

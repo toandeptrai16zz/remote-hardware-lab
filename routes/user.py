@@ -8,7 +8,7 @@ import json
 import stat
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.utils import secure_filename
-from utils import require_auth, make_safe_name, is_safe_path
+from utils import require_auth, require_rate_limit, make_safe_name, is_safe_path
 from config import HIDDEN_SYSTEM_FILES
 from services import (
     ensure_user_container_and_setup, get_ssh_client,
@@ -17,7 +17,7 @@ from services import (
 from config.database import get_db_connection
 from services.ai_grader import grade_submission_with_ai
 from utils.helpers import slugify_vn
-from services.workspace_manager import list_workspace_files, load_workspace_file, save_workspace_file
+from services.workspace_manager import list_workspace_files, load_workspace_file, save_workspace_file, collect_mission_files
 
 user_bp = Blueprint('user', __name__, url_prefix='/user')
 
@@ -171,6 +171,10 @@ def rename_item_api(username):
     # Validate
     if not old_path or not new_name or '/' in new_name or '..' in new_name:
         return jsonify(success=False, error="Invalid parameters"), 400
+        
+    protected_files = ["WELCOME.txt", ".bashrc", ".profile"]
+    if os.path.basename(old_path) in protected_files:
+        return jsonify(success=False, error="Hệ thống: Không được phép đổi tên file này!"), 403
 
     try:
         client = get_ssh_client(username)
@@ -204,6 +208,10 @@ def delete_item_api(username):
 
     if not path or not is_safe_path(home_dir, path):
         return jsonify(success=False, error="Invalid path"), 400
+        
+    protected_files = ["WELCOME.txt", ".bashrc", ".profile"]
+    if os.path.basename(path) in protected_files:
+        return jsonify(success=False, error="Hệ thống: Không được phép xóa file này!"), 403
 
     try:
         client = get_ssh_client(username)
@@ -336,6 +344,10 @@ def save_file_api(username):
     if not filename or not is_safe_path(home_dir, os.path.join(path, filename)):
         return jsonify(success=False, error="Invalid file path"), 400
 
+    protected_files = ["WELCOME.txt", ".bashrc", ".profile"]
+    if filename in protected_files:
+        return jsonify(success=False, error="Hệ thống: Không được phép lưu/sửa file này!"), 403
+
     try:
         from services.ssh_manager import get_ssh_client
         client = get_ssh_client(username)
@@ -365,6 +377,7 @@ def save_file_api(username):
 
 @user_bp.route('/<username>/compile', methods=['POST'])
 @require_auth('user')
+@require_rate_limit(max_requests=1, window_seconds=10)
 def compile_sketch_api(username):
     """API to compile Arduino sketch (Tự động nhận diện Board nếu không có phần cứng)"""
     from flask import current_app
@@ -390,6 +403,7 @@ def compile_sketch_api(username):
 
 @user_bp.route('/<username>/flash', methods=['POST'])
 @require_auth('user')
+@require_rate_limit(max_requests=1, window_seconds=15)
 def flash_sketch_api(username):
     """API to compile then flash directly to physical board via Bottleneck Queue"""
     import threading
@@ -577,26 +591,7 @@ def user_api_preview_files():
         client = get_ssh_client(username)
         sftp = client.open_sftp()
         home_dir = f"/home/{safe_username}"
-        def collect(path, depth=0):
-            if depth > 4: return
-            try:
-                EXCLUDED_DIRS = {'libraries', 'node_modules', 'venv', '__pycache__', '.git', '.arduino15', 'Arduino'}
-                for item in sftp.listdir_attr(path):
-                    if item.filename.startswith('.'): continue
-                    if item.filename in EXCLUDED_DIRS: continue
-                    
-                    fp = f"{path}/{item.filename}"
-                    if stat_mod.S_ISDIR(item.st_mode):
-                        collect(fp, depth + 1)
-                    elif item.filename.endswith(('.ino', '.cpp', '.c', '.h', '.py')):
-                        if 'libraries/' in fp or 'node_modules/' in fp: continue
-                        files_list.append({
-                            'name': item.filename,
-                            'path': fp.replace(home_dir, ''),
-                            'size': item.st_size
-                        })
-            except: pass
-        collect(home_dir)
+        files_list = collect_mission_files(sftp, home_dir, home_dir, include_content=False)
         sftp.close(); client.close()
     except Exception as e:
         return jsonify(success=False, error=str(e)), 500
@@ -692,37 +687,9 @@ def user_api_submit_mission(mission_id):
         except FileNotFoundError:
             files_snapshot.append({'name': 'error.txt', 'path': '/', 'content': 'Thư mục bài thi không tồn tại. Sinh viên chưa mở IDE hoặc đã cố tình xóa thư mục.', 'size': 0})
         
-        def collect(path, depth=0):
-            if depth > 4: return
-            try:
-                # Các thư mục cần loại bỏ không thu thập file bài làm
-                EXCLUDED_DIRS = {'libraries', 'node_modules', 'venv', '__pycache__', '.git', '.arduino15', 'Arduino'}
-                
-                for item in sftp.listdir_attr(path):
-                    if item.filename.startswith('.'): continue
-                    if item.filename in EXCLUDED_DIRS: continue
-                    
-                    fp = f"{path}/{item.filename}"
-                    if stat_mod.S_ISDIR(item.st_mode):
-                        collect(fp, depth + 1)
-                    elif item.filename.endswith(('.ino', '.cpp', '.c', '.h', '.py')):
-                        # Không lấy file trong thư mục libraries (lớp bảo vệ 2)
-                        if 'libraries/' in fp or 'node_modules/' in fp: continue
-                        
-                        try:
-                            with sftp.open(fp, 'r') as f:
-                                # Đọc tối đa 50k ký tự mỗi file
-                                content = f.read(50000).decode('utf-8', errors='replace')
-                            files_snapshot.append({
-                                'name': item.filename, 
-                                'path': fp.replace(home_dir, ''), 
-                                'content': content, 
-                                'size': item.st_size
-                            })
-                        except: pass
-            except: pass
         if len(files_snapshot) == 0:
-            collect(mission_dir)
+            files_snapshot.extend(collect_mission_files(sftp, mission_dir, home_dir, include_content=True))
+            
         sftp.close(); client.close()
     except Exception as e:
         files_snapshot = [{'name': 'error.txt', 'path': '/', 'content': f'Lỗi thu thập file: {e}', 'size': 0}]

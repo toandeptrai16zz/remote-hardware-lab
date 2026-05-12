@@ -9,10 +9,42 @@ import logging
 import json
 import glob
 import secrets
+import threading
 from utils import make_safe_name, find_free_port
-from config import get_db_connection, DEFAULT_ARDUINO_LIBRARIES
+from config import get_db_connection, DEFAULT_ARDUINO_LIBRARIES, USER_DATA_DIR, ESP32_CORE_DIR
 from services.logger import log_action
 from utils.metrics import ACTIVE_CONTAINERS
+
+# Global tracker cho hoạt động của User
+active_users_last_seen = {}
+
+def update_user_activity(username):
+    """Cập nhật thời gian hoạt động cuối cùng của user"""
+    active_users_last_seen[username] = time.time()
+
+def container_gc_worker():
+    """Luồng chạy ngầm để tắt các container không hoạt động quá 2 giờ"""
+    while True:
+        try:
+            time.sleep(600)  # Check mỗi 10 phút
+            now = time.time()
+            to_remove = []
+            for uname, last_seen in list(active_users_last_seen.items()):
+                if now - last_seen > 7200:  # 2 hours
+                    safe_uname = make_safe_name(uname)
+                    cname = f"{safe_uname}-dev"
+                    # Kiểm tra xem container có đang chạy không
+                    if docker_status(cname) == 'running':
+                        subprocess.run(["docker", "stop", cname], check=False)
+                        logger.info(f"[GC] Auto-stopped inactive container {cname}")
+                    to_remove.append(uname)
+            for u in to_remove:
+                del active_users_last_seen[u]
+        except Exception as e:
+            logger.error(f"[GC Worker] Error: {e}")
+
+# Khởi động luồng dọn dẹp
+threading.Thread(target=container_gc_worker, daemon=True).start()
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +177,7 @@ def ensure_user_container(username):
     db.close()
 
     # Prepare host directory
-    host_user_dir = f"/home/toan/QUAN_LY_USER/{safe_username}"
+    host_user_dir = os.path.join(USER_DATA_DIR, safe_username)
     os.makedirs(host_user_dir, exist_ok=True)
     os.chmod(host_user_dir, 0o750)
 
@@ -221,6 +253,9 @@ fi
 
 chown -R "$USER:$USER" /home/"$USER"
 
+# Khóa các file hệ thống không cho phép sinh viên sửa đổi
+chown root:root /home/"$USER"/.bashrc /home/"$USER"/WELCOME.txt
+chmod 444 /home/"$USER"/.bashrc /home/"$USER"/WELCOME.txt
 mkdir -p /run/sshd
 echo "ClientAliveInterval 30" >> /etc/ssh/sshd_config
 echo "ClientAliveCountMax 100" >> /etc/ssh/sshd_config
@@ -266,7 +301,7 @@ exec /usr/sbin/sshd -D
         "-e", f"CONTAINER_PASSWORD={container_password}",
         "-v", f"{host_user_dir}:/home/{safe_username}",
         "-v", f"{setup_script_path}:/startup.sh",
-        "-v", "/home/toan/flask-kerberos-demo/esp32_core:/root/.arduino15",
+        "-v", f"{ESP32_CORE_DIR}:/root/.arduino15",
         "--group-add", "dialout", 
         "--entrypoint", "/bin/bash"
     ]

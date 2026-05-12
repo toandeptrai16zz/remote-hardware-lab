@@ -972,7 +972,13 @@ async function apiCall(endpoint, options = {}, retries = 4, delay = 1500) {
                     await new Promise(res => setTimeout(res, delay));
                     continue;
                 }
-                throw new Error(`HTTP error! status: ${response.status}`);
+                
+                let errMsg = `HTTP error! status: ${response.status}`;
+                try {
+                    const errData = await response.json();
+                    if (errData && errData.error) errMsg = errData.error;
+                } catch(e) {}
+                throw new Error(errMsg);
             }
             const data = await response.json();
             if (data.error) {
@@ -987,10 +993,10 @@ async function apiCall(endpoint, options = {}, retries = 4, delay = 1500) {
                 await new Promise(res => setTimeout(res, delay));
                 continue;
             }
-            if (i === retries - 1) {
-                showNotification(`Lỗi API: ${error.message}`, 'error');
-                throw error;
-            }
+            
+            // Nếu không phải lỗi mạng hoặc đã hết số lần retry -> Hiển thị lỗi và Dừng luôn
+            showNotification(error.message, 'error');
+            throw error;
         }
     }
 }
