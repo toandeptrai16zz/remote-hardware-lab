@@ -9,6 +9,19 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: nckh_hardware_lab
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.12
@@ -20,6 +33,15 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest pytest-flask
+    - name: Run Schema Setup
+      run: |
+        mysql -h 127.0.0.1 -u root -proot nckh_hardware_lab < docker/mysql/init.sql
+      continue-on-error: true
     - name: Test with pytest
+      env:
+        DB_HOST: 127.0.0.1
+        DB_USER: root
+        DB_PASSWORD: root
+        DB_NAME: nckh_hardware_lab
       run: |
         PYTHONPATH=. pytest tests/
