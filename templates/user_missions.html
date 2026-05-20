@@ -83,13 +83,14 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
 'use strict';
 
 window.currentUsername = "{{ session.get('username', '') }}";
 </script>
-<script src="{{ url_for('static', filename='js/user_missions.js') }}?v=1.4"></script>
+<script src="{{ url_for('static', filename='js/user_missions.js') }}?v=1.5"></script>
 <script>
 
 </script>

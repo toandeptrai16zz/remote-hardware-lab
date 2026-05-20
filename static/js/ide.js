@@ -15,6 +15,7 @@ let currentFileCreationPath = '.';
 // Bien cuc bo cho Queue
 let socketUpload = null;
 let currentSid = null;
+let realtimeSocket = null;
 
 // Unsaved changes modal state
 let pendingCloseFile = null;
@@ -52,11 +53,78 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function setupRealTimeNotifications() {
-    const mainSocket = io.connect(location.protocol + '//' + document.domain + ':' + location.port + '/');
-    mainSocket.on('new_mission', function (data) {
-        showNotification(` BÀI TẬP MỚI: ${data.mission_name}. Hãy truy cập tab Bài tập/Thi để bắt đầu làm bài!`, 'info');
-        if (typeof checkIDEActiveMission === 'function') checkIDEActiveMission();
+    if (typeof io === 'undefined' || realtimeSocket) return;
+
+    realtimeSocket = io('/');
+
+    realtimeSocket.on('mission_changed', async (data) => {
+        const missionName = escapeHtml(data.mission_name || 'bài tập');
+        const messages = {
+            created: `Admin vừa giao bài mới: ${missionName}`,
+            updated: `Admin vừa cập nhật bài: ${missionName}`,
+            deleted: `Admin vừa xóa bài: ${missionName}`,
+        };
+
+        showNotification(messages[data.action] || 'Danh sách bài tập vừa được cập nhật.', 'info');
+        await refreshMissionViews();
     });
+
+    realtimeSocket.on('device_changed', async () => {
+        showNotification('Admin vừa cập nhật quyền board. IDE đang làm mới cấu hình thiết bị.', 'info');
+        await loadBoardInfo();
+        await refreshSerialPorts();
+    });
+
+    realtimeSocket.on('user_status_changed', (data) => {
+        if (data.status === 'blocked') {
+            forceLogoutFromRealtime('Tài khoản của bạn vừa bị khóa bởi admin.');
+            return;
+        }
+        if (data.status === 'active') {
+            showNotification('Trạng thái tài khoản của bạn vừa được cập nhật.', 'info');
+        }
+    });
+
+    realtimeSocket.on('user_deleted', () => {
+        forceLogoutFromRealtime('Tài khoản của bạn vừa bị xóa bởi admin.');
+    });
+}
+
+async function refreshMissionViews() {
+    await syncMissionsToIDE();
+
+    const iframe = document.getElementById('missions-iframe');
+    if (!iframe || !iframe.src || iframe.src.includes('about:blank')) return;
+
+    try {
+        if (iframe.contentWindow && typeof iframe.contentWindow.loadMyMissions === 'function') {
+            await iframe.contentWindow.loadMyMissions();
+        } else if (iframe.contentWindow) {
+            iframe.contentWindow.location.reload();
+        }
+    } catch (e) {
+        iframe.src = iframe.src;
+    }
+}
+
+function forceLogoutFromRealtime(message) {
+    const redirect = () => { window.location.href = '/logout'; };
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Phiên làm việc bị dừng',
+            text: message,
+            confirmButtonText: 'Đăng xuất',
+            confirmButtonColor: '#ef4444',
+            background: '#1a1a2e',
+            color: '#e0e0e0',
+        }).then(redirect);
+        setTimeout(redirect, 5000);
+        return;
+    }
+
+    alert(message);
+    redirect();
 }
 
 // Biến lưu trữ thông tin Board được cấp quyền
@@ -1004,7 +1072,7 @@ async function apiCall(endpoint, options = {}, retries = 4, delay = 1500) {
 }
 
 function showNotification(message, type = 'success') {
-    const alertType = type === 'error' ? 'danger' : (type === 'info' ? 'primary' : 'success');
+    const alertType = type === 'error' ? 'danger' : (type === 'info' ? 'primary' : (type === 'warning' ? 'warning' : 'success'));
     const toast = document.createElement('div');
     toast.className = `toast show align-items-center text-bg-${alertType} border-0`;
     toast.innerHTML = `

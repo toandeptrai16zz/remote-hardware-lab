@@ -7,14 +7,73 @@ import subprocess
 import io
 import pandas as pd
 from math import ceil
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, send_file, current_app
 from werkzeug.security import generate_password_hash
 import mysql.connector
 from utils import require_auth, make_safe_name, is_safe_path
 from config import get_db_connection, USER_DATA_DIR
 from services import log_action
+from sockets.realtime import emit_role_event, emit_user_event, emit_users_event
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
+
+
+def _row_value(row, key="username", index=0):
+    if isinstance(row, dict):
+        return row.get(key)
+    return row[index]
+
+
+def _fetch_mission_assignee_usernames(cur, mission_id):
+    cur.execute(
+        """
+        SELECT u.username
+        FROM mission_assignments ma
+        JOIN users u ON u.id = ma.user_id
+        WHERE ma.mission_id = %s
+        """,
+        (mission_id,),
+    )
+    return [_row_value(row) for row in cur.fetchall()]
+
+
+def _fetch_mission_event_context(cur, mission_id):
+    cur.execute(
+        """
+        SELECT m.name, u.username
+        FROM missions m
+        LEFT JOIN mission_assignments ma ON ma.mission_id = m.id
+        LEFT JOIN users u ON u.id = ma.user_id
+        WHERE m.id = %s
+        """,
+        (mission_id,),
+    )
+    rows = cur.fetchall()
+    if not rows:
+        return None, []
+
+    first = rows[0]
+    if isinstance(first, dict):
+        mission_name = first.get("name")
+        usernames = [row.get("username") for row in rows if row.get("username")]
+    else:
+        mission_name = first[0]
+        usernames = [row[1] for row in rows if row[1]]
+
+    return mission_name, usernames
+
+
+def _fetch_device_assignee_usernames(cur, device_id):
+    cur.execute(
+        """
+        SELECT u.username
+        FROM device_assignments da
+        JOIN users u ON u.id = da.user_id
+        WHERE da.device_id = %s
+        """,
+        (device_id,),
+    )
+    return [_row_value(row) for row in cur.fetchall()]
 
 @admin_bp.route("/")
 @require_auth('admin')
@@ -155,7 +214,6 @@ def delete_user(user_id):
         cname = f"{safe_username}-dev"
         host_user_dir = os.path.join(USER_DATA_DIR, safe_username)
 
-        from flask import current_app
         current_app.logger.info(f"Admin action: Deleting user {username_raw} (Safe name: {safe_username})")
 
         # Remove Docker container
@@ -182,6 +240,7 @@ def delete_user(user_id):
         # Remove from database
         cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
         db.commit()
+        emit_user_event(username_raw, "user_deleted", {"username": username_raw})
         
         log_action(session["username"], f"Deleted user '{username_raw}' and folder '{safe_username}'")
         flash(f"Đã xóa hoàn toàn user '{username_raw}' và thư mục dữ liệu.", "success")
@@ -209,6 +268,7 @@ def change_user_status(action, username):
         new_status, log_msg, flash_msg, flash_cat = actions[action]
         cur.execute("UPDATE users SET status=%s WHERE username=%s", (new_status, username))
         db.commit()
+        emit_user_event(username, "user_status_changed", {"username": username, "status": new_status, "action": action})
         log_action(session["username"], log_msg)
         flash(flash_msg, flash_cat)
     else:
@@ -261,6 +321,7 @@ def admin_api_create_mission():
     cur = db.cursor()
     
     success_count = 0
+    assigned_usernames = []
 
     try:
         cur.execute(
@@ -275,6 +336,7 @@ def admin_api_create_mission():
             if cur.rowcount > 0:
                 success_count += 1
 
+        assigned_usernames = _fetch_mission_assignee_usernames(cur, mission_id)
         db.commit()
     except Exception as e:
         db.rollback()
@@ -285,13 +347,9 @@ def admin_api_create_mission():
     cur.close()
     db.close()
     
-    try:
-        from flask import current_app
-        socket = current_app.extensions.get('socketio')
-        if socket:
-            socket.emit('new_mission', {'mission_name': mission_name})
-    except Exception:
-        pass
+    payload = {"action": "created", "mission_id": mission_id, "mission_name": mission_name}
+    emit_users_event(assigned_usernames, "mission_changed", payload)
+    emit_users_event(assigned_usernames, "new_mission", {"mission_id": mission_id, "mission_name": mission_name})
     
     log_action(session['username'], f"Tạo mission '{mission_name}' [ID: {mission_id}] và giao cho {success_count} user.")
     message = f"Tạo mission '{mission_name}' hoàn tất. Đã cấp quyền cho {success_count} user."
@@ -330,12 +388,18 @@ def admin_api_get_missions():
 def admin_api_delete_mission(mission_id):
     db = get_db_connection()
     cur = db.cursor()
+    mission_name, assigned_usernames = _fetch_mission_event_context(cur, mission_id)
     cur.execute("DELETE FROM mission_assignments WHERE mission_id = %s", (mission_id,))
     cur.execute("DELETE FROM submissions WHERE mission_id = %s", (mission_id,))
     cur.execute("DELETE FROM missions WHERE id = %s", (mission_id,))
     db.commit()
     cur.close()
     db.close()
+    emit_users_event(
+        assigned_usernames,
+        "mission_changed",
+        {"action": "deleted", "mission_id": mission_id, "mission_name": mission_name or f"Mission {mission_id}"},
+    )
     log_action(session['username'], f"Xóa mission ID: {mission_id}")
     return jsonify(success=True, message="Đã xóa bài thi thành công.")
 
@@ -345,14 +409,19 @@ def admin_api_update_mission(mission_id):
     data = request.get_json()
     db = get_db_connection()
     cur = db.cursor()
+    notify_usernames = []
+    mission_name = data.get('mission_name')
     try:
+        old_usernames = _fetch_mission_assignee_usernames(cur, mission_id)
         cur.execute("UPDATE missions SET name=%s, description=%s, type=%s, duration_minutes=%s, start_time=%s, end_time=%s WHERE id=%s",
-            (data.get('mission_name'), data.get('description'), data.get('type'), int(data.get('duration_minutes', 90)), data.get('start_time'), data.get('end_time'), mission_id)
+            (mission_name, data.get('description'), data.get('type'), int(data.get('duration_minutes', 90)), data.get('start_time'), data.get('end_time'), mission_id)
         )
         if data.get('user_ids'):
             cur.execute("DELETE FROM mission_assignments WHERE mission_id=%s", (mission_id,))
             for uid in data.get('user_ids'):
                 cur.execute("INSERT IGNORE INTO mission_assignments (mission_id, user_id) VALUES (%s, %s)", (mission_id, uid))
+        new_usernames = _fetch_mission_assignee_usernames(cur, mission_id)
+        notify_usernames = list(dict.fromkeys(old_usernames + new_usernames))
         db.commit()
         success, message = True, "Cập nhật bài thi thành công"
         log_action(session['username'], f"Cập nhật mission ID: {mission_id}")
@@ -362,6 +431,12 @@ def admin_api_update_mission(mission_id):
     finally:
         cur.close()
         db.close()
+    if success:
+        emit_users_event(
+            notify_usernames,
+            "mission_changed",
+            {"action": "updated", "mission_id": mission_id, "mission_name": mission_name or f"Mission {mission_id}"},
+        )
     return jsonify(success=success, message=message)
 
 @admin_bp.route("/api/missions/<int:mission_id>/export", methods=['GET'])
@@ -477,6 +552,7 @@ def admin_api_scan_devices():
     db.commit()
     cur.close(), db.close()
     
+    emit_role_event("user", "device_changed", {"action": "scanned"})
     log_action(session['username'], f"Quét thiết bị USB: {new_count} thiết bị mới, {offline_count} thiết bị bị ngắt kết nối.")
     return jsonify({'success': True, 'message': f'Tìm thấy {len(active_ports)} cổng kết nối. Đã thêm mới {new_count} thiết bị và phát hiện {offline_count} thiết bị bị ngắt cáp (Offline).'})
 
@@ -547,6 +623,7 @@ def admin_api_assign_device():
     
     db = get_db_connection()
     cur = db.cursor()
+    previous_usernames = _fetch_device_assignee_usernames(cur, device_id)
     
     # Cập nhật loại Board vào CSDL
     cur.execute("UPDATE hardware_devices SET type = %s WHERE id = %s", (board_type, device_id))
@@ -571,6 +648,12 @@ def admin_api_assign_device():
     db.commit()
     cur.close(), db.close()
     
+    notify_usernames = list(dict.fromkeys(previous_usernames + list(usernames or [])))
+    emit_users_event(
+        notify_usernames,
+        "device_changed",
+        {"action": "assigned", "device_id": device_id, "board_type": board_type},
+    )
     log_action(session['username'], f"Cập nhật Quyền Cổng USB ID {device_id} cho {added} Sinh viên.")
     return jsonify({'success': True, 'message': f'Cập nhật thành công! Đã cấp quyền sử dụng cho {len(usernames)} sinh viên chờ hàng đợi.'})
 
@@ -580,6 +663,7 @@ def admin_api_delete_device(device_id):
     """Xóa hoàn toàn thiết bị khỏi hệ thống"""
     db = get_db_connection()
     cur = db.cursor()
+    assigned_usernames = _fetch_device_assignee_usernames(cur, device_id)
     
     try:
         # Xóa cascade: Xóa quyền trước
@@ -595,5 +679,11 @@ def admin_api_delete_device(device_id):
     finally:
         cur.close()
         db.close()
-        
+
+    if success:
+        emit_users_event(
+            assigned_usernames,
+            "device_changed",
+            {"action": "deleted", "device_id": device_id},
+        )
     return jsonify(success=success, message=message)

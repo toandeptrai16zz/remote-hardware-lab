@@ -2,6 +2,7 @@
 let activeMission = null;   // Đối tượng bài thi hiện đang thi
 let timerInterval = null;   // Khoảng thời gian đếm ngược
 let currentUsername = window.currentUsername || "";
+let missionRealtimeSocket = null;
 
 // ── CÔNG CỤ (UTILS) ── by Chương ───────────────────────────
 function escH(s) { const d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
@@ -25,6 +26,53 @@ function toast(msg, type='success') {
   let c=document.querySelector('.toast-container');
   if(!c){c=document.createElement('div');c.className='toast-container position-fixed top-0 end-0 p-3 mt-5';c.style.zIndex='9998';document.body.appendChild(c);}
   c.appendChild(el); setTimeout(()=>el.remove(),5000);
+}
+
+function setupRealtimeMissionRefresh() {
+  if (typeof io === 'undefined' || missionRealtimeSocket) return;
+
+  const isEmbedded = window.location.search.includes('embed=1');
+  if (isEmbedded && window.parent !== window) return;
+
+  missionRealtimeSocket = io('/');
+
+  missionRealtimeSocket.on('mission_changed', async (data) => {
+    const name = data.mission_name || 'bài tập';
+    const messages = {
+      created: `Admin vừa giao bài mới: ${name}`,
+      updated: `Admin vừa cập nhật bài: ${name}`,
+      deleted: `Admin vừa xóa bài: ${name}`,
+    };
+
+    toast(messages[data.action] || 'Danh sách bài tập vừa được cập nhật.', 'info');
+    await loadMyMissions();
+    if (window.parent && window.parent !== window) window.parent.postMessage({ action: 'sync_ide_only' }, '*');
+  });
+
+  missionRealtimeSocket.on('user_status_changed', (data) => {
+    if (data.status === 'blocked') forceLogoutFromRealtime('Tài khoản của bạn vừa bị khóa bởi admin.');
+  });
+
+  missionRealtimeSocket.on('user_deleted', () => {
+    forceLogoutFromRealtime('Tài khoản của bạn vừa bị xóa bởi admin.');
+  });
+}
+
+function forceLogoutFromRealtime(message) {
+  const redirect = () => { window.location.href = '/logout'; };
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Phiên làm việc bị dừng',
+      text: message,
+      confirmButtonText: 'Đăng xuất',
+      confirmButtonColor: '#dc3545',
+    }).then(redirect);
+    setTimeout(redirect, 5000);
+    return;
+  }
+  alert(message);
+  redirect();
 }
 
 // ── TẢI BÀI THI (LOAD MISSIONS) ── by Chương ───────────────
@@ -462,4 +510,7 @@ document.getElementById('submitModal').addEventListener('click', function(e) {
 });
 
 // ── KHỞI TẠO (INIT) ── by Chương ───────────────────────────
-document.addEventListener('DOMContentLoaded', loadMyMissions);
+document.addEventListener('DOMContentLoaded', () => {
+  loadMyMissions();
+  setupRealtimeMissionRefresh();
+});

@@ -32,6 +32,7 @@ from routes.user import user_bp
 
 # Import trình xử lý Socket.IO - by Chương
 from sockets import (
+    register_realtime_handlers,
     register_terminal_handlers,
     register_serial_handlers,
     register_upload_status_handlers
@@ -84,6 +85,7 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(user_bp)
 
 # ================== ĐĂNG KÝ CÁC TRÌNH XỬ LÝ SOCKET.IO - by Chương ==================
+register_realtime_handlers(socketio)
 register_terminal_handlers(socketio)
 register_serial_handlers(socketio)
 register_upload_status_handlers(socketio)
