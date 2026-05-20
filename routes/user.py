@@ -21,6 +21,42 @@ from services.workspace_manager import list_workspace_files, load_workspace_file
 
 user_bp = Blueprint('user', __name__, url_prefix='/user')
 
+PROTECTED_FILES = {"WELCOME.txt", ".bashrc", ".profile"}
+
+
+def _user_home_dir(safe_username):
+    return f"/home/{safe_username}"
+
+
+def _is_safe_leaf_name(name):
+    if not name or "\x00" in name:
+        return False
+    if name in {".", ".."}:
+        return False
+    if os.path.isabs(name) or "/" in name or "\\" in name or ":" in name:
+        return False
+    return ".." not in name
+
+
+def _safe_user_path(safe_username, *parts):
+    home_dir = _user_home_dir(safe_username)
+    clean_parts = []
+    for part in parts:
+        if part in (None, ""):
+            continue
+        try:
+            part_path = os.fspath(part)
+        except TypeError:
+            return None
+        if "\x00" in part_path:
+            return None
+        clean_parts.append(part_path)
+    candidate = os.path.normpath(os.path.join(home_dir, *clean_parts))
+    if not is_safe_path(home_dir, candidate):
+        return None
+    return candidate
+
+
 @user_bp.route("/")
 @require_auth('user')
 def user_redirect():
@@ -56,7 +92,7 @@ def list_files_api(username):
         return jsonify(error="Unauthorized"), 403
     
     path = request.json.get("path", ".")
-    if '..' in path or path.startswith('/'): 
+    if _safe_user_path(safe_username, path) is None:
         return jsonify(error="Invalid path"), 400
     
     try:
@@ -93,18 +129,17 @@ def create_folder_api(username):
     folder_name = data.get("folder_name")
     path = data.get("path", ".")
 
-    if not folder_name or not is_safe_path("/home", folder_name):
+    if not _is_safe_leaf_name(folder_name):
         return jsonify(success=False, error="Invalid folder name"), 400
     
-    home_dir = f"/home/{safe_username}"
-    if not is_safe_path(home_dir, path):
+    full_path = _safe_user_path(safe_username, path, folder_name)
+    if full_path is None:
         return jsonify(success=False, error="Invalid path"), 400
 
     try:
         client = get_ssh_client(username)
         sftp = client.open_sftp()
         
-        full_path = os.path.join(home_dir, path, folder_name)
         sftp.mkdir(full_path)
         
         sftp.close()
@@ -127,10 +162,9 @@ def upload_files_api(username):
     path = request.form.get('path', '.')
     files = request.files.getlist('files')
     
-    home_dir = f"/home/{safe_username}"
     if not files: 
         return jsonify(success=False, error="No files provided"), 400
-    if not is_safe_path(home_dir, path): 
+    if _safe_user_path(safe_username, path) is None:
         return jsonify(success=False, error="Invalid path"), 400
 
     try:
@@ -141,7 +175,12 @@ def upload_files_api(username):
         for file in files:
             if file.filename:
                 safe_filename = secure_filename(file.filename)
-                target_path = os.path.join(home_dir, path, safe_filename)
+                if not _is_safe_leaf_name(safe_filename):
+                    continue
+
+                target_path = _safe_user_path(safe_username, path, safe_filename)
+                if target_path is None:
+                    continue
                 
                 sftp.putfo(file, target_path)
                 count += 1
@@ -169,20 +208,21 @@ def rename_item_api(username):
     new_name = data.get("new_name")
     
     # Validate
-    if not old_path or not new_name or '/' in new_name or '..' in new_name:
+    if not old_path or not _is_safe_leaf_name(new_name):
         return jsonify(success=False, error="Invalid parameters"), 400
         
-    protected_files = ["WELCOME.txt", ".bashrc", ".profile"]
-    if os.path.basename(old_path) in protected_files:
+    if os.path.basename(old_path) in PROTECTED_FILES:
         return jsonify(success=False, error="Hệ thống: Không được phép đổi tên file này!"), 403
+
+    base_dir_rel = os.path.dirname(old_path)
+    old_full_path = _safe_user_path(safe_username, old_path)
+    new_full_path = _safe_user_path(safe_username, base_dir_rel, new_name)
+    if old_full_path is None or new_full_path is None:
+        return jsonify(success=False, error="Invalid path"), 400
 
     try:
         client = get_ssh_client(username)
         sftp = client.open_sftp()
-        
-        base_dir_rel = os.path.dirname(old_path)
-        old_full_path = os.path.join("/home", safe_username, old_path)
-        new_full_path = os.path.join("/home", safe_username, base_dir_rel, new_name)
         
         sftp.rename(old_full_path, new_full_path)
         
@@ -204,23 +244,21 @@ def delete_item_api(username):
         return jsonify(success=False, error="Unauthorized"), 403
     
     path = request.json.get("path")
-    home_dir = f"/home/{safe_username}"
-
-    if not path or not is_safe_path(home_dir, path):
+    full_path = _safe_user_path(safe_username, path)
+    if not path or full_path is None:
         return jsonify(success=False, error="Invalid path"), 400
         
-    protected_files = ["WELCOME.txt", ".bashrc", ".profile"]
-    if os.path.basename(path) in protected_files:
+    if os.path.basename(path) in PROTECTED_FILES:
         return jsonify(success=False, error="Hệ thống: Không được phép xóa file này!"), 403
 
     try:
-        client = get_ssh_client(username)
-
-        full_path = os.path.normpath(os.path.join(home_dir, path))
+        home_dir = _user_home_dir(safe_username)
         
         # Prevent deleting home directory
         if full_path == home_dir:
             return jsonify(success=False, error="Cannot delete root home"), 403
+
+        client = get_ssh_client(username)
              
         safe_command = f'rm -rf {shlex.quote(full_path)}'
 
@@ -254,17 +292,19 @@ def new_file_api(username):
     filename = data.get("filename", "").strip()
     path = data.get("path", ".")
 
-    if not filename or '..' in filename or '/' in filename:
+    if not _is_safe_leaf_name(filename):
         return jsonify(success=False, error="Tên file không hợp lệ"), 400
 
     if '.' not in filename:
         filename += '.ino'
 
+    filepath = _safe_user_path(safe_username, path, filename)
+    if filepath is None:
+        return jsonify(success=False, error="Invalid file path"), 400
+
     try:
         client = get_ssh_client(username)
         sftp = client.open_sftp()
-        
-        filepath = os.path.join("/home", safe_username, path, filename)
 
         # Check if file exists
         try:
@@ -301,8 +341,7 @@ def load_file_api(username):
     filename = data.get("filename")
     path = data.get("path", ".")
     
-    home_dir = f"/home/{safe_username}"
-    if not filename or not is_safe_path(home_dir, os.path.join(path, filename)):
+    if not filename or _safe_user_path(safe_username, path, filename) is None:
         return jsonify(success=False, error="Invalid file path"), 400
 
     try:
@@ -340,12 +379,10 @@ def save_file_api(username):
     content = data.get("content", "")
     path = data.get("path", ".")
 
-    home_dir = f"/home/{safe_username}"
-    if not filename or not is_safe_path(home_dir, os.path.join(path, filename)):
+    if not filename or _safe_user_path(safe_username, path, filename) is None:
         return jsonify(success=False, error="Invalid file path"), 400
 
-    protected_files = ["WELCOME.txt", ".bashrc", ".profile"]
-    if filename in protected_files:
+    if os.path.basename(filename) in PROTECTED_FILES:
         return jsonify(success=False, error="Hệ thống: Không được phép lưu/sửa file này!"), 403
 
     try:

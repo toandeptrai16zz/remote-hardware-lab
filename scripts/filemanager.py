@@ -1,12 +1,18 @@
+from flask import Blueprint, jsonify, request
+
+from services.ssh_manager import get_ssh_client
+
+
+fm_bp = Blueprint("filemanager", __name__)
+
+
 # API mở file
 @fm_bp.route('/user/<username>/open')
 def open_file(username):
     filename = request.args.get('file')
     if not filename:
         return jsonify(ok=False, error="No file specified")
-    ssh_port = get_ssh_port_from_db(username)
-    ssh_pwd = get_password_for_user(username)
-    client = ssh_client(username, ssh_pwd, 'linuxserver.chuongdev.local', ssh_port)
+    client = get_ssh_client(username)
     sftp = client.open_sftp()
     try:
         with sftp.open(filename, 'r') as f:
@@ -26,9 +32,7 @@ def save_file(username):
     content = data.get('content')
     if not filename:
         return jsonify(ok=False, error="Filename required")
-    ssh_port = get_ssh_port_from_db(username)
-    ssh_pwd = get_password_for_user(username)
-    client = ssh_client(username, ssh_pwd, 'linuxserver.chuongdev.local', ssh_port)
+    client = get_ssh_client(username)
     sftp = client.open_sftp()
     try:
         with sftp.open(filename, 'w') as f:
@@ -39,4 +43,3 @@ def save_file(username):
     finally:
         sftp.close()
         client.close()
-

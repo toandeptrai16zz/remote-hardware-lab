@@ -1,14 +1,5 @@
 import pytest
-from app import app
 from config.database import get_db_connection
-
-# ================= MÔI TRƯỜNG ẢO HÓA TEST - by Chương =================
-@pytest.fixture
-def client():
-    """Khởi tạo trình duyệt ảo (Test Client) để kiểm thử luồng - by Chương"""
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
 
 # ================= KIỂM THỬ AN TOÀN KẾT NỐI DB - by Chương =================
 def test_db_connection_pool_graceful_fail():

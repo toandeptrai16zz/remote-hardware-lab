@@ -235,9 +235,17 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
         # --- THU THẬP DỮ LIỆU ĐỂ TRAINING TRONG TƯƠNG LAI ---
         # Lưu lại tương tác này vào file JSONL theo định dạng Instruction-Input-Output (Alpaca style)
         try:
-            dataset_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+            if os.getenv('AI_GRADER_RECORD_DATASET', '1') == '0':
+                logger.info("AI grader dataset recording disabled by environment")
+                return result
+
+            dataset_path = os.getenv('AI_GRADER_DATASET_PATH')
+            if dataset_path:
+                dataset_dir = os.path.dirname(os.path.abspath(dataset_path))
+            else:
+                dataset_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+                dataset_path = os.path.join(dataset_dir, 'ai_training_dataset.jsonl')
             os.makedirs(dataset_dir, exist_ok=True)
-            dataset_path = os.path.join(dataset_dir, 'ai_training_dataset.jsonl')
             
             # Chỉ lấy nội dung code sạch của sinh viên
             student_code = files_text.strip()

@@ -16,6 +16,11 @@ backups/
 *.log
 *.sqlite3
 *.db
+pytest_output.txt
+.coverage
+coverage.xml
+htmlcov/
+.ruff_cache/
 
 # --- THƯ MỤC IDE ---
 .vscode/

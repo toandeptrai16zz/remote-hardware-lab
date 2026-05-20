@@ -10,7 +10,7 @@ from math import ceil
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from werkzeug.security import generate_password_hash
 import mysql.connector
-from utils import require_auth, make_safe_name
+from utils import require_auth, make_safe_name, is_safe_path
 from config import get_db_connection, USER_DATA_DIR
 from services import log_action
 
@@ -167,11 +167,15 @@ def delete_user(user_id):
         
         # Remove user directory
         try:
-            if os.path.exists(host_user_dir):
-                shutil.rmtree(host_user_dir)
-                current_app.logger.info(f"Deleted directory: {host_user_dir}")
+            root_dir = os.path.realpath(USER_DATA_DIR)
+            target_dir = os.path.realpath(host_user_dir)
+            if target_dir == root_dir or not is_safe_path(root_dir, target_dir):
+                current_app.logger.error(f"Refusing unsafe user directory deletion: {target_dir}")
+            elif os.path.exists(target_dir):
+                shutil.rmtree(target_dir)
+                current_app.logger.info(f"Deleted directory: {target_dir}")
             else:
-                current_app.logger.warning(f"Directory not found, skipping: {host_user_dir}")
+                current_app.logger.warning(f"Directory not found, skipping: {target_dir}")
         except Exception as e:
             current_app.logger.error(f"Failed to delete directory {host_user_dir}: {e}")
 

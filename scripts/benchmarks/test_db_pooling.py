@@ -75,12 +75,15 @@ def run_benchmark(mode_func, label):
     return latencies
 
 if __name__ == "__main__":
+    print("MANUAL ONLY: benchmark này kết nối MySQL thật theo biến môi trường hiện tại.")
     print("="*60)
     print("📊 HỆ THỐNG KIỂM THỬ HIỆU NĂNG DATABASE (REAL-TIME)")
     print("="*60)
     
     # Reset pool bằng cách gọi 1 cái trước
-    get_db_connection().close()
+    warmup_conn = get_db_connection()
+    if warmup_conn:
+        warmup_conn.close()
     
     # 1. Đo lường kịch bản có Pool (Ưu tiên pool trước)
     with_pool_results = run_benchmark(measure_with_pool, "CÓ CONNECTION POOLING (SIZE=15)")

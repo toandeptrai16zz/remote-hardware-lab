@@ -183,6 +183,8 @@ def main():
     try:
         # Khởi tạo cơ sở dữ liệu
         init_db()
+        from services.docker_manager import start_container_gc
+        start_container_gc()
         # Vô hiệu hóa tính năng theo dõi USB vì đã chuyển sang kiến trúc Virtual AI
         logger.info("🔧 Các dịch vụ chạy nền theo dõi USB đã được vô hiệu hóa.")
         background_services = None

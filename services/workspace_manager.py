@@ -17,7 +17,11 @@ from utils.helpers import is_safe_path
 def list_workspace_files(username, safe_username, sftp, target_path="."):
     """Liệt kê các tệp trong thư mục workspace của người dùng."""
     try:
-        base_path = os.path.join("/home", safe_username, target_path)
+        home_dir = os.path.join("/home", safe_username)
+        base_path = os.path.normpath(os.path.join(home_dir, target_path))
+        if not is_safe_path(home_dir, base_path):
+            return {"success": False, "error": "Invalid path", "status_code": 400}
+
         files = []
         try:
             dir_items = sftp.listdir_attr(base_path)
@@ -47,7 +51,7 @@ def list_workspace_files(username, safe_username, sftp, target_path="."):
 def load_workspace_file(username, safe_username, sftp, relative_path, filename):
     """Read a file from user's workspace."""
     home_dir = f"/home/{safe_username}"
-    filepath = os.path.join(home_dir, relative_path, filename)
+    filepath = os.path.normpath(os.path.join(home_dir, relative_path, filename))
 
     if not is_safe_path(home_dir, filepath):
         return {"success": False, "error": "Invalid file path", "status_code": 400}
@@ -87,6 +91,8 @@ def collect_mission_files(sftp, base_path, home_dir, include_content=False):
     
     def _collect(path, depth=0):
         if depth > 4: return
+        if not is_safe_path(home_dir, path):
+            return
         try:
             EXCLUDED_DIRS = {'libraries', 'node_modules', 'venv', '__pycache__', '.git', '.arduino15', 'Arduino'}
             for item in sftp.listdir_attr(path):
@@ -94,6 +100,8 @@ def collect_mission_files(sftp, base_path, home_dir, include_content=False):
                 if item.filename in EXCLUDED_DIRS: continue
                 
                 fp = f"{path}/{item.filename}"
+                if not is_safe_path(home_dir, fp):
+                    continue
                 if stat.S_ISDIR(item.st_mode):
                     _collect(fp, depth + 1)
                 elif item.filename.endswith(('.ino', '.cpp', '.c', '.h', '.py')):
@@ -115,4 +123,3 @@ def collect_mission_files(sftp, base_path, home_dir, include_content=False):
             
     _collect(base_path)
     return result_files
-

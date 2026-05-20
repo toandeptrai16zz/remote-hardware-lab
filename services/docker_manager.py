@@ -17,6 +17,7 @@ from utils.metrics import ACTIVE_CONTAINERS
 
 # Global tracker cho hoạt động của User
 active_users_last_seen = {}
+_gc_thread = None
 
 def update_user_activity(username):
     """Cập nhật thời gian hoạt động cuối cùng của user"""
@@ -43,8 +44,17 @@ def container_gc_worker():
         except Exception as e:
             logger.error(f"[GC Worker] Error: {e}")
 
-# Khởi động luồng dọn dẹp
-threading.Thread(target=container_gc_worker, daemon=True).start()
+def start_container_gc():
+    """Start the inactive-container cleanup worker when explicitly enabled."""
+    global _gc_thread
+    if os.getenv("ENABLE_CONTAINER_GC", "1") == "0":
+        logger.info("[GC] Container cleanup worker disabled by environment")
+        return None
+    if _gc_thread and _gc_thread.is_alive():
+        return _gc_thread
+    _gc_thread = threading.Thread(target=container_gc_worker, daemon=True)
+    _gc_thread.start()
+    return _gc_thread
 
 logger = logging.getLogger(__name__)
 

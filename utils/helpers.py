@@ -14,11 +14,24 @@ def make_safe_name(input_string):
 
 def is_safe_path(basedir, path):
     """Kiểm tra đường dẫn có an toàn không (ngăn chặn tấn công directory traversal)"""
-    # Loại bỏ dấu gạch chéo ở đầu đường dẫn nhập vào
-    if path.startswith('/'): 
-        path = path.lstrip('/')
-    target = os.path.abspath(os.path.join(basedir, path))
-    return target.startswith(os.path.abspath(basedir))
+    if not basedir or path is None:
+        return False
+
+    try:
+        base_path = os.path.realpath(os.path.abspath(os.fspath(basedir)))
+        requested_path = os.fspath(path)
+    except TypeError:
+        return False
+
+    if os.path.isabs(requested_path):
+        target_path = os.path.realpath(requested_path)
+    else:
+        target_path = os.path.realpath(os.path.join(base_path, requested_path))
+
+    try:
+        return os.path.commonpath([base_path, target_path]) == base_path
+    except ValueError:
+        return False
 
 def find_free_port(start=2200, end=2299):
     """Tìm một cổng (port) trống trong phạm vi cho trước"""

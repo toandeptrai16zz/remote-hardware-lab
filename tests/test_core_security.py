@@ -1,7 +1,6 @@
 import pytest
 import os
 from unittest.mock import MagicMock
-from app import app
 from utils.helpers import slugify_vn, is_safe_path
 from services.workspace_manager import collect_mission_files
 
@@ -22,9 +21,21 @@ def test_is_safe_path():
     
     # Đường dẫn độc hại (Leo ra ngoài basedir)
     assert is_safe_path(basedir, "../../../etc/passwd") == False
-    # /etc/passwd bị lstrip('/') thành relative path etc/passwd nên an toàn!
-    assert is_safe_path(basedir, "/etc/passwd") == True
+    assert is_safe_path(basedir, "/etc/passwd") == False
+    assert is_safe_path(basedir, "/home/user1/file.txt") == True
     assert is_safe_path(basedir, "folder/../../root_file") == False
+    assert is_safe_path(basedir, 123) == False
+
+
+def test_is_safe_path_blocks_symlink_escape(tmp_path):
+    base = tmp_path / "base"
+    outside = tmp_path / "outside"
+    base.mkdir()
+    outside.mkdir()
+    (outside / "secret.txt").write_text("secret", encoding="utf-8")
+    (base / "link").symlink_to(outside, target_is_directory=True)
+
+    assert is_safe_path(base, "link/secret.txt") is False
 
 def test_collect_mission_files():
     """Kiểm tra bộ thu thập file bài làm (Loại bỏ thư mục cấm)"""
@@ -62,16 +73,14 @@ def test_collect_mission_files():
     # Kiểm tra nội dung có được đọc không
     assert files[0]['content'] == "Hello Code"
 
-# ================= INTEGRATION TESTS =================
-@pytest.fixture
-def client():
-    app.config['TESTING'] = True
-    app.config['SECRET_KEY'] = 'test_secret'
-    with app.test_client() as client:
-        yield client
-
-def test_rate_limiter_compile(client):
+def test_rate_limiter_compile(client, monkeypatch):
     """Kiểm tra tính năng chống Spam API /compile"""
+    from services import arduino
+
+    monkeypatch.setattr(arduino, "get_user_assigned_device", lambda username: None)
+    monkeypatch.setattr(arduino, "detect_board_from_sketch", lambda username, sketch_path: "arduino:avr:uno")
+    monkeypatch.setattr(arduino, "compile_sketch", lambda username, fqbn, sketch_path: {"success": True, "output": "ok"})
+
     with client.session_transaction() as sess:
         sess['username'] = 'test_spam_user'
         sess['role'] = 'user'
