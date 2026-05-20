@@ -7,6 +7,30 @@ from flask_socketio import emit
 from services import get_ssh_client, log_action
 
 logger = logging.getLogger(__name__)
+terminal_sessions = {}
+
+
+def _close_terminal_session(sid):
+    entry = terminal_sessions.pop(sid, None)
+    if not entry:
+        return
+
+    username = entry.get("username", "unknown")
+    chan = entry.get("chan")
+    client = entry.get("client")
+
+    try:
+        if chan and getattr(chan, "active", False):
+            chan.close()
+    except Exception as e:
+        logger.warning(f"Error closing SSH channel for {username}: {e}")
+
+    try:
+        if client:
+            client.close()
+    except Exception as e:
+        logger.warning(f"Error closing SSH client for {username}: {e}")
+
 
 def register_terminal_handlers(socketio):
     """Đăng ký các trình xử lý namespace terminal"""
@@ -21,18 +45,20 @@ def register_terminal_handlers(socketio):
         sid = request.sid 
         
         try:
+            _close_terminal_session(sid)
             client = get_ssh_client(username)
-            chan = client.invoke_shell(term='xterm-color')
-            
-            # Lưu vào session
-            session['ssh_client'] = client
-            session['ssh_chan'] = chan
+            chan = client.invoke_shell(term='xterm-256color', width=120, height=32)
+            terminal_sessions[sid] = {
+                "username": username,
+                "client": client,
+                "chan": chan,
+            }
             log_action(username, "Terminal: User connected")
 
             def forward_output():
                 """Chuyển tiếp output từ container đến trình duyệt"""
                 try:
-                    while chan.active:
+                    while terminal_sessions.get(sid, {}).get("chan") is chan and chan.active:
                         if chan.recv_ready():
                             data = chan.recv(1024)
                             if not data:
@@ -51,44 +77,48 @@ def register_terminal_handlers(socketio):
             
         except Exception as e:
             logger.error(f"SOCKET CONNECT ERROR for {username}: {e}")
+            _close_terminal_session(sid)
             emit('output', f'\r\n\x1b[31mError connecting to terminal: {e}\x1b[0m\r\n', room=sid)
             return False
 
     @socketio.on('input', namespace='/terminal')
     def terminal_input(data):
         """Xử lý đầu vào terminal"""
-        if 'ssh_chan' in session and session['ssh_chan'].active:
-            try:
-                if isinstance(data, str):
-                    session['ssh_chan'].send(data)
-                else:
-                    logger.warning(f"Invalid input data type: {type(data)}")
-            except Exception as e:
-                logger.error(f"SOCKET INPUT ERROR: {e}")
-                emit('output', f'\r\n\x1b[31mInput error: {e}\x1b[0m\r\n')
+        entry = terminal_sessions.get(request.sid)
+        chan = entry.get("chan") if entry else None
+        if not chan or not getattr(chan, "active", False):
+            emit('output', '\r\n\x1b[31mTerminal session is not active.\x1b[0m\r\n')
+            return
+
+        try:
+            if isinstance(data, str):
+                chan.send(data)
+            else:
+                logger.warning(f"Invalid input data type: {type(data)}")
+        except Exception as e:
+            logger.error(f"SOCKET INPUT ERROR: {e}")
+            emit('output', f'\r\n\x1b[31mInput error: {e}\x1b[0m\r\n')
+
+    @socketio.on('resize', namespace='/terminal')
+    def terminal_resize(data):
+        """Resize remote PTY to match xterm dimensions."""
+        entry = terminal_sessions.get(request.sid)
+        chan = entry.get("chan") if entry else None
+        if not chan or not getattr(chan, "active", False):
+            return
+
+        try:
+            cols = max(20, min(int(data.get("cols", 120)), 300))
+            rows = max(5, min(int(data.get("rows", 32)), 120))
+            chan.resize_pty(width=cols, height=rows)
+        except Exception as e:
+            logger.warning(f"Terminal resize error for {entry.get('username', 'unknown')}: {e}")
 
     @socketio.on('disconnect', namespace='/terminal')
     def terminal_disconnect():
         """Xử lý ngắt kết nối terminal"""
         username = session.get("username", "unknown")
-        
-        # Đóng kênh SSH
-        if 'ssh_chan' in session:
-            try:
-                if session['ssh_chan'].active:
-                    session['ssh_chan'].close()
-            except Exception as e:
-                logger.warning(f"Error closing SSH channel for {username}: {e}")
-            finally:
-                session.pop('ssh_chan', None)
-        
-        # Close SSH client SSH
-        if 'ssh_client' in session:
-            try:
-                session['ssh_client'].close()
-            except Exception as e:
-                logger.warning(f"Error closing SSH client for {username}: {e}")
-            finally:
-                session.pop('ssh_client', None)
+        sid = request.sid
+        _close_terminal_session(sid)
                 
         log_action(username, "Terminal: User disconnected")

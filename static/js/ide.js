@@ -433,10 +433,9 @@ function setupTerminal() {
         }
     });
 
-    // Tự động căn chỉnh kích thước khi Terminal thay đổi (Auto-fit)
-    terminal.onResize(() => {
-        if (fitAddon) {
-            fitAddon.fit();
+    terminal.onResize((size) => {
+        if (socket && socket.connected) {
+            socket.emit('resize', { cols: size.cols, rows: size.rows });
         }
     });
 
@@ -505,6 +504,9 @@ function connectTerminalSocket() {
     socket = io('/terminal');
     socket.on('connect', () => {
         terminal.write('\r\n\x1b[32m✔\x1b[0m Terminal connected.\r\n$ ');
+        if (terminal) {
+            socket.emit('resize', { cols: terminal.cols, rows: terminal.rows });
+        }
     });
     socket.on('output', (data) => {
         terminal.write(data);
