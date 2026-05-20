@@ -18,6 +18,7 @@ jobs:
       TESTING: "1"
       ENABLE_CONTAINER_GC: "0"
       AI_GRADER_RECORD_DATASET: "0"
+      PYTHONPATH: "."
       FLASK_SECRET_KEY: "ci-secret"
       DB_HOST: "127.0.0.1"
       DB_USER: "ci"
