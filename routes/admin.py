@@ -14,6 +14,7 @@ from utils import require_auth, make_safe_name, is_safe_path
 from config import get_db_connection, USER_DATA_DIR
 from services import log_action
 from sockets.realtime import emit_role_event, emit_user_event, emit_users_event
+from utils.metrics import update_usb_device_metrics
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -551,6 +552,8 @@ def admin_api_scan_devices():
             
     db.commit()
     cur.close(), db.close()
+
+    update_usb_device_metrics(active_ports)
     
     emit_role_event("user", "device_changed", {"action": "scanned"})
     log_action(session['username'], f"Quét thiết bị USB: {new_count} thiết bị mới, {offline_count} thiết bị bị ngắt kết nối.")
@@ -592,6 +595,7 @@ def admin_api_get_devices():
         if dbp not in active_ports:
             cur.execute("UPDATE hardware_devices SET status = 'disconnected' WHERE port = %s", (dbp,))
     db.commit()
+    update_usb_device_metrics(active_ports)
     # -----------------------------------
     
     # Join qua bảng multi-assignment
@@ -681,6 +685,7 @@ def admin_api_delete_device(device_id):
         db.close()
 
     if success:
+        update_usb_device_metrics()
         emit_users_event(
             assigned_usernames,
             "device_changed",

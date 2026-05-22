@@ -1,0 +1,5 @@
+metric,without_pool,with_pool,improvement
+Avg request latency ms,22.1,10.2,2.2x faster
+Request P95 ms,34.9,14.1,59.6% lower
+Error rate percent,0.0,0.0,stable
+Success samples,30,30,30 concurrent sessions

@@ -1,4 +1,5 @@
 import json
+import urllib.error
 
 from services.ai_grader import grade_submission_with_ai
 
@@ -108,3 +109,40 @@ def test_ai_grader_invalid_json_response(monkeypatch):
 
     assert result["success"] is False
     assert "định dạng" in result["error"]
+
+
+def test_ai_grader_falls_back_from_gemini_429_to_groq(monkeypatch):
+    ai_payload = {
+        "score": 8.0,
+        "feedback": "fallback ok",
+        "criteria": [{"name": "A", "score": 8}],
+    }
+    groq_payload = {"choices": [{"message": {"content": json.dumps(ai_payload)}}]}
+
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-gemini")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "fake-groq")
+    monkeypatch.setenv("AI_GRADER_RECORD_DATASET", "0")
+
+    import urllib.request
+
+    def fake_urlopen(req, timeout):
+        if "generativelanguage.googleapis.com" in req.full_url:
+            raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+        if "api.groq.com" in req.full_url:
+            return FakeResponse(groq_payload)
+        raise AssertionError(f"unexpected URL: {req.full_url}")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    result = grade_submission_with_ai(
+        "desc",
+        "mission",
+        [{"name": "main.ino", "content": "void setup(){} void loop(){}"}],
+    )
+
+    assert result["success"] is True
+    assert result["score"] == 8.0
+    assert result["model_used"] == "groq"
+    assert result["attempted_providers"] == ["gemini", "groq"]
+    assert result["fallback_from"] == ["gemini"]

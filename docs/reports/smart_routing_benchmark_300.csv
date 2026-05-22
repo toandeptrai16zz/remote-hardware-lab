@@ -1,0 +1,6 @@
+port,requests,percent,avg_completion_s
+/dev/ttyUSB0,76,25.3,4.05
+/dev/ttyUSB1,75,25.0,4.06
+/dev/ttyUSB2,74,24.7,4.04
+/dev/ttyUSB3,75,25.0,4.05
+TOTAL,300,100.0,19.12

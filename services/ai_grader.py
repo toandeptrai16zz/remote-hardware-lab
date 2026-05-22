@@ -102,12 +102,15 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
         raw = ""
         success_api = False
         last_error = ""
+        attempted_providers = []
+        model_used = None
 
         # --- CHỌN PROVIDER (Gemini, Claude, Groq) ---
         
         # 1. Thử sử dụng Gemini (Dùng REST API để ổn định nhất)
         if gemini_key and (not provider or provider.lower() == 'gemini'):
             try:
+                attempted_providers.append('gemini')
                 import urllib.request
                 import urllib.error
                 
@@ -129,6 +132,7 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
                     resp_json = json.loads(response.read().decode('utf-8'))
                     raw = resp_json['candidates'][0]['content']['parts'][0]['text'].strip()
                     success_api = True
+                    model_used = 'gemini'
             except Exception as e:
                 logger.warning(f"Lỗi Gemini REST API: {e}")
                 last_error = str(e)
@@ -136,6 +140,7 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
         # 2. Thử sử dụng Anthropic Claude
         if not success_api and anthropic_key and (not provider or provider.lower() == 'claude'):
             try:
+                attempted_providers.append('claude')
                 import anthropic
                 client = anthropic.Anthropic(api_key=anthropic_key)
                 response = client.messages.create(
@@ -148,6 +153,7 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
                 )
                 raw = response.content[0].text.strip()
                 success_api = True
+                model_used = 'claude'
             except ImportError:
                 logger.error("Thư viện anthropic chưa cài đặt.")
                 last_error = "Thiếu thư viện anthropic"
@@ -158,6 +164,7 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
         # 3. Thử sử dụng model siêu tốc LLaMA 3 (thông qua API Groq)
         if not success_api and groq_key and (not provider or provider.lower() == 'groq'):
             try:
+                attempted_providers.append('groq')
                 import urllib.request
                 import urllib.error
                 
@@ -186,6 +193,7 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
                             resp_json = json.loads(response.read().decode('utf-8'))
                             raw = resp_json['choices'][0]['message']['content'].strip()
                             success_api = True
+                            model_used = 'groq'
                         else:
                             last_error = f"Groq Error: {response.status}"
                             logger.error(last_error)
@@ -229,7 +237,10 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
             'success': True,
             'score': score,
             'feedback': parsed.get('feedback', ''),
-            'criteria': criteria
+            'criteria': criteria,
+            'model_used': model_used,
+            'attempted_providers': attempted_providers,
+            'fallback_from': attempted_providers[:-1] if len(attempted_providers) > 1 else []
         }
 
         # --- THU THẬP DỮ LIỆU ĐỂ TRAINING TRONG TƯƠNG LAI ---
@@ -262,7 +273,8 @@ TRẢ VỀ DUY NHẤT MỘT KHỐI JSON, KHÔNG CÓ VĂN BẢN THỪA:
                 'metadata': {
                     'timestamp': datetime.now().isoformat(),
                     'mission_name': mission_name,
-                    'model_used': 'gemini' if gemini_key and success_api else ('anthropic' if success_api else 'groq')
+                    'model_used': model_used or 'unknown',
+                    'attempted_providers': attempted_providers
                 }
             }
             

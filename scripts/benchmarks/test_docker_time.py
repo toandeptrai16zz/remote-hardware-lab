@@ -1,71 +1,184 @@
 #!/usr/bin/env python3
-import sys
-import os
-sys.path.append(os.getcwd())
+"""Manual benchmark for sandbox container lifecycle timings.
 
+This script intentionally talks to the real Docker daemon. It only creates
+temporary containers with an `epu_bench_sandbox_` prefix and removes those
+containers in the cleanup step.
+"""
+
+from __future__ import annotations
+
+import math
+import os
+import statistics
 import subprocess
 import time
-import os
+import uuid
 
-# Cấu hình - by Chương
-IMAGE_NAME = "my-dev-env:v2"
-TEST_CONTAINER = "test_time_benchmark"
-PULL_IMAGE = "alpine:latest" # Dùng image nhẹ để test KB4 cho an toàn
 
-def run_cmd(cmd):
-    start = time.time()
-    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return time.time() - start
+IMAGE_NAME = os.getenv("BENCHMARK_SANDBOX_IMAGE", "my-dev-env:v2")
+PULL_IMAGE = os.getenv("BENCHMARK_PULL_IMAGE", "alpine:3.20")
+ITERATIONS = int(os.getenv("BENCHMARK_ITERATIONS", "20"))
+PREFIX = f"epu_bench_sandbox_{uuid.uuid4().hex[:8]}"
 
-def main():
-    print("MANUAL ONLY: benchmark này chạy Docker thật và có thể xóa container/image test.")
-    print("="*70)
-    print("⏳ HỆ THỐNG ĐO LƯỜNG HIỆU NĂNG CONTAINER REAL-TIME (EPU TECH)")
-    print("="*70)
 
-    # Dọn dẹp trước khi test
-    subprocess.run(f"docker rm -f {TEST_CONTAINER}", shell=True, stderr=subprocess.DEVNULL)
+def run_cmd(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        cmd,
+        check=check,
+        capture_output=True,
+        text=True,
+    )
 
-    # 1. Đo Kịch bản 1: Đã tồn tại & Đang chạy (Chỉ lấy info)
-    print("\n[KB1] Container đang chạy (docker inspect)...")
-    subprocess.run(f"docker run -d --name {TEST_CONTAINER} {IMAGE_NAME} sleep 3600", shell=True, stdout=subprocess.DEVNULL)
-    time_kb1 = run_cmd(f"docker inspect {TEST_CONTAINER}")
-    print(f"👉 Kết quả KB1: {time_kb1:.3f} giây")
 
-    # 2. Đo Kịch bản 2: Container đã dừng (Cold-start)
-    print("\n[KB2] Khởi động container đã dừng (docker start)...")
-    subprocess.run(f"docker stop {TEST_CONTAINER}", shell=True, stdout=subprocess.DEVNULL)
-    time_kb2 = run_cmd(f"docker start {TEST_CONTAINER}")
-    print(f"👉 Kết quả KB2: {time_kb2:.3f} giây")
+def timed(cmd: list[str], check: bool = True) -> tuple[float, subprocess.CompletedProcess[str]]:
+    start = time.perf_counter()
+    result = run_cmd(cmd, check=check)
+    return time.perf_counter() - start, result
 
-    # 3. Đo Kịch bản 3: Tạo mới container từ Local Cache (docker run)
-    print("\n[KB3] Tạo mới container từ Local Cache (docker run)...")
-    subprocess.run(f"docker rm -f {TEST_CONTAINER}", shell=True, stderr=subprocess.DEVNULL)
-    time_kb3 = run_cmd(f"docker run -d --name {TEST_CONTAINER} {IMAGE_NAME} sleep 3600")
-    print(f"👉 Kết quả KB3: {time_kb3:.3f} giây")
 
-    # 4. Đo Kịch bản 4: Pull Image từ Internet (Lần đầu)
-    print("\n[KB4] Pull Image mới hoàn toàn từ Internet (docker pull)...")
-    # Xóa image pull cũ nếu có
-    subprocess.run(f"docker rmi {PULL_IMAGE}", shell=True, stderr=subprocess.DEVNULL)
-    time_kb4 = run_cmd(f"docker pull {PULL_IMAGE}")
-    print(f"👉 Kết quả KB4: {time_kb4:.3f} giây")
+def percentile(values: list[float], percent: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    index = max(0, math.ceil((percent / 100) * len(ordered)) - 1)
+    return ordered[index]
 
-    # Dọn dẹp cuối cùng
-    subprocess.run(f"docker rm -f {TEST_CONTAINER}", shell=True, stderr=subprocess.DEVNULL)
 
-    print("\n" + "="*70)
-    print("📊 TỔNG HỢP SỐ LIỆU CHO BẢNG 3.4")
-    print("="*70)
-    print(f"| Tình huống                          | Thời gian (s) | Ghi chú                    |")
-    print(f"|--------------------------------------|---------------|---------------------------|")
-    print(f"| [KB1] Đang chạy (Inspect)            | {time_kb1:13.3f} | Lấy thông tin kết nối     |")
-    print(f"| [KB2] Cold-start (Start)             | {time_kb2:13.3f} | Container đã tồn tại      |")
-    print(f"| [KB3] Cấp phát mới (Local Cache)     | {time_kb3:13.3f} | Pull từ cache + Startup   |")
-    print(f"| [KB4] Pull từ Internet               | {time_kb4:13.3f} | Chỉ xảy ra lần đầu        |")
-    print("="*70)
-    print("✅ HOÀN TẤT! ĐẠI CA CHƯƠNG LẤY SỐ NÀY ĐIỀN VÀO BÁO CÁO NHÉ!")
+def avg(values: list[float]) -> float:
+    return statistics.mean(values) if values else 0.0
+
+
+def image_exists(image: str) -> bool:
+    result = run_cmd(["docker", "image", "inspect", image], check=False)
+    return result.returncode == 0
+
+
+def cleanup(names: list[str]) -> None:
+    for name in names:
+        run_cmd(["docker", "rm", "-f", name], check=False)
+
+
+def create_sleep_container(name: str) -> None:
+    run_cmd(
+        [
+            "docker",
+            "run",
+            "-d",
+            "--name",
+            name,
+            "--entrypoint",
+            "sleep",
+            IMAGE_NAME,
+            "3600",
+        ]
+    )
+
+
+def benchmark_running_container(name: str) -> list[float]:
+    measurements: list[float] = []
+    for _ in range(ITERATIONS):
+        start = time.perf_counter()
+        run_cmd(["docker", "inspect", name])
+        run_cmd(
+            [
+                "docker",
+                "exec",
+                name,
+                "sh",
+                "-lc",
+                "service ssh start >/dev/null 2>&1 || true",
+            ]
+        )
+        measurements.append(time.perf_counter() - start)
+    return measurements
+
+
+def benchmark_stopped_container(name: str) -> list[float]:
+    measurements: list[float] = []
+    for _ in range(ITERATIONS):
+        run_cmd(["docker", "stop", "-t", "0", name], check=False)
+        duration, _ = timed(["docker", "start", name])
+        measurements.append(duration)
+    return measurements
+
+
+def benchmark_new_local(containers: list[str]) -> list[float]:
+    measurements: list[float] = []
+    for index in range(ITERATIONS):
+        name = f"{PREFIX}_new_{index}"
+        containers.append(name)
+        duration, _ = timed(
+            [
+                "docker",
+                "run",
+                "-d",
+                "--name",
+                name,
+                "--entrypoint",
+                "sleep",
+                IMAGE_NAME,
+                "3600",
+            ]
+        )
+        measurements.append(duration)
+        run_cmd(["docker", "rm", "-f", name], check=False)
+    return measurements
+
+
+def print_row(label: str, values: list[float], note: str) -> None:
+    print(
+        f"| {label:<34} | {avg(values):>7.3f}s | "
+        f"{percentile(values, 95):>7.3f}s | {note:<28} |"
+    )
+
+
+def main() -> int:
+    print("MANUAL ONLY: benchmark talks to the real Docker daemon.")
+    print(f"Sandbox image: {IMAGE_NAME}")
+    print(f"Iterations: {ITERATIONS}")
+    print(f"Temp prefix: {PREFIX}")
+
+    containers: list[str] = []
+    base = f"{PREFIX}_base"
+    containers.append(base)
+
+    try:
+        if not image_exists(IMAGE_NAME):
+            print(f"Missing sandbox image: {IMAGE_NAME}")
+            return 2
+
+        cleanup(containers)
+        create_sleep_container(base)
+
+        running = benchmark_running_container(base)
+        stopped = benchmark_stopped_container(base)
+        local_new = benchmark_new_local(containers)
+
+        pull_note = "already cached"
+        pull_values: list[float] = []
+        if not image_exists(PULL_IMAGE):
+            duration, result = timed(["docker", "pull", PULL_IMAGE], check=False)
+            pull_values.append(duration)
+            pull_note = "pulled via Internet" if result.returncode == 0 else "pull failed"
+
+        print("\n| Scenario                           |      Avg |      P95 | Note                         |")
+        print("|------------------------------------|---------:|---------:|------------------------------|")
+        print_row("Existing container, running", running, "inspect + ssh check")
+        print_row("Existing container, stopped", stopped, "docker start")
+        print_row("New container, local image", local_new, "docker run local cache")
+        if pull_values:
+            print(
+                f"| Missing image pull                 | {pull_values[0]:>7.3f}s | "
+                f"{'-':>8} | {pull_note:<28} |"
+            )
+        else:
+            print(f"| Missing image pull                 | {'-':>8} | {'-':>8} | {pull_note:<28} |")
+
+        return 0
+    finally:
+        cleanup(containers)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

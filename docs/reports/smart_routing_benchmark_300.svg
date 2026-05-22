@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Benchmark Smart Routing 300 Requests</title>
+  <desc id="desc">Bar chart showing Smart Routing request distribution across four simulated USB ports.</desc>
+  <rect width="1280" height="720" fill="#f8fafc"/>
+  <rect x="46" y="40" width="1188" height="640" rx="18" fill="#ffffff" stroke="#dbe4f0"/>
+
+  <text x="80" y="92" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#1f2a60">Benchmark Smart Routing: 300 Requests</text>
+  <text x="80" y="128" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#526177">Mo phong 4 cong ESP32 /dev/ttyUSB0..3 theo thuat toan queue nho nhat + random tie-break</text>
+
+  <line x1="120" y1="550" x2="900" y2="550" stroke="#22304a" stroke-width="2"/>
+  <line x1="120" y1="160" x2="120" y2="550" stroke="#22304a" stroke-width="2"/>
+
+  <g font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#65758b">
+    <line x1="120" y1="550" x2="900" y2="550" stroke="#e2e8f0"/>
+    <text x="88" y="555">0</text>
+    <line x1="120" y1="452.5" x2="900" y2="452.5" stroke="#e2e8f0"/>
+    <text x="80" y="457.5">20</text>
+    <line x1="120" y1="355" x2="900" y2="355" stroke="#e2e8f0"/>
+    <text x="80" y="360">40</text>
+    <line x1="120" y1="257.5" x2="900" y2="257.5" stroke="#e2e8f0"/>
+    <text x="80" y="262.5">60</text>
+    <line x1="120" y1="160" x2="900" y2="160" stroke="#e2e8f0"/>
+    <text x="80" y="165">80</text>
+  </g>
+
+  <g font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
+    <rect x="160" y="179.5" width="105" height="370.5" rx="7" fill="#2563eb"/>
+    <text x="212.5" y="164" font-size="26" font-weight="700" fill="#1e3a8a">76</text>
+    <text x="212.5" y="592" font-size="17" font-weight="700" fill="#25324d">/dev/ttyUSB0</text>
+    <text x="212.5" y="622" font-size="16" fill="#526177">25.3% | 4.05s</text>
+
+    <rect x="340" y="184.375" width="105" height="365.625" rx="7" fill="#f59e0b"/>
+    <text x="392.5" y="169" font-size="26" font-weight="700" fill="#92400e">75</text>
+    <text x="392.5" y="592" font-size="17" font-weight="700" fill="#25324d">/dev/ttyUSB1</text>
+    <text x="392.5" y="622" font-size="16" fill="#526177">25.0% | 4.06s</text>
+
+    <rect x="520" y="189.25" width="105" height="360.75" rx="7" fill="#16a34a"/>
+    <text x="572.5" y="174" font-size="26" font-weight="700" fill="#166534">74</text>
+    <text x="572.5" y="592" font-size="17" font-weight="700" fill="#25324d">/dev/ttyUSB2</text>
+    <text x="572.5" y="622" font-size="16" fill="#526177">24.7% | 4.04s</text>
+
+    <rect x="700" y="184.375" width="105" height="365.625" rx="7" fill="#7c3aed"/>
+    <text x="752.5" y="169" font-size="26" font-weight="700" fill="#4c1d95">75</text>
+    <text x="752.5" y="592" font-size="17" font-weight="700" fill="#25324d">/dev/ttyUSB3</text>
+    <text x="752.5" y="622" font-size="16" fill="#526177">25.0% | 4.05s</text>
+  </g>
+
+  <rect x="940" y="160" width="250" height="390" rx="14" fill="#f1f5f9" stroke="#d4dde9"/>
+  <text x="965" y="205" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#1f2a60">Tong ket</text>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#25324d">
+    <text x="965" y="250" font-size="16">Tong request</text>
+    <text x="1162" y="250" font-size="24" font-weight="700" text-anchor="end">300</text>
+    <text x="965" y="303" font-size="16">Tong thoi gian</text>
+    <text x="1162" y="303" font-size="24" font-weight="700" text-anchor="end">19.12s</text>
+    <text x="965" y="356" font-size="16">Bien thien ty le</text>
+    <text x="1162" y="356" font-size="24" font-weight="700" text-anchor="end">0.7%</text>
+    <text x="965" y="409" font-size="16">HTTP 500</text>
+    <text x="1162" y="409" font-size="24" font-weight="700" text-anchor="end">0</text>
+  </g>
+
+  <rect x="965" y="442" width="200" height="74" rx="10" fill="#ffffff" stroke="#dbe4f0"/>
+  <text x="985" y="472" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#1f2a60">Ghi chu slide</text>
+  <text x="985" y="496" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#526177">So lieu mo phong, chua phai</text>
+  <text x="985" y="514" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#526177">kiem thu nap that 4 board.</text>
+
+  <text x="80" y="668" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#65758b">Nguon: mo phong endpoint /api/flash va thuat toan get_user_assigned_device(reserve=True). Khong cham board that.</text>
+</svg>

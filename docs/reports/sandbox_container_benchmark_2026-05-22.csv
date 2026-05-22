@@ -1,0 +1,5 @@
+scenario,avg_s,p95_s,note
+Existing container running,0.092,0.103,inspect + ssh check
+Existing container stopped,0.122,0.133,docker start
+New container local image,0.154,0.162,docker run local cache
+Missing image pull,4.779,,docker pull alpine:3.20 via Internet

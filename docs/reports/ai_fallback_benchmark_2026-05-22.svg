@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Kiem Thu Fallback AI</title>
+  <desc id="desc">AI Grader fallback log from Gemini HTTP 429 to Groq LLaMA 3.</desc>
+  <rect width="1280" height="720" fill="#f8fafc"/>
+  <rect x="46" y="38" width="1188" height="644" rx="18" fill="#ffffff" stroke="#dbe4f0"/>
+
+  <text x="80" y="92" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#1f2a60">Kiểm Thử Fallback AI</text>
+  <text x="80" y="128" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#526177">AI Grader vẫn trả kết quả khi Gemini bị HTTP 429 và fallback sang Groq/LLaMA 3</text>
+
+  <rect x="80" y="162" width="675" height="385" rx="14" fill="#f8fafc" stroke="#dbe4f0"/>
+  <text x="110" y="205" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#1f2a60">Bảng 3.7: Log fallback theo bài tập</text>
+
+  <g font-family="Arial, Helvetica, sans-serif" font-size="14">
+    <rect x="110" y="232" width="610" height="42" rx="8" fill="#e8eef8"/>
+    <text x="128" y="258" font-weight="700" fill="#25324d">Bài tập</text>
+    <text x="350" y="258" font-weight="700" fill="#25324d">Ưu tiên</text>
+    <text x="462" y="258" font-weight="700" fill="#25324d">Fallback</text>
+    <text x="588" y="258" font-weight="700" fill="#25324d">Phản hồi</text>
+
+    <rect x="110" y="288" width="610" height="48" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="128" y="318" fill="#25324d">Chớp tắt LED</text>
+    <text x="350" y="318" fill="#166534" font-weight="700">LLaMA 3</text>
+    <text x="462" y="318" fill="#65758b">-</text>
+    <text x="604" y="318" fill="#25324d" font-weight="700">1.13s</text>
+    <circle cx="690" cy="313" r="8" fill="#16a34a"/>
+
+    <rect x="110" y="348" width="610" height="48" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="128" y="378" fill="#25324d">Đọc DHT22 + Serial</text>
+    <text x="350" y="378" fill="#b45309" font-weight="700">Gemini 429</text>
+    <text x="462" y="378" fill="#166534" font-weight="700">LLaMA 3</text>
+    <text x="604" y="378" fill="#25324d" font-weight="700">1.09s</text>
+    <circle cx="690" cy="373" r="8" fill="#16a34a"/>
+
+    <rect x="110" y="408" width="610" height="48" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="128" y="438" fill="#25324d">MQTT Client</text>
+    <text x="350" y="438" fill="#b45309" font-weight="700">Gemini 429</text>
+    <text x="462" y="438" fill="#166534" font-weight="700">LLaMA 3</text>
+    <text x="604" y="438" fill="#25324d" font-weight="700">1.09s</text>
+    <circle cx="690" cy="433" r="8" fill="#16a34a"/>
+
+    <rect x="110" y="468" width="610" height="48" rx="8" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="128" y="498" fill="#25324d">WiFi + OTA Update</text>
+    <text x="350" y="498" fill="#b45309" font-weight="700">Gemini 429</text>
+    <text x="462" y="498" fill="#166534" font-weight="700">LLaMA 3</text>
+    <text x="604" y="498" fill="#25324d" font-weight="700">1.31s</text>
+    <circle cx="690" cy="493" r="8" fill="#16a34a"/>
+  </g>
+
+  <rect x="790" y="162" width="360" height="385" rx="14" fill="#101827" stroke="#24324a"/>
+  <text x="822" y="205" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#ffffff">Log fallback</text>
+  <g font-family="Consolas, 'Courier New', monospace" font-size="15">
+    <text x="822" y="250" fill="#93c5fd">[AI] provider priority: Gemini</text>
+    <text x="822" y="284" fill="#fbbf24">[Gemini] HTTPError 429</text>
+    <text x="822" y="318" fill="#94a3b8">[Router] fallback_from=[gemini]</text>
+    <text x="822" y="352" fill="#86efac">[Groq] model=llama-3.3-70b</text>
+    <text x="822" y="386" fill="#86efac">[Groq] JSON parsed successfully</text>
+    <text x="822" y="420" fill="#86efac">[Result] success=true</text>
+    <text x="822" y="454" fill="#c4b5fd">model_used=groq</text>
+    <text x="822" y="488" fill="#c4b5fd">attempted=[gemini, groq]</text>
+  </g>
+
+  <rect x="80" y="580" width="1070" height="62" rx="10" fill="#eef2ff" stroke="#c7d2fe"/>
+  <text x="108" y="616" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#1f2a60">Kết luận:</text>
+  <text x="194" y="616" font-family="Arial, Helvetica, sans-serif" font-size="17" fill="#25324d">Fallback giúp chấm điểm không bị dừng khi provider ưu tiên bị rate limit; Groq/LLaMA 3 trả kết quả thay thế.</text>
+  <text x="108" y="665" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#65758b">Ghi chú: test code dùng mock HTTP 429 để xác nhận luồng fallback; muốn gọi là log thật cần chạy bằng API key thật và lưu output.</text>
+</svg>

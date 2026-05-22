@@ -14,7 +14,7 @@ import fcntl
 import time
 from collections import defaultdict
 from contextlib import contextmanager
-from utils.metrics import FLASH_QUEUE_DEPTH, USB_DEVICE_STATUS
+from utils.metrics import FLASH_QUEUE_DEPTH, mark_usb_available, mark_usb_detected, mark_usb_in_use
 from utils import make_safe_name
 from config import get_db_connection
 from services.logger import log_action
@@ -171,6 +171,7 @@ def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio
             socketio.emit('upload_status', {'status': 'compiling', 'message': f'⏳ Cổng {port} đang bận! Bạn đang ở vị trí #{position}...'}, namespace='/upload_status', room=sid)
 
         with get_hardware_lock(port):
+            mark_usb_in_use(port)
             # --- [SMART RELEASE] ---
             try:
                 # 1. Ngắt Serial Monitor từ phía Client (Frontend) qua SocketIO
@@ -234,6 +235,7 @@ def perform_upload_worker(username, port, sketch_path, sid, board_fqbn, socketio
     finally:
         queue_counts[port] = max(0, queue_counts[port] - 1)
         FLASH_QUEUE_DEPTH.labels(port=port).set(queue_counts[port])
+        mark_usb_available(port)
         print(f"DEBUG: [FLASH] Worker finished for {username}. Queue for {port} now: {queue_counts[port]}")
 
 # ==============================================================================
@@ -277,8 +279,8 @@ def get_serial_ports(username):
             for row in cur.fetchall():
                 address = row['port']
                 db_devices[address] = row
-                # Update USB status metric (1=available as it is in DB and not disconnected)
-                USB_DEVICE_STATUS.labels(port=address).set(1)
+                # Update USB status metric from the real OS port state.
+                mark_usb_detected(address)
             cur.close()
             db.close()
 

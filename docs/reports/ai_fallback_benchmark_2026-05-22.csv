@@ -1,0 +1,5 @@
+task,priority,status,fallback,response_s,result
+Chop tat LED,LLaMA 3,Hoat dong,-,1.13,Thanh cong
+Doc DHT22 + Serial,Gemini,HTTP 429,LLaMA 3,1.09,Thanh cong
+MQTT Client,Gemini,HTTP 429,LLaMA 3,1.09,Thanh cong
+WiFi + OTA Update,Gemini,HTTP 429,LLaMA 3,1.31,Thanh cong

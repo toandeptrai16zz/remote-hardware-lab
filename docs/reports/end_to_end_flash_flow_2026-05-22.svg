@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Quy Trinh Nap Code Dau-Cuoi</title>
+  <desc id="desc">End-to-end flowchart for compiling and uploading firmware from Web IDE to physical microcontroller.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#24324a"/>
+    </marker>
+  </defs>
+  <rect width="1280" height="720" fill="#f8fafc"/>
+  <rect x="46" y="36" width="1188" height="648" rx="18" fill="#ffffff" stroke="#dbe4f0"/>
+
+  <text x="80" y="88" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#1f2a60">Quy Trình Nạp Code Đầu-Cuối</text>
+  <text x="80" y="124" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#526177">Smart Routing → Queue Reserve → Compile → Lock → Pause Serial → Upload → Release</text>
+
+  <g font-family="Arial, Helvetica, sans-serif">
+    <rect x="90" y="170" width="155" height="82" rx="12" fill="#eef2ff" stroke="#6476d9"/>
+    <text x="167.5" y="202" text-anchor="middle" font-size="16" font-weight="700" fill="#1f2a60">Web IDE</text>
+    <text x="167.5" y="226" text-anchor="middle" font-size="13" fill="#526177">POST /flash</text>
+
+    <rect x="290" y="170" width="155" height="82" rx="12" fill="#f0fdf4" stroke="#16a34a"/>
+    <text x="367.5" y="202" text-anchor="middle" font-size="16" font-weight="700" fill="#166534">Smart Routing</text>
+    <text x="367.5" y="226" text-anchor="middle" font-size="13" fill="#526177">queue thấp nhất</text>
+
+    <rect x="490" y="170" width="155" height="82" rx="12" fill="#fff7ed" stroke="#f59e0b"/>
+    <text x="567.5" y="202" text-anchor="middle" font-size="16" font-weight="700" fill="#92400e">Reserve Queue</text>
+    <text x="567.5" y="226" text-anchor="middle" font-size="13" fill="#526177">queue_counts + 1</text>
+
+    <rect x="690" y="170" width="155" height="82" rx="12" fill="#eff6ff" stroke="#2563eb"/>
+    <text x="767.5" y="202" text-anchor="middle" font-size="16" font-weight="700" fill="#1e3a8a">Worker nền</text>
+    <text x="767.5" y="226" text-anchor="middle" font-size="13" fill="#526177">không timeout HTTP</text>
+
+    <rect x="890" y="170" width="155" height="82" rx="12" fill="#f8fafc" stroke="#94a3b8"/>
+    <text x="967.5" y="202" text-anchor="middle" font-size="16" font-weight="700" fill="#25324d">Prepare Sketch</text>
+    <text x="967.5" y="226" text-anchor="middle" font-size="13" fill="#526177">copy vào folder</text>
+
+    <line x1="245" y1="211" x2="285" y2="211" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+    <line x1="445" y1="211" x2="485" y2="211" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+    <line x1="645" y1="211" x2="685" y2="211" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+    <line x1="845" y1="211" x2="885" y2="211" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+  </g>
+
+  <g font-family="Arial, Helvetica, sans-serif">
+    <rect x="90" y="320" width="165" height="86" rx="12" fill="#eff6ff" stroke="#2563eb"/>
+    <text x="172.5" y="352" text-anchor="middle" font-size="16" font-weight="700" fill="#1e3a8a">Compile</text>
+    <text x="172.5" y="376" text-anchor="middle" font-size="13" fill="#526177">arduino-cli compile</text>
+
+    <polygon points="330,316 430,363 330,410 230,363" fill="#fff7ed" stroke="#f59e0b"/>
+    <text x="330" y="357" text-anchor="middle" font-size="15" font-weight="700" fill="#92400e">Compile</text>
+    <text x="330" y="377" text-anchor="middle" font-size="15" font-weight="700" fill="#92400e">OK?</text>
+
+    <rect x="505" y="320" width="165" height="86" rx="12" fill="#f8fafc" stroke="#64748b"/>
+    <text x="587.5" y="352" text-anchor="middle" font-size="16" font-weight="700" fill="#25324d">Lock fcntl</text>
+    <text x="587.5" y="376" text-anchor="middle" font-size="13" fill="#526177">/tmp/arduino_flash_*</text>
+
+    <rect x="720" y="320" width="165" height="86" rx="12" fill="#fef2f2" stroke="#ef4444"/>
+    <text x="802.5" y="352" text-anchor="middle" font-size="16" font-weight="700" fill="#991b1b">Pause Serial</text>
+    <text x="802.5" y="376" text-anchor="middle" font-size="13" fill="#526177">kick + force close</text>
+
+    <rect x="935" y="320" width="165" height="86" rx="12" fill="#f0fdf4" stroke="#16a34a"/>
+    <text x="1017.5" y="352" text-anchor="middle" font-size="16" font-weight="700" fill="#166534">Upload</text>
+    <text x="1017.5" y="376" text-anchor="middle" font-size="13" fill="#526177">retry tối đa 3 lần</text>
+
+    <line x1="1045" y1="252" x2="1045" y2="285" stroke="#24324a" stroke-width="2.2"/>
+    <line x1="1045" y1="285" x2="172" y2="285" stroke="#24324a" stroke-width="2.2"/>
+    <line x1="172" y1="285" x2="172" y2="315" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+    <line x1="255" y1="363" x2="266" y2="363" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+    <line x1="430" y1="363" x2="500" y2="363" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+    <line x1="670" y1="363" x2="715" y2="363" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+    <line x1="885" y1="363" x2="930" y2="363" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+    <text x="454" y="350" font-size="13" font-weight="700" fill="#166534">Có</text>
+    <text x="310" y="432" font-size="13" font-weight="700" fill="#991b1b">Không</text>
+  </g>
+
+  <g font-family="Arial, Helvetica, sans-serif">
+    <rect x="248" y="468" width="180" height="78" rx="12" fill="#fef2f2" stroke="#ef4444"/>
+    <text x="338" y="499" text-anchor="middle" font-size="16" font-weight="700" fill="#991b1b">Stream lỗi compile</text>
+    <text x="338" y="522" text-anchor="middle" font-size="13" fill="#526177">Socket.IO upload_status</text>
+    <line x1="330" y1="410" x2="330" y2="463" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+
+    <rect x="505" y="468" width="185" height="78" rx="12" fill="#eef2ff" stroke="#6476d9"/>
+    <text x="597.5" y="499" text-anchor="middle" font-size="16" font-weight="700" fill="#1f2a60">Release/Cleanup</text>
+    <text x="597.5" y="522" text-anchor="middle" font-size="13" fill="#526177">queue - 1, metrics</text>
+
+    <rect x="790" y="468" width="185" height="78" rx="12" fill="#ecfdf5" stroke="#16a34a"/>
+    <text x="882.5" y="499" text-anchor="middle" font-size="16" font-weight="700" fill="#166534">Realtime Result</text>
+    <text x="882.5" y="522" text-anchor="middle" font-size="13" fill="#526177">success/error về UI</text>
+
+    <line x1="1017" y1="406" x2="1017" y2="438" stroke="#24324a" stroke-width="2.2"/>
+    <line x1="1017" y1="438" x2="597" y2="438" stroke="#24324a" stroke-width="2.2"/>
+    <line x1="597" y1="438" x2="597" y2="463" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+    <line x1="428" y1="507" x2="500" y2="507" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+    <line x1="690" y1="507" x2="785" y2="507" stroke="#24324a" stroke-width="2.2" marker-end="url(#arrow)"/>
+  </g>
+
+  <rect x="80" y="590" width="1070" height="58" rx="10" fill="#f8fafc" stroke="#dbe4f0"/>
+  <text x="108" y="623" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#1f2a60">Ghi chú đúng code:</text>
+  <text x="242" y="623" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#25324d">Nếu cổng bận, worker chờ file lock; không hủy ngay. Compile lỗi xảy ra trước lock phần cứng.</text>
+  <text x="108" y="670" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#65758b">Nguồn: routes/user.py::flash_sketch_api và services/arduino.py::perform_upload_worker.</text>
+</svg>
