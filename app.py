@@ -8,14 +8,13 @@ eventlet.monkey_patch()
 import os
 import secrets
 import logging
-import warnings
-from urllib3.exceptions import InsecureRequestWarning
+from datetime import timedelta
 from flask import Flask, session, redirect, url_for
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from prometheus_client import make_wsgi_app
 from flask_socketio import SocketIO
 from dotenv import load_dotenv
-from utils.metrics import init_metrics, FLASH_QUEUE_DEPTH, USB_DEVICE_STATUS, ACTIVE_CONTAINERS
+from utils.metrics import init_metrics
 
 # Tải các biến môi trường - by Chương
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -29,6 +28,7 @@ from config import init_db
 from routes.auth import auth_bp
 from routes.admin import admin_bp
 from routes.user import user_bp
+from routes.flash import flash_bp
 
 # Import trình xử lý Socket.IO - by Chương
 from sockets import (
@@ -37,15 +37,6 @@ from sockets import (
     register_serial_handlers,
     register_upload_status_handlers
 )
-
-# Mute request warnings - by Chương
-# (đã xử lý bên trên) - by Chương
-
-# Lấy đường dẫn JWT - by Chương
-
-# Lấy JWT path
-jwt_manager_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'venv', 'lib', 'python3.12', 'site-packages', 'flask_jwt_extended', 'jwt_manager.py')
-
 
 # ================== CÀI ĐẶT LOGGING - by Chương ==================
 logging.basicConfig(
@@ -64,7 +55,6 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(24))
 
 # ================== [BẢO MẬT] CẤU HÌNH SESSION & COOKIE ==================
-from datetime import timedelta
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)
 app.config['SESSION_COOKIE_HTTPONLY'] = True      # Chặn JavaScript truy cập Cookie (Chống XSS)
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'     # Ngăn chặn tấn công CSRF
@@ -83,6 +73,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(user_bp)
+app.register_blueprint(flash_bp)
 
 # ================== ĐĂNG KÝ CÁC TRÌNH XỬ LÝ SOCKET.IO - by Chương ==================
 register_realtime_handlers(socketio)
@@ -99,48 +90,6 @@ def index():
             return redirect(url_for("admin.admin_dashboard"))
         return redirect(url_for("user.user_redirect"))
     return redirect(url_for("auth.login_page"))
-@app.route("/api/flash", methods=["POST"])
-def flash_test_real_api():
-    """
-    [NCKH] API Flash đồng bộ dành riêng cho kiểm thử tải 300 SV - by Chương
-    Tích hợp Smart Routing thật sự từ services/arduino
-    """
-    from flask import request
-    import time, random
-    from services.arduino import get_user_assigned_device, FLASH_QUEUE_DEPTH, USB_DEVICE_STATUS
-    from utils.metrics import ACTIVE_CONTAINERS
-
-    data = request.json or {}
-    board_type = data.get('board_type', 'ESP32')
-    
-    # 1. Gọi Smart Routing thực tế (Giả lập username để lấy quyền thiết bị)
-    assigned = get_user_assigned_device("ha quang chuong", reserve=True)
-    if not assigned:
-        return {"success": False, "error": "No available hardware ports"}, 503
-    
-    port = assigned['port']
-    
-    try:
-        # 2. Cập nhật Metrics rực rỡ lên Grafana
-        ACTIVE_CONTAINERS.inc()
-        USB_DEVICE_STATUS.labels(port=port).set(2) # In Use
-        # Lưu ý: FLASH_QUEUE_DEPTH đã được tăng bên trong get_user_assigned_device(reserve=True)
-        
-        # 3. Giả lập thời gian nạp code vật lý thực tế
-        delay = random.uniform(3.8, 4.3)
-        time.sleep(delay)
-        
-        return {"success": True, "port": port, "delay": delay}
-    finally:
-        # 4. Giải phóng hàng đợi và trả trạng thái về Available
-        from services.arduino import queue_counts
-        queue_counts[port] = max(0, queue_counts[port] - 1)
-        FLASH_QUEUE_DEPTH.labels(port=port).set(queue_counts[port])
-        
-        if queue_counts[port] == 0:
-            USB_DEVICE_STATUS.labels(port=port).set(1) # Available
-        
-        ACTIVE_CONTAINERS.dec()
 
 # ================== CÁC TRÌNH XỬ LÝ LỖI - by Chương ==================
 @app.errorhandler(404)
@@ -155,22 +104,10 @@ def internal_error(e):
     return "Lỗi máy chủ nội bộ (500)", 500
 
 # ================== DỌN DẸP KHI THOÁT - by Chương ==================
-background_services = None
-
 def cleanup_on_exit(signum=None, frame=None):
     """Xử lý dọn dẹp để tắt ứng dụng một cách an toàn"""
     logger.info("🛑 Đang tắt ứng dụng...")
-
-    # Dừng các dịch vụ chạy nền (Logic này hiện đã được vô hiệu hóa)
-    # if 'background_services' in globals() and background_services:
-    #     stop_background_services()
-
     logger.info("✅ Đã tắt ứng dụng hoàn tất")
-
-
-# Đăng ký các trình xử lý tín hiệu để tắt ứng dụng an toàn
-# signal.signal(signal.SIGINT, cleanup_on_exit) # Đã gỡ bỏ vì import signal không còn dùng
-# signal.signal(signal.SIGTERM, cleanup_on_exit) # Đã gỡ bỏ vì import signal không còn dùng
 
 # ================== KHỞI CHẠY CHÍNH - by Chương ==================
 
@@ -188,8 +125,7 @@ def main():
         from services.docker_manager import start_container_gc
         start_container_gc()
         # Vô hiệu hóa tính năng theo dõi USB vì đã chuyển sang kiến trúc Virtual AI
-        logger.info("🔧 Các dịch vụ chạy nền theo dõi USB đã được vô hiệu hóa.")
-        background_services = None
+        logger.info("Các dịch vụ chạy nền theo dõi USB đã được vô hiệu hóa.")
         
         logger.info("✅ Khởi tạo ứng dụng thành công")
         logger.info("🌐 Server đang chạy tại địa chỉ http://[::]:5000")

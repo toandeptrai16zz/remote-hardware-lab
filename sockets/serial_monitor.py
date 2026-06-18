@@ -1,7 +1,4 @@
-"""
-Serial monitor and upload status Socket.IO handlers
-OPTIMIZED: Batching data to prevent Browser Freeze (Web đơ)
-"""
+
 import serial
 import logging
 import time
@@ -147,7 +144,7 @@ def register_serial_handlers(socketio):
                 try:
                     payload = data.get('data', '')
                     if payload:
-                        # Thêm ký tự xuống dòng nếu cần (tùy chọn)
+                        
                         ser.write(payload.encode('utf-8'))
                 except Exception as e:
                     emit('serial_error', {'error': str(e)})

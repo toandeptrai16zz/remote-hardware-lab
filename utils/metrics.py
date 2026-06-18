@@ -75,7 +75,7 @@ def init_metrics(app):
     
     # Initialize gauges for default ports to avoid "No Data" in Grafana.
     # Default to Offline; admin scan or serial/upload flows will promote real ports.
-    # by Chương
+   
     for port in DEFAULT_USB_PORTS:
         FLASH_QUEUE_DEPTH.labels(port=port).set(0)
         USB_DEVICE_STATUS.labels(port=port).set(0)

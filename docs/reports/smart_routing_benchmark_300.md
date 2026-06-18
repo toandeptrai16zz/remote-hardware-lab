@@ -4,7 +4,7 @@ Nguon so lieu: benchmark mo phong theo dung thuat toan Smart Routing hien co tro
 
 - `get_user_assigned_device(username, reserve=True)` chon cong co `queue_counts` nho nhat.
 - Neu nhieu cong cung nho nhat, he thong random trong nhom ung vien de chia deu tai.
-- Endpoint benchmark `/api/flash` trong `app.py` gia lap thoi gian nap 3.8-4.3 giay/request va giai phong queue sau khi xong.
+- Endpoint benchmark `/api/flash` trong `routes/flash.py` gia lap thoi gian nap 3.8-4.3 giay/request va giai phong queue sau khi xong.
 - Benchmark nay khong cham Docker, DB that, AI API that hoac board that; seed mo phong: `19`.
 
 ## Bang so lieu dua vao slide

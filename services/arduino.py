@@ -27,7 +27,7 @@ queue_counts = defaultdict(int)
 @contextmanager
 def get_hardware_lock(port_address):
     """
-    Cơ chế File Lock (Bản tay sắt): Khóa ở cấp độ Hệ điều hành.
+    Cơ chế File Lock : Khóa ở cấp độ Hệ điều hành.
     Giúp đồng bộ hóa nạp code xuyên suốt các Process (gunicorn workers) và Containers.
     Sử dụng vòng lặp Non-blocking để không làm treo eventlet event loop.
     """
@@ -307,17 +307,28 @@ def get_serial_ports(username):
 
 _routing_lock = None
 
+def _get_routing_lock():
+    """Return the shared routing lock used for queue reservation/release."""
+    global _routing_lock
+    if _routing_lock is None:
+        _routing_lock = threading.Lock()
+    return _routing_lock
+
+def release_reserved_device(port):
+    """Release a previously reserved flash slot for a hardware port."""
+    with _get_routing_lock():
+        queue_counts[port] = max(0, queue_counts[port] - 1)
+        FLASH_QUEUE_DEPTH.labels(port=port).set(queue_counts[port])
+        if queue_counts[port] == 0:
+            mark_usb_available(port)
+        return queue_counts[port]
+
 def get_user_assigned_device(username, reserve=False):
     """
     [HARDWARE LOAD BALANCING & POOLING]
     Áp dụng thuật toán Load Balancing với Race Condition Protection (Reserve).
     """
-    import threading
-    global _routing_lock
-    if _routing_lock is None:
-        _routing_lock = threading.Lock()
-        
-    with _routing_lock:
+    with _get_routing_lock():
         try:
             db = get_db_connection()
             if not db: return None
